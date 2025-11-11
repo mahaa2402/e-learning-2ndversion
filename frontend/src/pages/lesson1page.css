@@ -1,0 +1,166 @@
+.course-page {
+  background-color: #1e1e1e;
+  color: #1a202c;
+  font-family: "Segoe UI", sans-serif;
+  padding: 0;
+  margin: 0;
+}
+
+.course-header {
+  background-color: #f59e0b;
+  color: white;
+  padding: 20px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.course-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.course-header-text h1 {
+  font-size: 24px;
+  font-weight: bold;
+  margin: 0;
+}
+
+.course-header-text p {
+  margin: 5px 0 0;
+  font-size: 14px;
+}
+
+.course-duration {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.highlight {
+  color: #1a202c;
+}
+
+.course-main {
+  display: flex;
+  gap: 40px;
+  padding: 40px;
+  background-color: #f9fafb;
+}
+
+.course-left {
+  flex: 2;
+}
+
+.video-preview {
+  background-color: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.video-preview img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.progress-text {
+  padding: 10px;
+  font-size: 14px;
+  background-color: #f3f4f6;
+  text-align: center;
+}
+
+.course-content h2 {
+  font-size: 20px;
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+
+.course-content p {
+  font-size: 14px;
+  color: #4a5568;
+  line-height: 1.6;
+}
+
+.instructor-card {
+  display: flex;
+  gap: 15px;
+  background-color: white;
+  border-left: 5px solid #f59e0b;
+  padding: 15px;
+  margin-top: 30px;
+  border-radius: 8px;
+}
+
+.instructor-card .avatar {
+  background-color: #fcd34d;
+  padding: 10px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.instructor-card h4 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.instructor-card p {
+  font-size: 13px;
+  color: #4a5568;
+  margin: 5px 0 0;
+}
+
+.course-right {
+  flex: 1;
+}
+
+.section {
+  background-color: white;
+  padding: 20px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.section h3 {
+  font-size: 16px;
+  margin-bottom: 15px;
+  color: #1a202c;
+}
+
+.lesson-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.lesson-list li {
+  background-color: #edf2f7;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: #2d3748;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.lesson-list li.active {
+  background-color: #f59e0b;
+  color: white;
+  font-weight: bold;
+}
+
+.lesson-list li:hover {
+  background-color: #e2e8f0;
+}
+
+.duration {
+  font-weight: bold;
+}

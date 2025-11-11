@@ -1,0 +1,361 @@
+/* Enhanced Sidebar Styles with Blue Theme */
+.sidebar {
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 
+    0 10px 25px rgba(0, 0, 0, 0.1),
+    0 4px 6px rgba(0, 0, 0, 0.05) !important;
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+  width: 280px !important; /* Extended width from 256px to 280px */
+}
+
+.sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+/* Header Styling */
+.sidebar-header {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: blur(20px);
+  position: relative;
+}
+
+.sidebar-header h1 {
+  color: #1f2937 !important;
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-shadow: none;
+  letter-spacing: -0.025em;
+}
+
+/* Section Styling */
+.sidebar-section {
+  position: relative;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.95) !important;
+  margin: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.sidebar-section-title {
+  color: #6b7280 !important;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.75rem;
+  text-shadow: none;
+}
+
+/* Sidebar Items */
+.sidebar-item {
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 8px;
+  margin-bottom: 4px;
+  color: #1f2937 !important;
+  font-weight: 500;
+  background: transparent;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  min-height: 40px !important;
+}
+
+.sidebar-item:hover {
+  background: rgba(59, 130, 246, 0.1) !important;
+  color: #1f2937 !important;
+  transform: translateX(4px);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.1),
+    0 2px 4px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.sidebar-item:hover .sidebar-item-icon {
+  color: #1f2937 !important;
+}
+
+.sidebar-item:hover span {
+  color: #1f2937 !important;
+}
+
+/* Override Tailwind classes for active items */
+.sidebar-item[class*="bg-blue-50"],
+.sidebar-item[class*="text-blue-700"],
+.sidebar-item.active {
+  background: rgba(59, 130, 246, 0.2) !important;
+  color: #1f2937 !important;
+  border: 1px solid rgba(59, 130, 246, 0.3) !important;
+  box-shadow: 
+    0 4px 15px rgba(59, 130, 246, 0.2),
+    0 2px 6px rgba(59, 130, 246, 0.1) !important;
+  transform: translateX(6px);
+}
+
+.sidebar-item.active .sidebar-item-icon,
+.sidebar-item[class*="bg-blue-50"] .sidebar-item-icon {
+  color: #1f2937 !important;
+}
+
+.sidebar-item.active span,
+.sidebar-item[class*="bg-blue-50"] span {
+  color: #1f2937 !important;
+  font-weight: 600;
+}
+
+/* Force override for all text colors in sidebar items */
+.sidebar-item span {
+  color: #1f2937 !important;
+}
+
+/* Override gray text colors */
+.sidebar-item[class*="text-gray"] {
+  color: #1f2937 !important;
+}
+
+.sidebar-item[class*="text-gray"]:hover {
+  color: #1f2937 !important;
+}
+
+/* Active Item Styling */
+.sidebar-item.active,
+.sidebar-item[class*="bg-blue-50"] {
+  background: rgba(59, 130, 246, 0.2) !important;
+  color: #1f2937 !important;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  box-shadow: 
+    0 4px 15px rgba(59, 130, 246, 0.2),
+    0 2px 6px rgba(59, 130, 246, 0.1);
+  transform: translateX(6px);
+}
+
+.sidebar-item.active::before,
+.sidebar-item[class*="bg-blue-50"]::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: #3b82f6;
+  border-radius: 0 2px 2px 0;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+/* Active item hover effect */
+.sidebar-item.active:hover,
+.sidebar-item[class*="bg-blue-50"]:hover {
+  background: rgba(59, 130, 246, 0.3) !important;
+  color: #1f2937 !important;
+  transform: translateX(8px);
+  box-shadow: 
+    0 6px 20px rgba(59, 130, 246, 0.25),
+    0 3px 8px rgba(59, 130, 246, 0.15);
+}
+
+.sidebar-item.active:hover .sidebar-item-icon,
+.sidebar-item[class*="bg-blue-50"]:hover .sidebar-item-icon {
+  color: #1f2937 !important;
+  transform: scale(1.15);
+}
+
+.sidebar-item.active:hover span,
+.sidebar-item[class*="bg-blue-50"]:hover span {
+  color: #1f2937 !important;
+  font-weight: 700;
+}
+
+/* Icon Styling */
+.sidebar-item-icon {
+  transition: all 0.3s ease;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+.sidebar-item:hover .sidebar-item-icon {
+  transform: scale(1.1);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  color: #1f2937 !important;
+}
+
+.sidebar-item.active .sidebar-item-icon {
+  transform: scale(1.15);
+  color: #1f2937 !important;
+}
+
+/* Support Section */
+.sidebar-section:last-of-type {
+  border-top: none;
+  background: rgba(255, 255, 255, 0.95) !important;
+  margin: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Admin Profile Section */
+.admin-profile {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+  color: #1f2937 !important;
+}
+
+.admin-profile:hover {
+  background: rgba(255, 255, 255, 1) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.admin-profile p {
+  color: #1f2937 !important;
+  text-shadow: none;
+}
+
+.admin-profile p:last-child {
+  color: #6b7280 !important;
+}
+
+.sidebar .mt-auto {
+  border-top: none !important;
+  background: transparent;
+  margin: 8px;
+}
+
+.sidebar .mt-auto > div {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.sidebar .mt-auto > div:hover {
+  background: rgba(255, 255, 255, 1) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar .mt-auto p {
+  color: #1f2937 !important;
+  text-shadow: none;
+}
+
+.sidebar .mt-auto p:last-child {
+  color: #6b7280 !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100% !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+    height: 100vh;
+  }
+  
+  .sidebar-item {
+    padding: 12px 16px;
+    font-size: 1rem;
+  }
+  
+  .sidebar-header h1 {
+    font-size: 1.5rem;
+  }
+}
+
+/* Scrollbar Styling */
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  transition: background 0.3s ease;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Animation for sidebar items */
+.sidebar-item {
+  animation: slideInLeft 0.3s ease-out;
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Glowing effect for active items */
+.sidebar-item.active {
+  animation: activeGlow 3s ease-in-out infinite alternate;
+}
+
+@keyframes activeGlow {
+  from {
+    box-shadow: 
+      0 4px 15px rgba(59, 130, 246, 0.2),
+      0 2px 6px rgba(59, 130, 246, 0.1);
+  }
+  to {
+    box-shadow: 
+      0 6px 20px rgba(59, 130, 246, 0.25),
+      0 3px 8px rgba(59, 130, 246, 0.15);
+  }
+}
+
+/* Focus states for accessibility */
+.sidebar-item:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+/* Ensure Activities button is always visible */
+.sidebar-item[data-label="Activities"],
+.sidebar-item:has(span:contains("Activities")) {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  min-height: 40px !important;
+  background: transparent !important;
+}
+
+/* Force visibility for all sidebar items */
+.sidebar-section .sidebar-item {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Text selection */
+.sidebar ::selection {
+  background: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}

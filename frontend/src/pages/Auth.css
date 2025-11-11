@@ -1,0 +1,177 @@
+/* Full-page background */
+.auth-page {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  background: linear-gradient(to right, #74ebd5, #acb6e5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Auth container styling */
+.auth-container {
+  max-width: 400px;
+  width: 90%;
+  background-color: #ffffff;
+  padding: 30px 25px;
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  transition: transform 0.3s ease;
+}
+
+.auth-container h2 {
+  margin-bottom: 20px;
+  color: #333;
+  font-size: 2rem; /* Added font size */
+}
+
+.auth-container form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.auth-container input {
+  padding: 12px;
+  font-size: 18px; /* Increased from 16px */
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-sizing: border-box;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.auth-container input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 8px rgba(0, 123, 255, 0.4);
+}
+
+.auth-container button {
+  padding: 12px;
+  font-size: 18px; /* Increased from 16px */
+  color: #fff;
+  background: linear-gradient(to right, #007bff, #0056b3);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s ease, transform 0.2s;
+}
+/* Add this to the bottom of your Auth.css or inside your existing styles */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  gap: 6px; /* 👈 this adds the gap between label and input */
+}
+
+
+.auth-container button:hover {
+  background: linear-gradient(to right, #0056b3, #003e8a);
+  transform: scale(1.02);
+}
+
+.auth-container button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* OTP Section Styles */
+.otp-section {
+  margin-top: 15px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  text-align: left;
+}
+
+.otp-section label {
+  display: block;
+  margin-bottom: 8px;
+  color: #333;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.otp-input {
+  width: 100%;
+  padding: 12px;
+  font-size: 24px;
+  text-align: center;
+  letter-spacing: 8px;
+  border: 2px solid #007bff;
+  border-radius: 6px;
+  font-weight: bold;
+  box-sizing: border-box;
+}
+
+.otp-input:focus {
+  outline: none;
+  border-color: #0056b3;
+  box-shadow: 0 0 8px rgba(0, 123, 255, 0.4);
+}
+
+.otp-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.verify-otp-btn,
+.resend-otp-btn {
+  flex: 1;
+  padding: 10px;
+  font-size: 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.verify-otp-btn {
+  background: linear-gradient(to right, #28a745, #20c997);
+  color: white;
+}
+
+.verify-otp-btn:hover:not(:disabled) {
+  background: linear-gradient(to right, #20c997, #17a2b8);
+}
+
+.resend-otp-btn {
+  background: linear-gradient(to right, #6c757d, #5a6268);
+  color: white;
+}
+
+.resend-otp-btn:hover:not(:disabled) {
+  background: linear-gradient(to right, #5a6268, #495057);
+}
+
+.verify-otp-btn:disabled,
+.resend-otp-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* Error and Success Messages */
+.error-message {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  border: 1px solid #f5c6cb;
+  font-size: 14px;
+}
+
+.success-message {
+  background-color: #d4edda;
+  color: #155724;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  border: 1px solid #c3e6cb;
+  font-size: 14px;
+}

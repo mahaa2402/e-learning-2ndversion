@@ -1,0 +1,1750 @@
+/* ✅ Exclude sidebar from global reset to prevent CSS conflicts */
+.task-assignment-page > *:not(.sidebar),
+.task-assignment-page > *:not(.sidebar)::before,
+.task-assignment-page > *:not(.sidebar)::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.task-assignment-page {
+  /* ✅ Ensure proper flexbox layout for sidebar */
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  
+  --primary-50: #eff6ff;
+  --primary-100: #dbeafe;
+  --primary-200: #bfdbfe;
+  --primary-300: #93c5fd;
+  --primary-400: #60a5fa;
+  --primary-500: #3b82f6;
+  --primary-600: #2563eb;
+  --primary-700: #1d4ed8;
+  --primary-800: #1e40af;
+  --primary-900: #1e3a8a;
+  
+  --success-50: #ecfdf5;
+  --success-100: #d1fae5;
+  --success-200: #a7f3d0;
+  --success-300: #6ee7b7;
+  --success-400: #34d399;
+  --success-500: #10b981;
+  --success-600: #059669;
+  --success-700: #047857;
+  
+  --warning-50: #fffbeb;
+  --warning-100: #fef3c7;
+  --warning-200: #fde68a;
+  --warning-300: #fcd34d;
+  --warning-400: #fbbf24;
+  --warning-500: #f59e0b;
+  --warning-600: #d97706;
+  
+  --danger-50: #fef2f2;
+  --danger-100: #fee2e2;
+  --danger-200: #fecaca;
+  --danger-300: #fca5a5;
+  --danger-400: #f87171;
+  --danger-500: #ef4444;
+  --danger-600: #dc2626;
+  
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-10: 2.5rem;
+  --spacing-12: 3rem;
+  --spacing-16: 4rem;
+  
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.3);
+  --shadow-glow-success: 0 0 20px rgba(16, 185, 129, 0.3);
+  
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+  
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: 400ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  font-family: var(--font-family);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  line-height: 1.5;
+  
+  /* ✅ Ensure main content area is properly styled */
+  .task-assignment-page > div:last-child {
+    flex: 1;
+    overflow: auto;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+  }
+  
+  /* ✅ Ensure the container and main wrapper don't interfere with sidebar */
+  .task-assignment-page .container,
+  .task-assignment-page .main-wrapper {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+  }
+  
+  /* ✅ Ensure sidebar is properly positioned and styled */
+  .task-assignment-page .sidebar {
+    flex-shrink: 0;
+    width: 280px !important;
+    position: relative !important;
+    z-index: 10 !important;
+  }
+  
+  /* ✅ Override any conflicting styles for sidebar elements */
+  .task-assignment-page .sidebar * {
+    box-sizing: border-box;
+  }
+  
+  .task-assignment-page .sidebar .sidebar-header,
+  .task-assignment-page .sidebar .sidebar-section,
+  .task-assignment-page .sidebar .sidebar-item {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* ✅ Ensure sidebar text and colors are not overridden */
+  .task-assignment-page .sidebar h1,
+  .task-assignment-page .sidebar h2,
+  .task-assignment-page .sidebar h3,
+  .task-assignment-page .sidebar p,
+  .task-assignment-page .sidebar span {
+    color: inherit !important;
+    font-family: inherit !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+    line-height: inherit !important;
+  }
+  
+  /* ✅ Ensure sidebar section titles are properly styled */
+  .task-assignment-page .sidebar .sidebar-section-title {
+    color: #6b7280 !important;
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.1em !important;
+    margin-bottom: 0.75rem !important;
+    text-shadow: none !important;
+  }
+  
+  /* ✅ Ensure sidebar admin section is properly styled */
+  .task-assignment-page .sidebar .mt-auto {
+    background: #1f2937 !important;
+    color: white !important;
+    border-radius: 8px !important;
+    padding: 12px !important;
+  }
+  
+  /* ✅ Ensure sidebar background and borders are preserved */
+  .task-assignment-page .sidebar {
+    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 
+      0 10px 25px rgba(0, 0, 0, 0.1),
+      0 4px 6px rgba(0, 0, 0, 0.05) !important;
+  }
+  
+  /* ✅ Ensure sidebar sections maintain their styling */
+  .task-assignment-page .sidebar .sidebar-section {
+    background: rgba(255, 255, 255, 0.95) !important;
+    margin: 8px !important;
+    border-radius: 12px !important;
+    border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  }
+  
+  /* ✅ Ensure sidebar items maintain their styling */
+  .task-assignment-page .sidebar .sidebar-item {
+    color: #1f2937 !important;
+    font-weight: 500 !important;
+    background: transparent !important;
+    border-radius: 8px !important;
+    margin-bottom: 4px !important;
+  }
+  
+  /* ✅ Ensure sidebar header maintains its styling */
+  .task-assignment-page .sidebar .sidebar-header {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
+  }
+  
+  /* ✅ Ensure sidebar hover effects work properly */
+  
+  /* ✅ Ensure active sidebar items are properly styled */
+  .task-assignment-page .sidebar .sidebar-item.active,
+  .task-assignment-page .sidebar .sidebar-item[class*="bg-blue-50"] {
+    background: rgba(59, 130, 246, 0.2) !important;
+    color: #1f2937 !important;
+    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+    box-shadow: 
+      0 4px 15px rgba(59, 130, 246, 0.2),
+      0 2px 6px rgba(59, 130, 246, 0.1) !important;
+    transform: translateX(6px) !important;
+  }
+  color: var(--gray-900);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+.task-assignment-page .heading1 {
+  background: linear-gradient(135deg, #faae38 0%, #F48C06 100%);
+  padding: 20px;
+}
+
+.task-assignment-page::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 40% 60%, rgba(16, 185, 129, 0.05) 0%, transparent 50%);
+  animation: float 20s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.8; }
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-10px); }
+  60% { transform: translateY(-5px); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+  20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 5px var(--primary-500); }
+  50% { box-shadow: 0 0 20px var(--primary-500), 0 0 30px var(--primary-500); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+.task-assignment-page .animate-fade-in { animation: fadeIn 0.6s ease-out; }
+.task-assignment-page .animate-slide-up { animation: slideUp 0.7s ease-out 0.2s both; }
+.task-assignment-page .animate-slide-down { animation: slideDown 0.4s ease-out; }
+.task-assignment-page .animate-slide-in-right { animation: slideInRight 0.4s ease-out; }
+.task-assignment-page .animate-pulse { animation: pulse 2s infinite; }
+.task-assignment-page .animate-bounce { animation: bounce 0.6s ease-in-out; }
+.task-assignment-page .animate-float { animation: float 3s ease-in-out infinite; }
+
+/* Enhanced overall page background */
+/* in assigntask.css */
+.task-assignment-page .container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f0f2ff 0%, #e6f3ff 100%);
+  padding: var(--spacing-6);
+  position: relative;
+  z-index: 1;
+  border-radius: var(--radius-2xl);
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+
+  /* ✅ Removed margin-left to prevent sidebar CSS conflicts */
+}
+
+/* Enhanced header card */
+.task-assignment-page .header-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-2xl);
+  box-shadow: 
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: var(--spacing-8);
+  margin-bottom: var(--spacing-8);
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition-slow);
+}
+
+
+.task-assignment-page .header-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(167, 148, 10, 0.4), transparent);
+  transition: left 0.6s ease;
+}
+
+.task-assignment-page .header-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary-500), var(--success-500), var(--warning-500));
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+  transform: scaleX(0);
+  transition: transform var(--transition-slow);
+}
+
+
+.task-assignment-page .header-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-6);
+  position: relative;
+  z-index: 2;
+}
+
+.task-assignment-page .header-icon-wrapper {
+  padding: var(--spacing-6);
+  color: var(--primary-500);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-bounce);
+  box-shadow: var(--shadow-lg);
+  background: linear-gradient(135deg, var(--primary-100), var(--primary-200));
+  border: 2px solid var(--primary-300);
+  position: relative;
+  cursor: pointer;
+}
+.task-assignment-page .header-icon-wrapper::before {
+  content: '';
+  position: absolute;   /* ✅ instead of fixed */
+  inset: 0;             /* stay inside the circle */
+  background: linear-gradient(45deg, transparent, rgba(187, 176, 18, 0.3), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+  border-radius: 50%;   /* make sure it matches circle */
+  z-index: -1;          /* so the icon is always above */
+}
+
+/* Sidebar Container */
+/* in assigntask.css */
+
+
+.task-assignment-page .header-icon-wrapper::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(45deg, var(--primary-400), var(--success-400), var(--warning-400), var(--primary-400));
+  background-size: 400% 400%;
+  border-radius: 50%;
+  z-index: -1;
+  animation: gradientShift 3s ease infinite;
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+
+.task-assignment-page .header-icon {
+  color: var(--primary-600);
+  z-index: 1;
+  position: relative;
+}
+
+.task-assignment-page .header-title {
+  font-size: var(--font-size-3xl);
+  font-weight: 800;
+  color: var(--primary-700);
+  margin: 0;
+  line-height: 1.2;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: block;
+  visibility: visible;
+  opacity: 1;
+}
+
+.task-assignment-page .header-subtitle {
+  color: var(--gray-700);
+  margin: var(--spacing-1) 0 0 0;
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  line-height: 1.4;
+  display: block;
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Enhanced form card shadows and borders */
+.task-assignment-page .form-card {
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-2xl);
+  box-shadow: 
+    0 10px 25px -5px rgba(0, 0, 0, 0.08),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+  padding: var(--spacing-8);
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition-slow);
+  cursor: pointer;
+  min-height: 600px;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(0);
+}
+
+.task-assignment-page .form-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary-500), var(--success-500), var(--warning-500), var(--primary-500));
+  background-size: 300% 100%;
+  animation: shimmer 4s linear infinite;
+  transform: scaleX(0);
+  transition: transform var(--transition-slow);
+}
+
+.task-assignment-page .form-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.03), transparent);
+  transition: left 0.8s ease;
+}
+
+
+
+/* Enhanced form grid spacing */
+.task-assignment-page .form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+  align-items: start;
+  margin: var(--spacing-8) auto;
+  max-width: 1400px;
+  padding: 0 var(--spacing-8);
+  justify-content: center;
+}
+
+
+.task-assignment-page .form-group {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.task-assignment-page .form-card.full-width {
+  grid-column: 1 / -1;  /* make it span across both columns */
+}
+
+
+.task-assignment-page .form-label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: var(--spacing-2);
+  transition: color var(--transition-base);
+}
+
+.task-assignment-page .form-group:focus-within .form-label { color: var(--primary-600); }
+
+/* Enhanced form inputs with better styling */
+.task-assignment-page .form-input,
+.task-assignment-page .form-textarea,
+.task-assignment-page .form-select {
+  width: 100%;
+  padding: var(--spacing-4);
+  border: 2px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-base);
+  transition: all var(--transition-slow);
+  background: white;
+  font-family: inherit;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.task-assignment-page .form-input::placeholder,
+.task-assignment-page .form-textarea::placeholder {
+  color: var(--gray-400);
+  transition: opacity var(--transition-base);
+}
+
+.task-assignment-page .form-input:focus::placeholder,
+.task-assignment-page .form-textarea:focus::placeholder { opacity: 0.5; }
+
+/* Enhanced form inputs with better focus states */
+.task-assignment-page .form-input:focus,
+.task-assignment-page .form-textarea:focus,
+.task-assignment-page .form-select:focus {
+  outline: none;
+  border-color: var(--primary-500);
+  box-shadow: 
+    0 0 0 3px rgba(59, 130, 246, 0.15),
+    0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, #ffffff, #f8fafc);
+}
+
+
+.task-assignment-page .form-textarea {
+  resize: vertical;
+  min-height: 120px;
+  line-height: 1.6;
+}
+
+.task-assignment-page .form-input:invalid:not(:focus) {
+  animation: shake 0.3s ease-in-out;
+  border-color: var(--danger-500);
+}
+
+/* Enhanced priority wrapper positioning */
+.task-assignment-page .priority-wrapper {
+  position: relative;
+}
+
+.task-assignment-page .priority-indicator {
+  position: absolute;
+  right: 48px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all var(--transition-base);
+}
+
+
+.task-assignment-page .employee-selector { position: relative; }
+
+.task-assignment-page .add-employee-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-4) var(--spacing-6);
+  background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-weight: 600;
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: all var(--transition-bounce);
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  letter-spacing: 0.3px;
+}
+
+.task-assignment-page .add-employee-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.task-assignment-page .add-employee-btn::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(45deg, var(--primary-400), var(--primary-500), var(--primary-600), var(--primary-400));
+  background-size: 400% 400%;
+  border-radius: var(--radius-lg);
+  z-index: -1;
+  animation: gradientShift 3s ease infinite;
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+.task-assignment-page .add-employee-btn:active {
+  transform: translateY(-1px) scale(1.02);
+  animation: bounce 0.3s ease;
+}
+
+.task-assignment-page .employee-dropdown {
+  position: absolute;
+  top: calc(100% + var(--spacing-2));
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-2xl), var(--shadow-glow);
+  z-index: 50;
+  max-height: 300px;
+  overflow: hidden;
+  animation: slideDown 0.3s ease;
+  transform-origin: top center;
+}
+
+
+.task-assignment-page .employee-dropdown-content {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.task-assignment-page .employee-item {
+  padding: var(--spacing-4);
+  cursor: pointer;
+  border-bottom: 1px solid var(--gray-100);
+  transition: all var(--transition-base);
+  position: relative;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.task-assignment-page .employee-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(to bottom, var(--primary-500), var(--success-500));
+  transform: scaleY(0);
+  transition: transform var(--transition-base);
+  border-radius: 0 2px 2px 0;
+}
+
+.task-assignment-page .employee-item::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent, rgba(59, 130, 246, 0.02), transparent);
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+.task-assignment-page .employee-item:last-child { border-bottom: none; }
+
+.task-assignment-page .employee-name {
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-bottom: var(--spacing-1);
+}
+
+.task-assignment-page .employee-department {
+  font-size: var(--font-size-sm);
+  color: var(--gray-500);
+}
+
+.task-assignment-page .selected-employees {
+  margin-top: var(--spacing-4);
+  padding: var(--spacing-4);
+  background: linear-gradient(135deg, var(--gray-50), var(--primary-50));
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--gray-200);
+  transition: all var(--transition-base);
+}
+
+
+.task-assignment-page .selected-title {
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-bottom: var(--spacing-3);
+  font-size: var(--font-size-sm);
+}
+
+.task-assignment-page .employee-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+}
+
+.task-assignment-page .employee-tag {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  background: linear-gradient(135deg, var(--primary-100), var(--primary-200));
+  color: var(--primary-800);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  animation: slideInRight 0.3s ease;
+  transition: all var(--transition-base);
+  border: 1px solid var(--primary-200);
+}
+
+
+.task-assignment-page .employee-tag-name { color: var(--primary-800); }
+
+.task-assignment-page .employee-tag-remove {
+  background: none;
+  border: none;
+  color: var(--primary-600);
+  cursor: pointer;
+  padding: var(--spacing-1);
+  border-radius: 50%;
+  transition: all var(--transition-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+
+.task-assignment-page .submit-section {
+  margin-top: var(--spacing-8);
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Enhanced submit button with gradient */
+.task-assignment-page .submit-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  background: linear-gradient(135deg, var(--success-500), var(--success-600));
+  border: none;
+  border-radius: var(--radius-lg);
+  color: white;
+  font-weight: 600;
+  font-size: var(--font-size-lg);
+  padding: var(--spacing-4) var(--spacing-8);
+  cursor: pointer;
+  transition: all var(--transition-bounce);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+  min-width: 180px;
+  justify-content: center;
+  letter-spacing: 0.5px;
+}
+
+.task-assignment-page .submit-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.6s ease;
+}
+
+
+.task-assignment-page .submit-btn:active {
+  transform: translateY(-2px) scale(1.02);
+}
+
+.task-assignment-page .submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+
+.task-assignment-page .preview-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--primary-200);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-xl);
+  padding: var(--spacing-8);
+  margin-top: var(--spacing-6);
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition-slow);
+  cursor: pointer;
+}
+
+.task-assignment-page .preview-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary-500), var(--success-500), var(--warning-500), var(--primary-500));
+  background-size: 300% 100%;
+  animation: shimmer 4s linear infinite;
+}
+
+.task-assignment-page .preview-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.03), transparent);
+  transition: left 0.8s ease;
+}
+
+
+/* Enhanced preview section */
+.task-assignment-page .preview-title {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--gray-800);
+  margin-bottom: var(--spacing-6);
+  position: relative;
+  padding-bottom: var(--spacing-3);
+}
+
+.task-assignment-page .preview-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary-500), var(--success-500));
+  border-radius: var(--radius-full);
+}
+
+.task-assignment-page .preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--spacing-4);
+}
+
+.task-assignment-page .preview-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.task-assignment-page .preview-item {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-3) var(--spacing-4);
+  transition: all var(--transition-base);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-2);
+  position: relative;
+  background: var(--gray-50);
+  border-left: 3px solid transparent;
+}
+
+.task-assignment-page .preview-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 0;
+  background: var(--primary-500);
+  transition: height var(--transition-base);
+}
+
+
+.task-assignment-page .preview-label {
+  font-weight: 600;
+  color: var(--gray-700);
+  min-width: 140px;
+  font-size: var(--font-size-sm);
+}
+
+.task-assignment-page .preview-value {
+  color: var(--gray-600);
+  margin-left: var(--spacing-2);
+  font-size: var(--font-size-sm);
+}
+
+.task-assignment-page .priority-badge {
+  padding: var(--spacing-1) var(--spacing-3);
+  border-radius: var(--radius-full);
+  color: white;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  margin-left: var(--spacing-2);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all var(--transition-base);
+}
+
+
+.task-assignment-page .employee-dropdown-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.task-assignment-page .employee-dropdown-content::-webkit-scrollbar-track {
+  background: var(--gray-100);
+  border-radius: var(--radius-sm);
+}
+
+.task-assignment-page .employee-dropdown-content::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-base);
+}
+
+
+@media (max-width: 1024px) {
+  .task-assignment-page .main-wrapper { max-width: 100%; }
+.task-assignment-page .form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);  /* 3 equal columns */
+  gap: 2rem; /* increased space between cards */
+  align-items: start;
+  margin: var(--spacing-8) auto; /* center horizontally with top/bottom margin */
+  max-width: 1400px; /* control max width */
+  padding: 0 var(--spacing-8); /* add padding on left/right sides */
+  justify-content: center; /* center the grid */
+}
+}
+
+@media (max-width: 768px) {
+  .task-assignment-page .container { padding: var(--spacing-4); }
+  .task-assignment-page .header-card,
+  .task-assignment-page .form-card,
+  .task-assignment-page .preview-card { padding: var(--spacing-6); }
+  .task-assignment-page .header-content {
+    flex-direction: column;
+    text-align: center;
+    gap: var(--spacing-4);
+  }
+  .task-assignment-page .header-title { font-size: var(--font-size-2xl); }
+  .task-assignment-page .employee-tags { justify-content: center; }
+  .task-assignment-page .submit-section { justify-content: center; }
+  .task-assignment-page .preview-grid { grid-template-columns: 1fr; }
+  .task-assignment-page .form-grid { 
+    grid-template-columns: 1fr;
+    gap: var(--spacing-4);
+  }
+}
+
+@media (max-width: 480px) {
+  .task-assignment-page .header-card,
+  .task-assignment-page .form-card,
+  .task-assignment-page .preview-card { padding: var(--spacing-4); }
+  .task-assignment-page .header-title { font-size: var(--font-size-xl); }
+  .task-assignment-page .submit-btn { width: 100%; padding: var(--spacing-4); }
+  .task-assignment-page .employee-dropdown { max-height: 250px; }
+  .task-assignment-page .form-grid { gap: var(--spacing-4); }
+  .task-assignment-page .form-card { min-height: auto; }
+}
+
+.task-assignment-page .loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.task-assignment-page .loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-assignment-page *,
+  .task-assignment-page *::before,
+  .task-assignment-page *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.task-assignment-page .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.task-assignment-page *:focus-visible {
+  outline: 2px solid var(--primary-500);
+  outline-offset: 2px;
+}
+
+.task-assignment-page button:focus-visible,
+.task-assignment-page .form-input:focus-visible,
+.task-assignment-page .form-textarea:focus-visible,
+.task-assignment-page .form-select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2), var(--shadow-lg);
+}
+
+.task-assignment-page .error-message {
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  border: 1px solid #fecaca;
+  color: var(--danger-500);
+  padding: var(--spacing-4);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  margin-top: var(--spacing-4);
+  position: relative;
+  overflow: hidden;
+  animation: slideDown 0.3s ease;
+}
+
+.task-assignment-page .error-message::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--danger-500);
+}
+
+.task-assignment-page .success-message {
+  background: linear-gradient(135deg, var(--success-50), #d1fae5);
+  border: 1px solid #a7f3d0;
+  color: var(--success-600);
+  padding: var(--spacing-4);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  margin-top: var(--spacing-4);
+  position: relative;
+  overflow: hidden;
+  animation: slideDown 0.3s ease;
+}
+
+.task-assignment-page .success-message::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--success-500);
+}
+
+.task-assignment-page .interactive-card {
+  transition: all var(--transition-slow);
+  cursor: pointer;
+}
+
+
+.task-assignment-page .interactive-card:active {
+  transform: translateY(0) scale(1);
+  transition: all 0.1s ease;
+}
+
+.task-assignment-page .ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.task-assignment-page .ripple::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: all 0.6s ease;
+}
+
+.task-assignment-page .ripple:active::after {
+  width: 200px;
+  height: 200px;
+}
+
+.task-assignment-page .custom-checkbox {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--gray-300);
+  border-radius: var(--radius-sm);
+  position: relative;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.task-assignment-page .custom-checkbox:checked {
+  background: var(--primary-500);
+  border-color: var(--primary-500);
+}
+
+.task-assignment-page .custom-checkbox:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+
+.task-assignment-page .custom-checkbox:focus-visible {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.task-assignment-page .tooltip {
+  position: relative;
+  cursor: help;
+}
+
+.task-assignment-page .tooltip::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--gray-800);
+  color: white;
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-base);
+  z-index: 1000;
+}
+
+.task-assignment-page .tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--gray-800);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-base);
+  z-index: 1000;
+}
+
+
+.task-assignment-page .progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--gray-200);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  position: relative;
+}
+
+.task-assignment-page .progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-500), var(--primary-600));
+  border-radius: var(--radius-full);
+  transition: width var(--transition-slow);
+  position: relative;
+}
+
+.task-assignment-page .progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+.task-assignment-page .spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--gray-200);
+  border-top-color: var(--primary-500);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.task-assignment-page .glass-card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.task-assignment-page .glass-button {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  transition: all var(--transition-base);
+}
+
+
+@media (prefers-color-scheme: dark) {
+  .task-assignment-page {
+    --gray-50: #111827;
+    --gray-100: #1f2937;
+    --gray-200: #374151;
+    --gray-300: #4b5563;
+    --gray-400: #6b7280;
+    --gray-500: #9ca3af;
+    --gray-600: #d1d5db;
+    --gray-700: #e5e7eb;
+    --gray-800: #f3f4f6;
+    --gray-900: #f9fafb;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    color: var(--gray-900);
+  }
+  
+  .task-assignment-page .container { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
+  
+  .task-assignment-page .header-card,
+  .task-assignment-page .form-card,
+  .task-assignment-page .preview-card {
+    background: rgba(30, 41, 59, 0.8);
+    border-color: rgba(71, 85, 105, 0.3);
+  }
+  
+  .task-assignment-page .form-input,
+  .task-assignment-page .form-textarea,
+  .task-assignment-page .form-select {
+    background: rgba(30, 41, 59, 0.5);
+    color: var(--gray-900);
+    border-color: rgba(71, 85, 105, 0.3);
+  }
+  
+  .task-assignment-page .employee-dropdown {
+    background: rgba(30, 41, 59, 0.9);
+    border-color: rgba(71, 85, 105, 0.3);
+  }
+}
+
+@media (prefers-contrast: high) {
+  .task-assignment-page {
+    --primary-500: #0000ff;
+    --success-500: #008000;
+    --danger-500: #ff0000;
+    --gray-900: #000000;
+    --gray-50: #ffffff;
+  }
+  
+  .task-assignment-page .form-input,
+  .task-assignment-page .form-textarea,
+  .task-assignment-page .form-select { border-width: 3px; }
+  
+  .task-assignment-page button { border: 2px solid currentColor; }
+}
+
+@media print {
+  .task-assignment-page .container { background: white !important; box-shadow: none !important; }
+  
+  .task-assignment-page .header-card,
+  .task-assignment-page .form-card,
+  .task-assignment-page .preview-card {
+    background: white !important;
+    box-shadow: none !important;
+    border: 1px solid #000 !important;
+  }
+  
+  .task-assignment-page .submit-btn,
+  .task-assignment-page .add-employee-btn { display: none !important; }
+  
+  .task-assignment-page .employee-dropdown { display: none !important; }
+}
+
+.task-assignment-page .text-center { text-align: center; }
+.task-assignment-page .text-left { text-align: left; }
+.task-assignment-page .text-right { text-align: right; }
+
+.task-assignment-page .font-thin { font-weight: 100; }
+.task-assignment-page .font-light { font-weight: 300; }
+.task-assignment-page .font-normal { font-weight: 400; }
+.task-assignment-page .font-medium { font-weight: 500; }
+.task-assignment-page .font-semibold { font-weight: 600; }
+.task-assignment-page .font-bold { font-weight: 700; }
+.task-assignment-page .font-extrabold { font-weight: 800; }
+.task-assignment-page .font-black { font-weight: 900; }
+
+.task-assignment-page .rounded-none { border-radius: 0; }
+.task-assignment-page .rounded-sm { border-radius: var(--radius-sm); }
+.task-assignment-page .rounded { border-radius: var(--radius-md); }
+.task-assignment-page .rounded-md { border-radius: var(--radius-md); }
+.task-assignment-page .rounded-lg { border-radius: var(--radius-lg); }
+.task-assignment-page .rounded-xl { border-radius: var(--radius-xl); }
+.task-assignment-page .rounded-2xl { border-radius: var(--radius-2xl); }
+.task-assignment-page .rounded-full { border-radius: var(--radius-full); }
+
+.task-assignment-page .shadow-none { box-shadow: none; }
+.task-assignment-page .shadow-sm { box-shadow: var(--shadow-sm); }
+.task-assignment-page .shadow { box-shadow: var(--shadow-md); }
+.task-assignment-page .shadow-md { box-shadow: var(--shadow-md); }
+.task-assignment-page .shadow-lg { box-shadow: var(--shadow-lg); }
+.task-assignment-page .shadow-xl { box-shadow: var(--shadow-xl); }
+.task-assignment-page .shadow-2xl { box-shadow: var(--shadow-2xl); }
+.task-assignment-page .shadow-glow { box-shadow: var(--shadow-glow); }
+.task-assignment-page .shadow-glow-success { box-shadow: var(--shadow-glow-success); }
+
+.task-assignment-page .transition-none { transition: none; }
+.task-assignment-page .transition-all { transition: all var(--transition-base); }
+.task-assignment-page .transition-fast { transition: all var(--transition-fast); }
+.task-assignment-page .transition-slow { transition: all var(--transition-slow); }
+.task-assignment-page .transition-bounce { transition: all var(--transition-bounce); }
+
+.task-assignment-page .opacity-0 { opacity: 0; }
+.task-assignment-page .opacity-25 { opacity: 0.25; }
+.task-assignment-page .opacity-50 { opacity: 0.5; }
+.task-assignment-page .opacity-75 { opacity: 0.75; }
+.task-assignment-page .opacity-100 { opacity: 1; }
+
+.task-assignment-page .scale-90 { transform: scale(0.9); }
+.task-assignment-page .scale-95 { transform: scale(0.95); }
+.task-assignment-page .scale-100 { transform: scale(1); }
+.task-assignment-page .scale-105 { transform: scale(1.05); }
+.task-assignment-page .scale-110 { transform: scale(1.1); }
+
+.task-assignment-page .rotate-0 { transform: rotate(0deg); }
+.task-assignment-page .rotate-90 { transform: rotate(90deg); }
+.task-assignment-page .rotate-180 { transform: rotate(180deg); }
+.task-assignment-page .rotate-270 { transform: rotate(270deg); }
+
+
+.task-assignment-page .focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.task-assignment-page .focus-ring-success:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.task-assignment-page .employee-list {
+  margin-top: var(--spacing-4);
+}
+
+.task-assignment-page .employee-list .space-y-2 > * + * {
+  margin-top: var(--spacing-2);
+}
+
+.task-assignment-page .employee-list .max-h-96 {
+  max-height: 24rem;
+}
+
+.task-assignment-page .employee-list .overflow-y-auto {
+  overflow-y: auto;
+}
+
+.task-assignment-page .employee-list .p-3 {
+  padding: var(--spacing-3);
+}
+
+.task-assignment-page .employee-list .rounded-lg {
+  border-radius: var(--radius-lg);
+}
+
+.task-assignment-page .employee-list .border {
+  border: 1px solid;
+}
+
+.task-assignment-page .employee-list .transition-all {
+  transition: all var(--transition-base);
+}
+
+.task-assignment-page .employee-list .cursor-pointer {
+  cursor: pointer;
+}
+
+.task-assignment-page .employee-list .bg-blue-50 {
+  background-color: var(--primary-50);
+}
+
+.task-assignment-page .employee-list .border-blue-200 {
+  border-color: var(--primary-200);
+}
+
+.task-assignment-page .employee-list .bg-white {
+  background-color: white;
+}
+
+.task-assignment-page .employee-list .border-gray-200 {
+  border-color: var(--gray-200);
+}
+
+
+.task-assignment-page .employee-list .font-medium {
+  font-weight: 500;
+}
+
+.task-assignment-page .employee-list .text-sm {
+  font-size: var(--font-size-sm);
+}
+
+.task-assignment-page .employee-list .text-xs {
+  font-size: var(--font-size-xs);
+}
+
+.task-assignment-page .employee-list .text-gray-500 {
+  color: var(--gray-500);
+}
+
+.task-assignment-page .employee-list .text-gray-400 {
+  color: var(--gray-400);
+}
+
+.task-assignment-page .employee-list .mt-4 {
+  margin-top: var(--spacing-4);
+}
+
+/* Enhanced employee list styling */
+.task-assignment-page .employee-list .employee-item {
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-3);
+  margin-bottom: var(--spacing-2);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+
+.task-assignment-page .employee-list .employee-item.bg-blue-50 {
+  background: linear-gradient(135deg, var(--primary-50), var(--primary-100));
+  border-color: var(--primary-300);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+
+.task-assignment-page .employee-list .employee-item.bg-white {
+  background: white;
+  border-color: var(--gray-200);
+}
+
+
+.task-assignment-page .employee-list .employee-name {
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-bottom: var(--spacing-1);
+  font-size: var(--font-size-sm);
+}
+
+.task-assignment-page .employee-list .employee-department {
+  font-size: var(--font-size-sm);
+  color: var(--gray-600);
+  margin-bottom: var(--spacing-1);
+}
+
+.task-assignment-page .employee-list .employee-email {
+  font-size: var(--font-size-xs);
+  color: var(--gray-500);
+  font-family: monospace;
+}
+
+.task-assignment-page .employee-list .overflow-y-auto::-webkit-scrollbar {
+  width: 6px;
+}
+
+.task-assignment-page .employee-list .overflow-y-auto::-webkit-scrollbar-track {
+  background: var(--gray-100);
+  border-radius: var(--radius-sm);
+}
+
+.task-assignment-page .employee-list .overflow-y-auto::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-base);
+}
+
+
+.task-assignment-page .employee-list .overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: var(--gray-300) var(--gray-100);
+}
+
+/* Enhanced card headers with icons */
+.task-assignment-page .form-card h3,
+.task-assignment-page .form-card h2 {
+  position: relative;
+  margin-bottom: var(--spacing-6);
+  padding-bottom: var(--spacing-3);
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--gray-800);
+}
+
+.task-assignment-page .form-card h3::after,
+.task-assignment-page .form-card h2::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 40px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary-500), var(--success-500));
+  border-radius: var(--radius-full);
+  transition: width var(--transition-base);
+}
+
+
+/* Enhanced form labels */
+.task-assignment-page .form-label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: var(--spacing-3);
+  transition: color var(--transition-base);
+  position: relative;
+}
+
+.task-assignment-page .form-label::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 0;
+  background: var(--primary-500);
+  border-radius: var(--radius-full);
+  transition: height var(--transition-base);
+}
+
+.task-assignment-page .form-group:focus-within .form-label::before {
+  height: 16px;
+}
+
+.task-assignment-page .form-group:focus-within .form-label {
+  color: var(--primary-600);
+}
+
+/* Enhanced spacing between form groups */
+.task-assignment-page .form-card .space-y-8 > * + * {
+  margin-top: var(--spacing-6);
+}
+
+/* Enhanced employee search bar */
+.task-assignment-page .employee-selector {
+  position: relative;
+  margin-bottom: var(--spacing-6);
+}
+
+.task-assignment-page .employee-selector .form-input {
+  padding-left: 3rem;
+  background: white;
+  border: 2px solid var(--gray-200);
+  transition: all var(--transition-base);
+}
+
+.task-assignment-page .employee-selector .form-input:focus {
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  transform: translateY(-1px);
+}
+
+
+/* Enhanced employee list container */
+.task-assignment-page .employee-list {
+  margin-top: var(--spacing-4);
+  background: var(--gray-50);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-4);
+  border: 1px solid var(--gray-200);
+}
+
+/* Enhanced selected employees section */
+.task-assignment-page .selected-employees {
+  margin-top: var(--spacing-6);
+  padding: var(--spacing-4);
+  background: linear-gradient(135deg, var(--success-50), var(--primary-50));
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--success-200);
+  transition: all var(--transition-base);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
+}
+
+
+.task-assignment-page .selected-title {
+  font-weight: 600;
+  color: var(--success-700);
+  margin-bottom: var(--spacing-3);
+  font-size: var(--font-size-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.task-assignment-page .selected-title::before {
+  content: '✓';
+  background: var(--success-500);
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* Enhanced employee tags */
+.task-assignment-page .employee-tag {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  background: linear-gradient(135deg, var(--success-100), var(--success-200));
+  color: var(--success-800);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  animation: slideInRight 0.3s ease;
+  transition: all var(--transition-base);
+  border: 1px solid var(--success-300);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+
+/* Enhanced preview grid */
+.task-assignment-page .preview-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-4);
+}
+
+.task-assignment-page .preview-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+/* Card entrance animations */
+.task-assignment-page .form-card:nth-child(1) {
+  animation: slideInLeft 0.6s ease-out 0.1s both;
+}
+
+.task-assignment-page .form-card:nth-child(2) {
+  animation: slideInUp 0.6s ease-out 0.2s both;
+}
+
+.task-assignment-page .form-card:nth-child(3) {
+  animation: slideInRight 0.6s ease-out 0.3s both;
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

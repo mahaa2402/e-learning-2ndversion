@@ -1,0 +1,127 @@
+.certificate-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: #fdf6e3;
+  padding: 20px;
+}
+
+.certificate {
+  background: white;
+  padding: 40px;
+  border: 5px solid #333;
+  text-align: center;
+  width: 800px;
+  font-family: 'Georgia', serif;
+  box-shadow: 0 0 15px rgba(0,0,0,0.2);
+}
+
+.certificate-title {
+  font-size: 36px;
+  font-weight: bold;
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+
+.certificate-text {
+  font-size: 18px;
+  color: #34495e;
+  margin: 10px 0;
+}
+
+.employee-name {
+  font-size: 28px;
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+.course-title {
+  font-size: 22px;
+  font-weight: bold;
+  color: #16a085;
+  margin-bottom: 20px;
+}
+
+/* New styles for course completion details */
+.course-details {
+  margin: 20px 0;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #16a085;
+}
+
+.completion-info {
+  font-size: 16px;
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+
+.modules-list {
+  text-align: left;
+  margin-top: 10px;
+}
+
+.modules-list p {
+  font-weight: bold;
+  color: #2c3e50;
+  margin-bottom: 5px;
+}
+
+.modules-list ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.modules-list li {
+  padding: 3px 0;
+  color: #34495e;
+  font-size: 14px;
+}
+
+.modules-list li:before {
+  content: "✓ ";
+  color: #27ae60;
+  font-weight: bold;
+}
+
+.certificate-id {
+  font-size: 14px;
+  color: #7f8c8d;
+  font-style: italic;
+  margin-bottom: 20px;
+}
+
+.date {
+  font-size: 16px;
+  margin-bottom: 30px;
+  color: #555;
+}
+
+.signature-section {
+  margin-top: 40px;
+  text-align: right;
+  margin-right: 60px;
+}
+
+.signature hr {
+  margin-top: 10px;
+  border: 1px solid #444;
+  width: 200px;
+}
+
+.print-button {
+  margin-top: 40px;
+  padding: 10px 20px;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.print-button:hover {
+  background-color: #2980b9;
+}

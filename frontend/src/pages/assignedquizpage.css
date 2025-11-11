@@ -1,0 +1,695 @@
+/* Assigned Quiz Page Styles - Page Specific Classes */
+.aqp-assigned-quiz-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #333;
+}
+
+/* Header */
+.aqp-quiz-header {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  padding: 1rem 2rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.aqp-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  color: #667eea;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.aqp-back-btn:hover {
+  background: rgba(102, 126, 234, 0.1);
+  transform: translateX(-2px);
+}
+
+.aqp-back-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.aqp-quiz-title-section {
+  flex: 1;
+}
+
+.aqp-quiz-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 0.25rem 0;
+}
+
+.aqp-quiz-subtitle {
+  color: #666;
+  font-size: 1rem;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* Main Content */
+.aqp-quiz-content {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  min-height: calc(100vh - 100px);
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Progress Section */
+.aqp-progress-section {
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.aqp-progress-bar {
+  flex: 1;
+  height: 8px;
+  background: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.aqp-progress-fill {
+  height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.aqp-progress-text {
+  font-weight: 600;
+  color: #333;
+  font-size: 1rem;
+  min-width: 60px;
+  text-align: center;
+}
+
+/* Question Container */
+.aqp-question-container {
+  flex: 1;
+}
+
+.aqp-question-card {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.aqp-question-header {
+  margin-bottom: 2rem;
+}
+
+.aqp-question-title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Options Container */
+.aqp-options-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1;
+}
+
+.aqp-option-label {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.aqp-option-label:hover {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.05);
+  transform: translateY(-2px);
+}
+
+.aqp-option-label.aqp-selected {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.aqp-option-input {
+  width: 20px;
+  height: 20px;
+  accent-color: #667eea;
+}
+
+.aqp-option-text {
+  flex: 1;
+  font-size: 1.1rem;
+  color: #333;
+  font-weight: 500;
+}
+
+/* Navigation Section */
+.aqp-navigation-section {
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.aqp-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+}
+
+.aqp-btn-previous {
+  background: #f8f9fa;
+  color: #666;
+  border: 2px solid #e9ecef;
+}
+
+.aqp-btn-previous:hover:not(:disabled) {
+  background: #e9ecef;
+  color: #333;
+}
+
+.aqp-btn-previous:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.aqp-btn-next {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.aqp-btn-next:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+}
+
+.aqp-btn-next:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.aqp-btn-submit {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+}
+
+.aqp-btn-submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(40, 167, 69, 0.3);
+}
+
+.aqp-btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.aqp-nav-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Question Indicators */
+.aqp-question-indicators {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.aqp-indicator {
+  width: 40px;
+  height: 40px;
+  border: 2px solid #e9ecef;
+  background: white;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+}
+
+.aqp-indicator:hover {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.aqp-indicator.aqp-answered {
+  background: #28a745;
+  color: white;
+  border-color: #28a745;
+}
+
+.aqp-indicator.aqp-current {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+  transform: scale(1.1);
+}
+
+/* Quiz Results */
+.aqp-quiz-results-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+}
+
+.aqp-results-card {
+  background: white;
+  border-radius: 20px;
+  padding: 3rem;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  max-width: 500px;
+  width: 100%;
+}
+
+.aqp-results-header {
+  margin-bottom: 2rem;
+}
+
+.aqp-results-icon {
+  width: 64px;
+  height: 64px;
+  color: #667eea;
+  margin-bottom: 1rem;
+}
+
+.aqp-results-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #333;
+  margin: 0;
+}
+
+.aqp-score-section {
+  margin-bottom: 2rem;
+}
+
+.aqp-score-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+}
+
+.aqp-score-number {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: white;
+}
+
+.aqp-score-label {
+  font-size: 1.1rem;
+  color: #666;
+  margin: 0;
+  font-weight: 500;
+}
+
+.aqp-stats-section {
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.aqp-stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.aqp-stat-label {
+  color: #666;
+  font-weight: 500;
+}
+
+.aqp-stat-value {
+  color: #333;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.aqp-pass-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-radius: 12px;
+  font-weight: 600;
+  margin-bottom: 2rem;
+}
+
+.aqp-pass-status.aqp-passed {
+  background: rgba(40, 167, 69, 0.1);
+  color: #28a745;
+}
+
+.aqp-pass-status.aqp-failed {
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+}
+
+.aqp-status-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.aqp-progress-update {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #667eea;
+  font-weight: 500;
+}
+
+.aqp-action-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.aqp-btn-retry {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.aqp-btn-retry:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+}
+
+.aqp-btn-retry:disabled {
+  background: #6c757d;
+  color: #fff;
+  cursor: not-allowed;
+  transform: none;
+  opacity: 0.6;
+  box-shadow: none;
+}
+
+.aqp-btn-retry:disabled:hover {
+  background: #6c757d;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Certificate Button */
+.aqp-btn-certificate {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+  font-weight: 700;
+  font-size: 1.1rem;
+  padding: 12px 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.aqp-btn-certificate:hover {
+  background: linear-gradient(135deg, #218838 0%, #1ea085 100%);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+}
+
+.aqp-certificate-section {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.aqp-btn-back-to-module {
+  background: #f8f9fa;
+  color: #666;
+  border: 2px solid #e9ecef;
+}
+
+.aqp-btn-back-to-module:hover {
+  background: #e9ecef;
+  color: #333;
+}
+
+/* Loading and Error States */
+.aqp-loading-container,
+.aqp-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  text-align: center;
+  color: white;
+}
+
+.aqp-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top: 4px solid white;
+  border-radius: 50%;
+  animation: aqp-spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes aqp-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.aqp-loading-text,
+.aqp-error-text {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.aqp-error-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 1rem;
+  color: #ff6b6b;
+}
+
+.aqp-btn-back {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 2px solid white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 1rem;
+}
+
+.aqp-btn-back:hover {
+  background: white;
+  color: #667eea;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .aqp-quiz-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem;
+  }
+  
+  .aqp-quiz-title {
+    font-size: 1.5rem;
+  }
+  
+  .aqp-quiz-content {
+    padding: 1rem;
+  }
+  
+  .aqp-question-card {
+    padding: 1.5rem;
+  }
+  
+  .aqp-question-title {
+    font-size: 1.2rem;
+  }
+  
+  .aqp-option-label {
+    padding: 1rem;
+  }
+  
+  .aqp-option-text {
+    font-size: 1rem;
+  }
+  
+  .aqp-navigation-section {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .aqp-question-indicators {
+    order: -1;
+  }
+  
+  .aqp-results-card {
+    padding: 2rem 1.5rem;
+    margin: 1rem;
+  }
+  
+  .aqp-score-circle {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .aqp-score-number {
+    font-size: 2rem;
+  }
+  
+  .aqp-action-buttons {
+    flex-direction: column;
+  }
+}
+
+/* Blocked Quiz State */
+.aqp-blocked-message {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.aqp-blocked-message p {
+  font-size: 1.1rem;
+  color: #666;
+  margin: 0.5rem 0;
+  line-height: 1.6;
+}
+
+.aqp-cooldown-info {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+}
+
+.aqp-cooldown-info h3 {
+  color: #333;
+  margin: 0 0 1rem 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.aqp-cooldown-timer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.aqp-time-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: white;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 2px solid #667eea;
+  min-width: 80px;
+}
+
+.aqp-time-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #667eea;
+  line-height: 1;
+}
+
+.aqp-time-label {
+  font-size: 0.8rem;
+  color: #666;
+  text-transform: uppercase;
+  font-weight: 500;
+  margin-top: 0.25rem;
+}
+
+.aqp-time-separator {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0.5rem;
+}
+
+.aqp-blocked-note {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 8px;
+}
+
+.aqp-blocked-note p {
+  color: #856404;
+  font-size: 0.9rem;
+  margin: 0;
+}
