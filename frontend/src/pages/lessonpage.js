@@ -913,10 +913,13 @@ const renderFormattedContent = (contentArray) => {
                   disabled={!unlocked}
                   onClick={() => unlocked && navigate(`/course/${courseId}/lesson/${id}`)}
                 >
-                  {!unlocked && <span className="lock-icon">🔒</span>}
-                  {completed && <span className="check-icon">✓</span>}
-                  Lesson {id}: {lessons[id].title.split(' ').slice(0, 3).join(' ')}...
-                 
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+                    {!unlocked && <span className="lock-icon">🔒</span>}
+                    {completed && <span className="check-icon">✓</span>}
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      Lesson {id}: {lessons[id].title}
+                    </span>
+                  </span>
                 </button>
               );
             })}
@@ -975,9 +978,13 @@ const renderFormattedContent = (contentArray) => {
                     navigate(`/quiz/${courseId}/${id}`);
                   }}
                 >
-                  {!quizAvailable && <span className="lock-icon">🔒</span>}
-                  {quizCompleted && <span className="check-icon">✓</span>}
-                  Quiz {id}: {lessons[id].title.split(' ').slice(0, 2).join(' ')}...
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+                    {!quizAvailable && <span className="lock-icon">🔒</span>}
+                    {quizCompleted && <span className="check-icon">✓</span>}
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      Quiz {id}: {lessons[id].title}
+                    </span>
+                  </span>
                 </button>
               );
             })}
@@ -1002,18 +1009,18 @@ const renderFormattedContent = (contentArray) => {
                 style={{
                   backgroundColor: '#28a745',
                   color: 'white',
-                  padding: '12px 24px',
-                  fontSize: '16px',
+                  padding: '10px 16px',
+                  fontSize: '14px',
                   fontWeight: 'bold',
                   border: 'none',
-                  borderRadius: '8px',
+                  borderRadius: '6px',
                   cursor: 'pointer',
-                  marginTop: '8px',
+                  marginTop: '6px',
                   width: '100%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '8px',
+                  gap: '6px',
                   transition: 'background-color 0.3s ease'
                 }}
                 onMouseOver={(e) => e.target.style.backgroundColor = '#218838'}

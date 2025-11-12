@@ -13,7 +13,9 @@ import {
   RefreshCw,
   Calendar,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Award,
+  LogOut
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -29,6 +31,7 @@ const UserDashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [adminName, setAdminName] = useState(''); // New state for admin name
   const [adminLoading, setAdminLoading] = useState(true); // Loading state for admin profile
+  const [activeSection, setActiveSection] = useState('tasks'); // Track active section: 'tasks' or 'certificates'
   const navigate = useNavigate();
 
   // Helper to safely extract admin name as string for filtering and rendering
@@ -353,6 +356,13 @@ const fetchAdminProfile = async () => {
   };
 
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('userSession');
+    navigate('/');
+  };
+
   return (
     <div className="dashboard">
       {/* Navbar Component */}
@@ -361,83 +371,53 @@ const fetchAdminProfile = async () => {
       <div className="main-container">
         <div className="layout">
         <aside className="userdash-sidebar">
-  <div className="userdash-sidebar-content">
-    <div className="userdash-profile">
-      <div className="userdash-avatar">
-        <User className="userdash-avatar-icon" />
-      </div>
-                {adminLoading ? (
-                  <div className="loading-admin-name">
-                    <div className="admin-name-skeleton"></div>
-                    <p className="greeting-subtitle">Loading your profile...</p>
-                  </div>
-                ) : (
-                  (() => {
-                    // Helper to extract username from email
-                    const getNameFromEmail = (email) => {
-                      if (!email) return 'Employee';
-                      const atIdx = email.indexOf('@');
-                      return atIdx > 0 ? email.substring(0, atIdx) : email;
-                    };
-                    // If adminName is a valid name, use it. If it's an email, extract username. If missing, fallback.
-                    let displayName = adminName;
-                    if (!displayName || displayName === 'Employee') {
-                      // Try to get from localStorage token (JWT)
-                      try {
-                        const token = localStorage.getItem('token');
-                        if (token) {
-                          const payload = JSON.parse(atob(token.split('.')[1]));
-                          if (payload.email) displayName = getNameFromEmail(payload.email);
-                        }
-                      } catch (e) { /* ignore */ }
-                      if (!displayName || displayName === 'Employee') displayName = 'Employee';
-                    } else if (displayName.includes('@')) {
-                      displayName = getNameFromEmail(displayName);
-                    }
-                    // Dynamic greeting
-                    const hour = new Date().getHours();
-                    let greeting = 'Good Morning';
-                    if (hour >= 12 && hour < 18) greeting = 'Good Afternoon';
-                    else if (hour >= 18 || hour < 4) greeting = 'Good Evening';
-                    return (
-                      <>
-                        <h3 className="greeting">{greeting} {displayName}</h3>
-                        <p className="greeting-subtitle">Continue Your Journey And Achieve Your Target</p>
-                      </>
-                    );
-                  })()
-                )}
-              </div>
-               <div className="userdash-stats">
-      <div className="userdash-stat-item">
-        <span className="userdash-stat-label">Total Courses Completed</span>
-        <span className="userdash-stat-value">
-          {completedTasks.length}
-        </span>
-      </div>
-      <div className="userdash-stat-item">
-        <span className="userdash-stat-label">Certificates</span>
-        <span className="userdash-stat-value">{certificates.length}</span>
-      </div>
-      <div className="userdash-stat-item">
-        <span className="userdash-stat-label">Quizzes Completed</span>
-        <span className="userdash-stat-value">-</span>
-      </div>
-      <div className="userdash-stat-item">
-        <span className="userdash-stat-label">Uncompleted Tasks</span>
-        <span className="userdash-stat-value">
-          {uncompletedTasks.length}
-        </span>
-      </div>
-    </div>
+          {/* Sidebar Header */}
+          <div className="userdash-sidebar-header">
+            <h2 className="userdash-sidebar-title">User Dashboard</h2>
+          </div>
 
-  </div>
-</aside>
+          {/* Sidebar Content */}
+          <div className="userdash-sidebar-content">
+            {/* MAIN Section */}
+            <div className="sidebar-section">
+              <div className="sidebar-section-label">MAIN</div>
+              <div className="sidebar-nav-items">
+                <button 
+                  className={`sidebar-nav-item ${activeSection === 'tasks' ? 'active' : ''}`}
+                  onClick={() => setActiveSection('tasks')}
+                >
+                  <BookOpen className="nav-icon" />
+                  <span>My Tasks</span>
+                </button>
+                <button 
+                  className={`sidebar-nav-item ${activeSection === 'certificates' ? 'active' : ''}`}
+                  onClick={() => setActiveSection('certificates')}
+                >
+                  <Award className="nav-icon" />
+                  <span>Certificates</span>
+                </button>
+              </div>
+            </div>
+
+            {/* SUPPORT Section */}
+            <div className="sidebar-section">
+              <div className="sidebar-section-label">SUPPORT</div>
+              <div className="sidebar-nav-items">
+                <button 
+                  className="sidebar-nav-item"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="nav-icon" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </aside>
 
           <main className="main-content">
-            
-           
             {/* Uncompleted Tasks Section */}
+            {activeSection === 'tasks' && (
             <section className="assigned-courses">
               <div className="section-header">
                 <h2 className="section-title">Your Assigned Tasks</h2>
@@ -558,9 +538,10 @@ const fetchAdminProfile = async () => {
                 </div>
               )}
             </section>
+            )}
 
             {/* Completed Tasks Section */}
-            {completedTasks.length > 0 && (
+            {activeSection === 'tasks' && completedTasks.length > 0 && (
               <section className="assigned-courses completed-tasks">
                 <div className="section-header">
                   <h2 className="section-title">Completed Tasks</h2>
@@ -660,6 +641,85 @@ const fetchAdminProfile = async () => {
                       })}
                     </tbody>
                   </table>
+                </div>
+              </section>
+            )}
+
+            {/* Certificates Section - All Certificates */}
+            {activeSection === 'certificates' && certificates.length > 0 && (
+              <section className="assigned-courses certificates-section">
+                <div className="section-header">
+                  <h2 className="section-title">My Certificates</h2>
+                  <div className="section-header-actions">
+                    <span className="task-count">{certificates.length} certificate(s)</span>
+                  </div>
+                </div>
+
+                <div className="certificates-grid">
+                  {certificates.map((certificate, index) => {
+                    // Check if this certificate is from an assigned course
+                    const isAssignedCourse = completedTasks.some(task => task.taskTitle === certificate.courseTitle);
+                    
+                    return (
+                      <div key={certificate._id || index} className="certificate-card">
+                        <div className="certificate-card-header">
+                          <div className="certificate-badge">
+                            {isAssignedCourse ? 'Assigned Course' : 'Common Course'}
+                          </div>
+                          <div className="certificate-date">
+                            <Calendar className="date-icon-small" />
+                            {certificate.completionDate 
+                              ? new Date(certificate.completionDate).toLocaleDateString()
+                              : certificate.date 
+                                ? new Date(certificate.date).toLocaleDateString()
+                                : 'N/A'}
+                          </div>
+                        </div>
+                        <div className="certificate-card-body">
+                          <h3 className="certificate-course-title">{certificate.courseTitle || 'Untitled Course'}</h3>
+                          <div className="certificate-details-list">
+                            <div className="certificate-detail-item">
+                              <span className="detail-label">Completed Modules:</span>
+                              <span className="detail-value">{certificate.completedModules?.length || 0} / {certificate.totalModules || 0}</span>
+                            </div>
+                            {certificate.certificateId && (
+                              <div className="certificate-detail-item">
+                                <span className="detail-label">Certificate ID:</span>
+                                <span className="detail-value certificate-id-small">{certificate.certificateId}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="certificate-card-footer">
+                          <button 
+                            className="btn btn-view-certificate"
+                            onClick={() => {
+                              localStorage.setItem('selectedCertificate', JSON.stringify(certificate));
+                              localStorage.setItem('courseCompleted', 'true');
+                              localStorage.setItem('completedCourseName', certificate.courseTitle);
+                              localStorage.setItem('lastGeneratedCertificate', JSON.stringify(certificate));
+                              navigate('/certificate');
+                            }}
+                          >
+                            View Certificate
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {activeSection === 'certificates' && certificates.length === 0 && (
+              <section className="assigned-courses certificates-section">
+                <div className="section-header">
+                  <h2 className="section-title">My Certificates</h2>
+                </div>
+                <div className="empty-state">
+                  <BookOpen className="empty-state-icon" />
+                  <p className="empty-state-text">No certificates found.</p>
+                  <p className="empty-state-subtext">Complete courses to earn certificates.</p>
                 </div>
               </section>
             )}

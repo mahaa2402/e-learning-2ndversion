@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Users, BookOpen, Send, X, Search, Check, BarChart, Zap, Activity, HelpCircle, Settings } from 'lucide-react';
+import { Calendar, Clock, Users, BookOpen, Send, X, Search, Check, BarChart, Zap, Activity, HelpCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import './assigntask.css';
 import Sidebar from '../components/Sidebar';  // ✅ import Sidebar component

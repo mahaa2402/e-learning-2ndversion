@@ -14,7 +14,7 @@ const EmployeeCard = ({ employee, onViewDetails }) => {
         </div>
         <div>
           <h3 className="employee-name">{employee.name}</h3>
-          <span className="employee-department-badge">{employee.department}</span>
+        
         </div>
       </div>
 
@@ -24,8 +24,7 @@ const EmployeeCard = ({ employee, onViewDetails }) => {
           <span>{employee.email}</span>
         </div>
         <div className="employee-info-item">
-          <Building className="employee-info-icon" />
-          <span>{employee.department}</span>
+      
         </div>
         <div className="employee-info-item">
           <Calendar className="employee-info-icon" />
@@ -117,7 +116,7 @@ const EmployeeDirectory = () => {
                 _id: cert.employeeId || cert.employeeEmail,
                 name: cert.employeeName || cert.employeeEmail.split('@')[0],
                 email: cert.employeeEmail,
-                department: 'Unknown', // Certificates don't have department info
+               
                 createdAt: cert.createdAt || cert.completionDate,
                 hasCertificates: true,
                 certificateCount: 1
@@ -184,13 +183,8 @@ const EmployeeDirectory = () => {
           {loading && (
             <div className="employee-directory-loading-container">
               <div className="employee-directory-loading-content">
-                <RefreshCw
-                  className="employee-directory-spin"
-                  style={{ width: '24px', height: '24px', color: '#3b82f6' }}
-                />
-                <span className="employee-directory-loading-text">
-                  Loading employees...
-                </span>
+              
+               
               </div>
             </div>
           )}
@@ -241,11 +235,8 @@ const EmployeeDirectory = () => {
                     onClick={fetchEmployees}
                     disabled={loading}
                   >
-                    <RefreshCw
-                      className={loading ? 'employee-directory-spin' : ''}
-                      style={{ width: '16px', height: '16px' }}
-                    />
-                    <span>{loading ? 'Loading...' : 'Refresh'}</span>
+                   
+                  
                   </button>
                 </div>
               </div>
@@ -317,13 +308,7 @@ const EmployeeDirectory = () => {
             </div>
           )}
 
-          {/* Footer */}
-          <div className="employee-directory-footer">
-            <p>Employee Directory System - Using existing authentication</p>
-            <p className="employee-directory-footer-line">
-              Auth token detected: {getAuthToken() ? '✅ Found' : '❌ Not found'}
-            </p>
-          </div>
+        
         </div>
       </div>
     </div>

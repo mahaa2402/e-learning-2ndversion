@@ -690,7 +690,7 @@ const CertificateDetails = () => {
     <div className="certificate-page">
       <div className="page-header">
         <h1>🎓 Certificate Details</h1>
-        <button className="back-button" onClick={() => navigate(-1)}>⬅ Go Back</button>
+        <button className="back-button" onClick={() => navigate(-1)}>← Go Back</button>
       </div>
 
       {/* Certificates Section */}
@@ -704,26 +704,46 @@ const CertificateDetails = () => {
             </div>
             
             <div className="certificate-details">
-              <p><strong>🧑‍💼 Employee Name:</strong> {certificate.employeeName || 'N/A'}</p>
-              <p><strong>📧 Employee Email:</strong> {certificate.employeeEmail || 'N/A'}</p>
-              <p><strong>🆔 Employee ID:</strong> {certificate.employeeId || 'N/A'}</p>
-              <p><strong>📅 Earned On:</strong> {
+              <p><strong>Employee Name:</strong> {certificate.employeeName || 'N/A'}</p>
+              <p><strong>Employee Email:</strong> {certificate.employeeEmail || 'N/A'}</p>
+              <p><strong>Employee ID:</strong> {certificate.employeeId || 'N/A'}</p>
+              <p><strong>Earned On:</strong> {
                 certificate.date && !isNaN(Date.parse(certificate.date)) 
-                  ? new Date(certificate.date).toLocaleDateString() 
+                  ? new Date(certificate.date).toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    }) 
                   : (certificate.createdAt && !isNaN(Date.parse(certificate.createdAt)) 
-                      ? new Date(certificate.createdAt).toLocaleDateString() 
+                      ? new Date(certificate.createdAt).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        }) 
                       : 'N/A')
               }</p>
               
-              {certificate.module && <p><strong>📚 Module:</strong> {certificate.module}</p>}
-              {certificate.awarder && <p><strong>🎖️ Awarded By:</strong> {certificate.awarder}</p>}
-              {certificate.description && <p><strong>📝 Description:</strong> {certificate.description}</p>}
+              {certificate.module && <p><strong>Module:</strong> {certificate.module}</p>}
+              {certificate.awarder && <p><strong>Awarded By:</strong> {certificate.awarder}</p>}
+              {certificate.description && <p><strong>Description:</strong> {certificate.description}</p>}
               
               {certificate.createdAt && !isNaN(Date.parse(certificate.createdAt)) && (
-                <p><strong>🕒 Created:</strong> {new Date(certificate.createdAt).toLocaleString()}</p>
+                <p><strong>Created:</strong> {new Date(certificate.createdAt).toLocaleString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}</p>
               )}
               {certificate.updatedAt && !isNaN(Date.parse(certificate.updatedAt)) && (
-                <p><strong>🔄 Updated:</strong> {new Date(certificate.updatedAt).toLocaleString()}</p>
+                <p><strong>Updated:</strong> {new Date(certificate.updatedAt).toLocaleString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}</p>
               )}
             </div>
           </div>
@@ -731,109 +751,91 @@ const CertificateDetails = () => {
       </div>
 
       {/* User Progress Section */}
-      <div className="progress-container">
-        {/* <h2>📊 Learning Progress</h2> */}
-        
-        {progressLoading ? (
-          <div className="progress-loading">
-            <p>Loading progress data...</p>
-            <div className="spinner"></div>
-          </div>
-        ) : progressList && progressList.length > 0 ? (
-          <div className="progress-grid">
-            {progressList.map((progress, idx) => (
-              <div key={progress.id || progress._id || idx} className="progress-box">
-                <div className="progress-header">
-                  <h3>{progress.courseName || progress.courseTitle || 'Unknown Course'}</h3>
-                  <div className="progress-percentage">
-                    {calculateProgressPercentage(progress)}%
-                  </div>
-                </div>
-                
-                <div className="progress-details">
-                  <p><strong>📚 Last Accessed Module:</strong> {
-                    progress.lastAccessedModule || 
-                    progress.currentModule || 
-                    'None'
-                  }</p>
-                  
-                  {(progress.lastAccessedAt || progress.updatedAt) && (
-                    <p><strong>🕒 Last Activity:</strong> {
-                      new Date(progress.lastAccessedAt || progress.updatedAt).toLocaleDateString()
-                    }</p>
-                  )}
-                  
-                  <div className="modules-section">
-                    <p><strong>✅ Completed Modules ({
-                      Array.isArray(progress.completedModules) 
-                        ? progress.completedModules.length 
-                        : (progress.completedModules || 0)
-                    }):</strong></p>
+      {progressList && progressList.length > 0 && (
+        <div className="progress-container">
+          {progressLoading ? (
+            <div className="progress-loading">
+              <p>Loading progress data...</p>
+              <div className="spinner"></div>
+            </div>
+          ) : (
+            <div className="progress-grid">
+              {progressList.map((progress, idx) => (
+                <div key={progress.id || progress._id || idx} className="progress-box">
+                  <div className="progress-header">
+                    <h3>{progress.courseName || progress.courseTitle || 'Unknown Course'}</h3>
                     
-                    {progress.completedModules && Array.isArray(progress.completedModules) && progress.completedModules.length > 0 ? (
-                      <ul className="completed-modules-list">
-                        {progress.completedModules.map((mod, i) => (
-                          <li key={mod.id || mod._id || i} className="module-item">
-                            <span className="module-id">
-                              {mod.m_id || mod.moduleId || mod.name || mod.title || `Module ${i + 1}`}
-                            </span>
-                            <span className="completion-date">
-                              {mod.completedAt ? new Date(mod.completedAt).toLocaleDateString() : 'N/A'}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="no-modules">No modules completed yet</p>
-                    )}
                   </div>
-
-                  {progress.totalModules && (
-                    <div className="progress-bar-container">
-                      <div className="progress-bar">
-                        <div 
-                          className="progress-fill" 
-                          style={{ width: `${calculateProgressPercentage(progress)}%` }}
-                        ></div>
-                      </div>
-                      <span className="progress-text">
-                        {Array.isArray(progress.completedModules) 
+                  
+                  <div className="progress-details">
+                    <p><strong>Last Accessed Module:</strong> {
+                      progress.lastAccessedModule || 
+                      progress.currentModule || 
+                      'None'
+                    }</p>
+                    
+                    {(progress.lastAccessedAt || progress.updatedAt) && (
+                      <p><strong>Last Activity:</strong> {
+                        new Date(progress.lastAccessedAt || progress.updatedAt).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })
+                      }</p>
+                    )}
+                    
+                    <div className="modules-section">
+                      <p><strong>Completed Modules ({
+                        Array.isArray(progress.completedModules) 
                           ? progress.completedModules.length 
                           : (progress.completedModules || 0)
-                        } of {progress.totalModules} modules completed
-                      </span>
+                      }):</strong></p>
+                      
+                      {progress.completedModules && Array.isArray(progress.completedModules) && progress.completedModules.length > 0 ? (
+                        <ul className="completed-modules-list">
+                          {progress.completedModules.map((mod, i) => (
+                            <li key={mod.id || mod._id || i} className="module-item">
+                              <span className="module-id">
+                                {mod.m_id || mod.moduleId || mod.name || mod.title || `Module ${i + 1}`}
+                              </span>
+                              <span className="completion-date">
+                                {mod.completedAt ? new Date(mod.completedAt).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                }) : 'N/A'}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="no-modules">No modules completed yet</p>
+                      )}
                     </div>
-                  )}
+
+                    {progress.totalModules && (
+                      <div className="progress-bar-container">
+                        <div className="progress-bar">
+                          <div 
+                            className="progress-fill" 
+                            style={{ width: `${calculateProgressPercentage(progress)}%` }}
+                          ></div>
+                        </div>
+                        <span className="progress-text">
+                          {Array.isArray(progress.completedModules) 
+                            ? progress.completedModules.length 
+                            : (progress.completedModules || 0)
+                          } of {progress.totalModules} modules completed
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="no-progress">
-            {/* <p>📈 No learning progress data found for this employee</p> */}
-            {/* <div className="debug-info" style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f5f5f5', borderRadius: '8px', fontSize: '14px' }}> */}
-              {/* <h4>🔧 Debug Information:</h4> */}
-              {/* <p><strong>Employee Email:</strong> {certificates[0]?.employeeEmail || 'Not found'}</p> */}
-              {/* <p><strong>Employee ID:</strong> {certificates[0]?.employeeId || 'Not found'}</p> */}
-              {/* <p><strong>Searched for progress using:</strong> { */}
-                {/* certificates[0]?.employeeEmail  */}
-                  {/* ? `Email: ${certificates[0].employeeEmail}${certificates[0]?.employeeId ? ` and ID: ${certificates[0].employeeId}` : ''}`  */}
-                  {/* : certificates[0]?.employeeId  */}
-                    {/* ? `ID: ${certificates[0].employeeId}`  */}
-                    {/* : 'No identifier available' */}
-              {/* }</p> */}
-              {/* <p><strong>Possible solutions:</strong></p> */}
-              {/* <ul style={{ marginLeft: '20px', marginTop: '10px' }}> */}
-                {/* <li>Check if your backend has a progress/learning API endpoint</li> */}
-                {/* <li>Verify the endpoint path matches your backend routes</li> */}
-                {/* <li>Ensure the employee email/ID in certificates matches the progress data</li> */}
-                {/* <li>Check browser Network tab for exact API responses</li> */}
-                {/* <li>Verify authentication token has required permissions</li> */}
-              {/* </ul> */}
-            {/* </div> */}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );};
 

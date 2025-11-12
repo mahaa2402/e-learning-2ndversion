@@ -248,9 +248,6 @@ const AdminDashboard = () => {
               <div className="space-y-4">
                 {data.weakestTopics.length > 0 ? data.weakestTopics.map((topic, index) => (
                   <div key={index} className="flex items-center">
-                    <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center mr-3">
-                      <div className="w-6 h-6 bg-gray-400 rounded"></div>
-                    </div>
                     <div className="flex-1">
                       <p className="font-medium text-gray-900">{topic.name}</p>
                       <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
@@ -276,9 +273,6 @@ const AdminDashboard = () => {
               <div className="space-y-4">
                 {data.strongestTopics.length > 0 ? data.strongestTopics.map((topic, index) => (
                   <div key={index} className="flex items-center">
-                    <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center mr-3">
-                      <div className="w-6 h-6 bg-gray-400 rounded"></div>
-                    </div>
                     <div className="flex-1">
                       <p className="font-medium text-gray-900">{topic.name}</p>
                       <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
@@ -308,7 +302,6 @@ const AdminDashboard = () => {
                 {data.leaderboard.length > 0 ? data.leaderboard.map((user, index) => (
                   <div key={index} className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-lg">
                     <div className="flex items-center">
-                      <div className="w-10 h-10 bg-gray-300 rounded-full mr-4"></div>
                       <div>
                         <p className="font-medium text-gray-900">{user.name}</p>
                         <p className="text-sm text-gray-500">{user.points} Certificates • {user.correct}% Correct</p>

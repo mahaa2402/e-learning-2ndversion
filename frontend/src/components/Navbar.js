@@ -12,7 +12,6 @@ const Navbar = ({ showSearch = true }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [showSearchBar, setShowSearchBar] = useState(false);
 
   // Check authentication status
   useEffect(() => {
@@ -108,13 +107,13 @@ const Navbar = ({ showSearch = true }) => {
     setShowSearchResults(true);
   };
 
+
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (searchQuery.trim() && searchResults.length > 0) {
       navigate(`/coursedetailpage/${searchResults[0].title}`);
       setSearchQuery('');
       setShowSearchResults(false);
-      setShowSearchBar(false);
     }
   };
 
@@ -122,7 +121,6 @@ const Navbar = ({ showSearch = true }) => {
     navigate(`/coursedetailpage/${courseTitle}`);
     setSearchQuery('');
     setShowSearchResults(false);
-    setShowSearchBar(false);
   };
 
   // Handle logout
@@ -140,19 +138,11 @@ const Navbar = ({ showSearch = true }) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Close dropdown and search results when clicking outside
+  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (showCoursesDropdown && !event.target.closest('.dropdown')) {
         setShowCoursesDropdown(false);
-      }
-      if (showSearchBar && !event.target.closest('.search-section')) {
-        setShowSearchBar(false);
-        setSearchQuery('');
-        setShowSearchResults(false);
-      }
-      if (showSearchResults && !event.target.closest('.search-section')) {
-        setShowSearchResults(false);
       }
     };
 
@@ -160,7 +150,7 @@ const Navbar = ({ showSearch = true }) => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showCoursesDropdown, showSearchResults, showSearchBar]);
+  }, [showCoursesDropdown]);
 
   return (
     <header className="navbar-container">
@@ -191,7 +181,7 @@ const Navbar = ({ showSearch = true }) => {
                 handleCoursesDropdownToggle();
               }}>
                 Courses
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="white" style={{ marginLeft: '4px' }}>
                   <path d="M7 10l5 5 5-5z"/>
                 </svg>
               </a>
@@ -257,75 +247,45 @@ const Navbar = ({ showSearch = true }) => {
             />
           </div>
         </div>
-        {showSearch && (
-          <div className="search-section">
-            {!showSearchBar ? (
-              <button 
-                className="search-icon-btn"
-                onClick={() => setShowSearchBar(true)}
-                title="Search Courses"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8"/>
-                  <path d="m21 21-4.35-4.35"/>
-                </svg>
-              </button>
-            ) : (
-              <div className="search-popover">
-                <form onSubmit={handleSearchSubmit} className="search-form">
-                  <input
-                    type="text"
-                    placeholder="Search Courses..."
-                    className="search-input"
-                    value={searchQuery}
-                    onChange={handleSearchChange}
-                    autoFocus
-                  />
-                  <button type="submit" className="search-submit-btn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="11" cy="11" r="8"/>
-                      <path d="m21 21-4.35-4.35"/>
-                    </svg>
-                  </button>
-                  <button 
-                    type="button" 
-                    className="search-close-btn"
-                    onClick={() => {
-                      setShowSearchBar(false);
-                      setSearchQuery('');
-                      setShowSearchResults(false);
-                    }}
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="18" y1="6" x2="6" y2="18"/>
-                      <line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                  </button>
-                </form>
-                {showSearchResults && searchResults.length > 0 && (
-                  <div className="search-results-dropdown">
-                    {searchResults.map((course, index) => (
-                      <div
-                        key={course._id || index}
-                        className="search-result-item"
-                        onClick={() => handleSearchResultClick(course.title)}
-                      >
-                        {course.title}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {showSearchResults && searchResults.length === 0 && searchQuery.trim() !== '' && (
-                  <div className="search-results-dropdown">
-                    <div className="search-result-item no-results">
-                      No courses found for "{searchQuery}"
+        <div className="bottom-navbar-right">
+          <div className="search-sidebar">
+              <form onSubmit={handleSearchSubmit} className="search-sidebar-form">
+                <input
+                  type="text"
+                  placeholder="Search.."
+                  className="search-sidebar-input"
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                />
+                <button type="submit" className="search-sidebar-submit">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.35-4.35"/>
+                  </svg>
+                </button>
+              </form>
+              {showSearchResults && searchResults.length > 0 && (
+                <div className="search-results-dropdown">
+                  {searchResults.map((course, index) => (
+                    <div
+                      key={course._id || index}
+                      className="search-result-item"
+                      onClick={() => handleSearchResultClick(course.title)}
+                    >
+                      {course.title}
                     </div>
+                  ))}
+                </div>
+              )}
+              {showSearchResults && searchResults.length === 0 && searchQuery.trim() !== '' && (
+                <div className="search-results-dropdown">
+                  <div className="search-result-item no-results">
+                    No courses found for "{searchQuery}"
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
           </div>
-        )}
+        </div>
       </div>
     </header>
   );

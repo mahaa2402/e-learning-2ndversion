@@ -86,9 +86,6 @@ const VistaCourseModules = () => {
               </nav>
             </div>
             <div className="vista-header-buttons">
-              <button className="vista-btn vista-btn-primary">
-                Get Started
-              </button>
               <button className="vista-btn vista-btn-secondary">
                 Login
               </button>

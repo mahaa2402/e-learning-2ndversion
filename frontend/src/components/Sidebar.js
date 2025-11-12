@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart, Zap, Users, Activity, HelpCircle, Settings, LogOut } from 'lucide-react';
+import { BarChart, Zap, Users, Activity, LogOut } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.css';
 
@@ -60,8 +60,6 @@ const Sidebar = () => {
   console.log('Sidebar items:', sidebarItems);
 
   const supportItems = [
-    { icon: HelpCircle, label: 'Get Started' },
-    { icon: Settings, label: 'Settings' },
     { icon: LogOut, label: 'Logout', onClick: handleLogout }
   ];
 
@@ -119,12 +117,7 @@ const Sidebar = () => {
       </div>
 
       {/* Admin profile section at bottom */}
-      <div className="mt-auto p-4 border-t border-gray-200">
-        <div className="bg-gray-900 rounded-lg p-3 text-white">
-          <p className="text-sm font-medium">Admin</p>
-          <p className="text-xs text-gray-300">admin@company.com</p>
-        </div>
-      </div>
+      
     </div>
   );
 };

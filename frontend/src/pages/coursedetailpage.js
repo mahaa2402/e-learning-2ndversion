@@ -63,7 +63,7 @@ const CourseDetailPage = () => {
   // Add the same imageMap as landing page
   const imageMap = {
     ISP: "isp.jpeg",
-    GDPR: "isp.jpeg", 
+    GDPR: "gdpr.jpg", 
     POSH: "posh.png",
     "Factory Act": "hsi.jpg",
     Welding: "course.jpg",
