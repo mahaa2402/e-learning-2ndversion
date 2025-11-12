@@ -881,18 +881,8 @@ const renderFormattedContent = (contentArray) => {
             {!subtitleUrl && (
               <div className="subtitle-info-message">
                 <p className="subtitle-info-text">
-                  <span className="info-icon">ℹ️</span>
-                  Subtitles are not available for this video. 
-                  <a 
-                    href="#subtitle-guide" 
-                    className="subtitle-guide-link"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      alert(`HOW TO CREATE SUBTITLE FILES:\n\n1. Use YouTube Studio (Free):\n   - Upload your video to YouTube (private)\n   - YouTube auto-generates captions\n   - Download as .vtt file\n   - Upload to S3 in same folder as video\n\n2. Use Online Tools:\n   - Rev.com (paid, accurate)\n   - Otter.ai (free tier available)\n   - Descript.com (free trial)\n\n3. Manual Creation:\n   - Use Subtitle Edit (free software)\n   - Create .vtt file with timestamps\n   - Format: HH:MM:SS.mmm --> HH:MM:SS.mmm\n\n4. Upload to S3:\n   - Path: e-learning/videos/{course.name}/Module{N}/subtitle.vtt\n   - Same folder as your video file`);
-                    }}
-                  >
-                    Learn how to add subtitles
-                  </a>
+                 
+                
                 </p>
               </div>
             )}
