@@ -8,6 +8,7 @@ const CreateCommonCourses = () => {
   const [courses, setCourses] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
+  const [editingModuleIndex, setEditingModuleIndex] = useState(null);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -20,7 +21,10 @@ const CreateCommonCourses = () => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    modules: []
+    modules: [],
+    backgroundImage: null, // For storing the image file
+    backgroundImageUrl: null, // For storing the uploaded image URL
+    retakeQuizCooldownHours: 24 // Default 24 hours (1 day) for retake quiz cooldown
   });
 
   const [currentModule, setCurrentModule] = useState({
@@ -30,19 +34,31 @@ const CreateCommonCourses = () => {
     description: '',
     lessons: 1,
     video: null,
+    notes: '', // Notes for the video
     quiz: {
-      questions: [],
+      firstAttemptQuestions: [],
+      retakeQuestions: [],
       passingScore: 70
     }
   });
 
   const [currentQuestion, setCurrentQuestion] = useState({
-    question: '',
-    type: 'multiple-choice',
-    options: ['', '', '', ''],
-    correctAnswer: '', // Changed to string to store the actual answer text
-    points: 1,
-    imageUrl: null // Added for question images
+    firstAttempt: {
+      question: '',
+      type: 'multiple-choice',
+      options: ['', '', '', ''],
+      correctAnswer: '',
+      points: 1,
+      imageUrl: null
+    },
+    retake: {
+      question: '',
+      type: 'multiple-choice',
+      options: ['', '', '', ''],
+      correctAnswer: '',
+      points: 1,
+      imageUrl: null
+    }
   });
 
   const questionTypes = ['multiple-choice', 'true-false', 'fill-in-blank'];
@@ -77,47 +93,67 @@ const CreateCommonCourses = () => {
 
   useEffect(() => {
     if (showModal) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      setTimeout(() => {
-        if (modalRef.current) {
-          modalRef.current.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'start',
-            inline: 'nearest'
-          });
-        }
-      }, 100);
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Restore body scroll when modal is closed
+      document.body.style.overflow = 'unset';
     }
+    
+    return () => {
+      // Cleanup: restore body scroll on unmount
+      document.body.style.overflow = 'unset';
+    };
   }, [showModal]);
 
   const resetForm = () => {
     setFormData({
       title: '',
       description: '',
-      modules: []
+      modules: [],
+      backgroundImage: null,
+      backgroundImageUrl: null,
+      retakeQuizCooldownHours: 24
     });
     setCurrentModule({
       m_id: '',
       name: '',
-      duration: 0,
+      duration: '',
       description: '',
       lessons: 1,
       video: null,
+      notes: '',
       quiz: {
-        questions: [],
+        firstAttemptQuestions: [],
+        retakeQuestions: [],
         passingScore: 70
       }
     });
     setCurrentQuestion({
-      question: '',
-      type: 'multiple-choice',
-      options: ['', '', '', ''],
-      correctAnswer: '',
-      points: 1,
-      imageUrl: null
+      firstAttempt: {
+        question: '',
+        type: 'multiple-choice',
+        options: ['', '', '', ''],
+        correctAnswer: '',
+        points: 1,
+        imageUrl: null
+      },
+      retake: {
+        question: '',
+        type: 'multiple-choice',
+        options: ['', '', '', ''],
+        correctAnswer: '',
+        points: 1,
+        imageUrl: null
+      }
     });
     setActiveTab('basic');
     setExpandedModules({});
+    setEditingModuleIndex(null);
+    // Clear the video input field
+    if (videoInputRefs.current['new']) {
+      videoInputRefs.current['new'].value = '';
+    }
   };
 
   const openModal = (course = null) => {
@@ -137,14 +173,19 @@ const CreateCommonCourses = () => {
       setFormData({
         title: course.title || '',
         description: course.description || '',
-        modules: convertedModules
+        modules: convertedModules.map(module => ({
+          ...module,
+          notes: module.lessonDetails?.notes || ''
+        })),
+        backgroundImage: null,
+        backgroundImageUrl: course.backgroundImageUrl || null,
+        retakeQuizCooldownHours: course.retakeQuizCooldownHours || 24
       });
     } else {
       setEditingCourse(null);
       resetForm();
     }
     setShowModal(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const closeModal = () => {
@@ -163,6 +204,11 @@ const CreateCommonCourses = () => {
     if (!currentModule.name) {
       setError("Please provide module name");
       return;
+    }
+
+    // If editing an existing module, update it instead of adding a new one
+    if (editingModuleIndex !== null) {
+      return handleUpdateModule(editingModuleIndex);
     }
 
     // If there's a video file that hasn't been uploaded yet, upload it first
@@ -312,6 +358,7 @@ const CreateCommonCourses = () => {
       description: currentModule.description || '',
       lessons: currentModule.lessons || 1,
       video: videoData, // Use the videoData we prepared above
+      notes: currentModule.notes || '', // Include notes
       quiz: currentModule.quiz || { questions: [], passingScore: 70 }
     };
     
@@ -330,9 +377,22 @@ const CreateCommonCourses = () => {
         title: newModule.name,
         videoUrl: newModule.video.url,
         content: [],
-        duration: `${newModule.duration || 0}min`
+        duration: `${newModule.duration || 0}min`,
+        notes: newModule.notes || ''
       };
       console.log('✅ Added lessonDetails to new module with video URL:', newModule.video.url);
+    } else if (newModule.notes && !newModule.lessonDetails) {
+      // Even if no video, set lessonDetails if notes exist
+      newModule.lessonDetails = {
+        title: newModule.name,
+        videoUrl: null,
+        content: [],
+        duration: `${newModule.duration || 0}min`,
+        notes: newModule.notes
+      };
+    } else if (newModule.lessonDetails) {
+      // Update existing lessonDetails with notes
+      newModule.lessonDetails.notes = newModule.notes || '';
     }
 
     setFormData({
@@ -340,19 +400,26 @@ const CreateCommonCourses = () => {
       modules: [...formData.modules, newModule]
     });
 
-    // Reset current module
+    // Reset current module - don't auto-generate ID, leave it empty
     setCurrentModule({
-      m_id: generateModuleId(),
+      m_id: '',
       name: '',
-      duration: 0,
+      duration: '',
       description: '',
       lessons: 1,
       video: null,
+      notes: '',
       quiz: {
-        questions: [],
+        firstAttemptQuestions: [],
+        retakeQuestions: [],
         passingScore: 70
       }
     });
+    setEditingModuleIndex(null); // Clear editing state
+    // Clear the video input field
+    if (videoInputRefs.current['new']) {
+      videoInputRefs.current['new'].value = '';
+    }
     setError(null);
   };
 
@@ -362,6 +429,220 @@ const CreateCommonCourses = () => {
       ...formData,
       modules: updatedModules
     });
+    // If we're editing the removed module, clear editing state
+    if (editingModuleIndex === index) {
+      setEditingModuleIndex(null);
+      // Reset current module
+      setCurrentModule({
+        m_id: '',
+        name: '',
+        duration: '',
+        description: '',
+        lessons: 1,
+        video: null,
+        notes: '',
+        quiz: {
+          firstAttemptQuestions: [],
+          retakeQuestions: [],
+          passingScore: 70
+        }
+      });
+    } else if (editingModuleIndex !== null && editingModuleIndex > index) {
+      // Adjust editing index if a module before it was removed
+      setEditingModuleIndex(editingModuleIndex - 1);
+    }
+  };
+
+  const handleEditModule = (index) => {
+    const moduleToEdit = formData.modules[index];
+    setEditingModuleIndex(index);
+    
+    // Populate currentModule with the module data
+    setCurrentModule({
+      m_id: moduleToEdit.m_id || '',
+      name: moduleToEdit.name || '',
+      duration: moduleToEdit.duration || '',
+      description: moduleToEdit.description || '',
+      lessons: moduleToEdit.lessons || 1,
+      video: moduleToEdit.video || null,
+      notes: moduleToEdit.notes || '',
+      quiz: moduleToEdit.quiz || {
+        firstAttemptQuestions: [],
+        retakeQuestions: [],
+        passingScore: 70
+      }
+    });
+    
+    // Scroll to the form
+    const formElement = document.querySelector('.module-form');
+    if (formElement) {
+      formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleUpdateModule = async (index) => {
+    if (!currentModule.name) {
+      setError("Please provide module name");
+      return;
+    }
+
+    // Handle video upload if there's a new file
+    let videoUrl = null;
+    let videoData = null;
+    
+    if (currentModule.video?.file && !currentModule.video.url) {
+      try {
+        setIsLoading(true);
+        const courseTitle = formData.title || editingCourse?.title;
+        if (!courseTitle) {
+          videoData = {
+            file: currentModule.video.file,
+            name: currentModule.video.file.name,
+            size: `${(currentModule.video.file.size / 1024 / 1024).toFixed(2)} MB`,
+            type: currentModule.video.file.type,
+            pendingUpload: true
+          };
+        } else {
+          const moduleNumber = index + 1;
+          const formDataToSend = new FormData();
+          formDataToSend.append("video", currentModule.video.file);
+
+          const courseName = courseTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+          const uploadUrl = `${API_ENDPOINTS.VIDEOS.UPLOAD}/${encodeURIComponent(courseName)}/${moduleNumber}`;
+
+          const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+          const uploadResponse = await fetch(uploadUrl, {
+            method: 'POST',
+            body: formDataToSend,
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (!uploadResponse.ok) {
+            let errorData;
+            try {
+              errorData = await uploadResponse.json();
+            } catch (e) {
+              errorData = { error: `HTTP ${uploadResponse.status}: ${uploadResponse.statusText}` };
+            }
+            throw new Error(errorData.error || `Failed to upload video: ${uploadResponse.statusText}`);
+          }
+
+          const uploadResult = await uploadResponse.json();
+          videoUrl = uploadResult.video?.url || uploadResult.videoUrl;
+          
+          videoData = {
+            url: videoUrl,
+            name: currentModule.video.file.name,
+            size: `${(currentModule.video.file.size / 1024 / 1024).toFixed(2)} MB`,
+            type: currentModule.video.file.type,
+            s3Key: uploadResult.video?.s3Key,
+            uploadedAt: uploadResult.video?.uploadedAt || new Date().toISOString(),
+            pendingUpload: false
+          };
+        }
+      } catch (err) {
+        console.error('❌ Video upload failed:', err);
+        if (currentModule.video?.file) {
+          videoData = {
+            file: currentModule.video.file,
+            name: currentModule.video.file.name,
+            size: `${(currentModule.video.file.size / 1024 / 1024).toFixed(2)} MB`,
+            type: currentModule.video.file.type,
+            pendingUpload: true
+          };
+          setError(`Video upload failed: ${err.message}. The video file will be uploaded when you save the course.`);
+        } else {
+          setError(err.message || "Failed to upload video");
+          setIsLoading(false);
+          return;
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    } else if (currentModule.video?.url) {
+      videoData = {
+        url: currentModule.video.url,
+        name: currentModule.video.name || '',
+        size: currentModule.video.size || '',
+        type: currentModule.video.type || '',
+        s3Key: currentModule.video.s3Key,
+        uploadedAt: currentModule.video.uploadedAt || new Date().toISOString(),
+        pendingUpload: false
+      };
+    } else if (currentModule.video?.file) {
+      videoData = {
+        file: currentModule.video.file,
+        name: currentModule.video.file.name,
+        size: `${(currentModule.video.file.size / 1024 / 1024).toFixed(2)} MB`,
+        type: currentModule.video.file.type,
+        pendingUpload: true
+      };
+    }
+
+    // Auto-generate module ID if not provided
+    const moduleId = currentModule.m_id || generateModuleId();
+    const updatedModule = {
+      m_id: moduleId,
+      name: currentModule.name,
+      duration: currentModule.duration || 0,
+      description: currentModule.description || '',
+      lessons: currentModule.lessons || 1,
+      video: videoData,
+      notes: currentModule.notes || '',
+      quiz: currentModule.quiz || { questions: [], passingScore: 70 }
+    };
+
+    if (updatedModule.video?.url && !updatedModule.lessonDetails) {
+      updatedModule.lessonDetails = {
+        title: updatedModule.name,
+        videoUrl: updatedModule.video.url,
+        content: [],
+        duration: `${updatedModule.duration || 0}min`,
+        notes: updatedModule.notes || ''
+      };
+    } else if (updatedModule.notes && !updatedModule.lessonDetails) {
+      updatedModule.lessonDetails = {
+        title: updatedModule.name,
+        videoUrl: null,
+        content: [],
+        duration: `${updatedModule.duration || 0}min`,
+        notes: updatedModule.notes
+      };
+    } else if (updatedModule.lessonDetails) {
+      updatedModule.lessonDetails.notes = updatedModule.notes || '';
+    }
+
+    const updatedModules = [...formData.modules];
+    updatedModules[index] = updatedModule;
+    
+    setFormData({
+      ...formData,
+      modules: updatedModules
+    });
+
+    // Reset current module
+    setCurrentModule({
+      m_id: '',
+      name: '',
+      duration: '',
+      description: '',
+      lessons: 1,
+      video: null,
+      notes: '',
+      quiz: {
+        firstAttemptQuestions: [],
+        retakeQuestions: [],
+        passingScore: 70
+      }
+    });
+    setEditingModuleIndex(null);
+    // Clear the video input field
+    if (videoInputRefs.current['new']) {
+      videoInputRefs.current['new'].value = '';
+    }
+    setError(null);
   };
 
   const handleVideoUpload = async (moduleIndex, file) => {
@@ -496,70 +777,121 @@ const CreateCommonCourses = () => {
   };
 
   const handleAddQuestion = () => {
-    if (!currentQuestion.question) {
-      setError("Please provide a question");
+    // Validate first attempt question
+    if (!currentQuestion.firstAttempt.question.trim()) {
+      setError("Please provide a question for first attempt");
       return;
     }
 
-    if (currentQuestion.type === 'multiple-choice') {
-      if (currentQuestion.options.some(opt => !opt.trim())) {
-      setError("Please fill all options for multiple-choice question");
-      return;
+    if (currentQuestion.firstAttempt.type === 'multiple-choice') {
+      if (currentQuestion.firstAttempt.options.some(opt => !opt.trim())) {
+        setError("Please fill all options for first attempt multiple-choice question");
+        return;
       }
-      if (!currentQuestion.correctAnswer || !currentQuestion.correctAnswer.trim()) {
-        setError("Please select a correct answer");
+      if (!currentQuestion.firstAttempt.correctAnswer || !currentQuestion.firstAttempt.correctAnswer.trim()) {
+        setError("Please select a correct answer for first attempt question");
+        return;
+      }
+    } else if (currentQuestion.firstAttempt.type === 'true-false') {
+      if (!currentQuestion.firstAttempt.correctAnswer || (currentQuestion.firstAttempt.correctAnswer !== 'True' && currentQuestion.firstAttempt.correctAnswer !== 'False')) {
+        setError("Please select True or False for first attempt question");
+        return;
+      }
+    } else if (currentQuestion.firstAttempt.type === 'fill-in-blank') {
+      if (!currentQuestion.firstAttempt.correctAnswer || !currentQuestion.firstAttempt.correctAnswer.trim()) {
+        setError("Please provide a correct answer for first attempt fill-in-blank question");
         return;
       }
     }
 
-    const newQuestion = {
-      question: currentQuestion.question,
-      type: currentQuestion.type,
-      options: currentQuestion.type === 'multiple-choice' ? currentQuestion.options : [],
-      correctAnswer: currentQuestion.correctAnswer, // Now stores the actual answer string
-      points: currentQuestion.points || 1,
-      imageUrl: currentQuestion.imageUrl || null
+    // Validate retake question
+    if (!currentQuestion.retake.question.trim()) {
+      setError("Please provide a question for retake attempt");
+      return;
+    }
+
+    if (currentQuestion.retake.type === 'multiple-choice') {
+      if (currentQuestion.retake.options.some(opt => !opt.trim())) {
+        setError("Please fill all options for retake multiple-choice question");
+        return;
+      }
+      if (!currentQuestion.retake.correctAnswer || !currentQuestion.retake.correctAnswer.trim()) {
+        setError("Please select a correct answer for retake question");
+        return;
+      }
+    } else if (currentQuestion.retake.type === 'true-false') {
+      if (!currentQuestion.retake.correctAnswer || (currentQuestion.retake.correctAnswer !== 'True' && currentQuestion.retake.correctAnswer !== 'False')) {
+        setError("Please select True or False for retake question");
+        return;
+      }
+    } else if (currentQuestion.retake.type === 'fill-in-blank') {
+      if (!currentQuestion.retake.correctAnswer || !currentQuestion.retake.correctAnswer.trim()) {
+        setError("Please provide a correct answer for retake fill-in-blank question");
+        return;
+      }
+    }
+
+    const newFirstAttemptQuestion = {
+      question: currentQuestion.firstAttempt.question,
+      type: currentQuestion.firstAttempt.type,
+      options: currentQuestion.firstAttempt.type === 'multiple-choice' ? currentQuestion.firstAttempt.options : [],
+      correctAnswer: currentQuestion.firstAttempt.correctAnswer,
+      points: currentQuestion.firstAttempt.points || 1,
+      imageUrl: currentQuestion.firstAttempt.imageUrl || null
+    };
+
+    const newRetakeQuestion = {
+      question: currentQuestion.retake.question,
+      type: currentQuestion.retake.type,
+      options: currentQuestion.retake.type === 'multiple-choice' ? currentQuestion.retake.options : [],
+      correctAnswer: currentQuestion.retake.correctAnswer,
+      points: currentQuestion.retake.points || 1,
+      imageUrl: currentQuestion.retake.imageUrl || null
     };
 
     setCurrentModule({
       ...currentModule,
       quiz: {
         ...currentModule.quiz,
-        questions: [...currentModule.quiz.questions, newQuestion]
+        firstAttemptQuestions: [...currentModule.quiz.firstAttemptQuestions, newFirstAttemptQuestion],
+        retakeQuestions: [...currentModule.quiz.retakeQuestions, newRetakeQuestion]
       }
     });
 
     setCurrentQuestion({
-      question: '',
-      type: 'multiple-choice',
-      options: ['', '', '', ''],
-      correctAnswer: '',
-      points: 1,
-      imageUrl: null
+      firstAttempt: {
+        question: '',
+        type: 'multiple-choice',
+        options: ['', '', '', ''],
+        correctAnswer: '',
+        points: 1,
+        imageUrl: null
+      },
+      retake: {
+        question: '',
+        type: 'multiple-choice',
+        options: ['', '', '', ''],
+        correctAnswer: '',
+        points: 1,
+        imageUrl: null
+      }
     });
     setError(null);
     
     // Calculate success message
-    const totalQuestions = currentModule.quiz.questions.length + 1;
-    let message = `Question added! (Total: ${totalQuestions} questions. `;
-    if (totalQuestions <= 5) {
-      message += 'Add ' + (5 - totalQuestions) + ' more for retake quiz.';
-    } else if (totalQuestions <= 10) {
-      message += 'Retake quiz ready!';
-    } else {
-      message += 'More than 10 questions added.';
-    }
-    message += ')';
-    setSuccess(message);
+    const totalQuestionPairs = currentModule.quiz.firstAttemptQuestions.length + 1;
+    setSuccess(`Question pair added! (Total: ${totalQuestionPairs} question pairs - ${totalQuestionPairs} for first attempt, ${totalQuestionPairs} for retake)`);
   };
 
   const handleRemoveQuestion = (questionIndex) => {
-    const updatedQuestions = currentModule.quiz.questions.filter((_, i) => i !== questionIndex);
+    const updatedFirstAttempt = currentModule.quiz.firstAttemptQuestions.filter((_, i) => i !== questionIndex);
+    const updatedRetake = currentModule.quiz.retakeQuestions.filter((_, i) => i !== questionIndex);
     setCurrentModule({
       ...currentModule,
       quiz: {
         ...currentModule.quiz,
-        questions: updatedQuestions
+        firstAttemptQuestions: updatedFirstAttempt,
+        retakeQuestions: updatedRetake
       }
     });
   };
@@ -783,10 +1115,45 @@ const CreateCommonCourses = () => {
         currentModule.video.pendingUpload = false;
       }
 
-      // Step 3: Prepare course data with all video URLs
+      // Step 3: Upload course background image if needed
+      let finalBackgroundImageUrl = formData.backgroundImageUrl;
+      
+      // If there's a new image file but no URL, upload it
+      if (formData.backgroundImage && !formData.backgroundImageUrl) {
+        try {
+          console.log('📤 Uploading course background image...');
+          const courseName = courseTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+          const formDataToSend = new FormData();
+          formDataToSend.append("image", formData.backgroundImage);
+
+          const uploadUrl = `${API_ENDPOINTS.UPLOAD.QUIZ_IMAGE.replace('/upload-quiz-image', '/upload-course-image')}/${encodeURIComponent(courseName)}`;
+          const uploadResponse = await fetch(uploadUrl, {
+            method: 'POST',
+            body: formDataToSend,
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (uploadResponse.ok) {
+            const uploadResult = await uploadResponse.json();
+            finalBackgroundImageUrl = uploadResult.image?.url;
+            console.log('✅ Course background image uploaded:', finalBackgroundImageUrl);
+          } else {
+            console.warn('⚠️ Failed to upload course background image');
+          }
+        } catch (err) {
+          console.error('❌ Error uploading course background image:', err);
+          // Don't fail the entire save if image upload fails
+        }
+      }
+
+      // Step 4: Prepare course data with all video URLs
       const courseData = {
         title: formData.title,
         description: formData.description || '',
+        backgroundImageUrl: finalBackgroundImageUrl,
+        retakeQuizCooldownHours: formData.retakeQuizCooldownHours || 24,
         modules: updatedModules.map((module, index) => {
           const moduleData = {
           m_id: module.m_id,
@@ -813,7 +1180,8 @@ const CreateCommonCourses = () => {
           if (module.lessonDetails && module.lessonDetails.videoUrl) {
             moduleData.lessonDetails = {
               ...module.lessonDetails,
-              videoUrl: module.lessonDetails.videoUrl
+              videoUrl: module.lessonDetails.videoUrl,
+              notes: module.lessonDetails.notes || module.notes || ''
             };
             console.log(`✅ Module "${module.name}" has lessonDetails with video URL: ${module.lessonDetails.videoUrl}`);
           } else if (videoUrl) {
@@ -821,16 +1189,18 @@ const CreateCommonCourses = () => {
               title: module.name,
               videoUrl: videoUrl, // S3 URL from upload or existing from database
               content: module.lessonDetails?.content || [], // Preserve existing content if any
-              duration: module.lessonDetails?.duration || `${module.duration || 0}min`
+              duration: module.lessonDetails?.duration || `${module.duration || 0}min`,
+              notes: module.lessonDetails?.notes || module.notes || ''
             };
             console.log(`✅ Module "${module.name}" has video URL: ${videoUrl}`);
           } else {
             console.log(`⚠️ Module "${module.name}" has no video URL`);
             // Even if no video, include lessonDetails structure if it exists to preserve other data
-            if (module.lessonDetails) {
+            if (module.lessonDetails || module.notes) {
               moduleData.lessonDetails = {
                 ...module.lessonDetails,
-                videoUrl: null // Explicitly set to null
+                videoUrl: null, // Explicitly set to null
+                notes: module.lessonDetails?.notes || module.notes || ''
               };
             }
           }
@@ -908,11 +1278,11 @@ const CreateCommonCourses = () => {
       
       // If there are videos or quizzes, save them separately
       const courseId = isEditing ? editingCourse._id : (result.course?._id || result._id);
-      if (updatedModules.some(m => m.video || (m.quiz && m.quiz.questions.length > 0))) {
+      if (updatedModules.some(m => m.video || (m.quiz && (m.quiz.firstAttemptQuestions?.length > 0 || m.quiz.retakeQuestions?.length > 0)))) {
         
         // Save quizzes for each module
         for (const module of updatedModules) {
-          if (module.quiz && module.quiz.questions.length > 0) {
+          if (module.quiz && (module.quiz.firstAttemptQuestions?.length > 0 || module.quiz.retakeQuestions?.length > 0)) {
             const quizResponse = await fetch(`${API_ENDPOINTS.COURSES.GET_COURSES.replace('/getcourse', '/create-quiz')}`, {
               method: 'POST',
               headers: {
@@ -922,7 +1292,8 @@ const CreateCommonCourses = () => {
               body: JSON.stringify({
                 courseId: courseId,
                 mo_id: module.m_id,
-                questions: module.quiz.questions,
+                firstAttemptQuestions: module.quiz.firstAttemptQuestions || [],
+                retakeQuestions: module.quiz.retakeQuestions || [],
                 passingScore: module.quiz.passingScore || 70
               })
             });
@@ -1028,17 +1399,17 @@ const CreateCommonCourses = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen create-common-courses-container">
       <Sidebar />
       <div className="flex-1 overflow-auto">
-        <div className="bg-white shadow-sm border-b border-gray-200 p-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-gray-900">Create Common Courses</h2>
+        <div className="course-header p-6">
+          <h2>Create Common Courses</h2>
+          <div className="header-actions">
             <button
               onClick={() => openModal()}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="create-btn"
             >
-              <Plus className="w-4 h-4 mr-2" />
+              <Plus className="w-4 h-4" />
               Create New Course
             </button>
           </div>
@@ -1046,42 +1417,42 @@ const CreateCommonCourses = () => {
 
         <div className="p-6">
           {isLoading && !showModal && (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading courses...</p>
+            <div className="loading-container">
+              <div className="spinner"></div>
+              <p className="loading-text">Loading courses...</p>
             </div>
           )}
 
           {error && !showModal && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+            <div className="alert alert-error">
               {error}
             </div>
           )}
 
           {success && !showModal && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4">
+            <div className="alert alert-success">
               {success}
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="courses-grid">
             {courses.map((course) => (
-              <div key={course._id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{course.title}</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  {course.modules?.length || 0} Modules
+              <div key={course._id} className="course-card">
+                <h3 className="course-card-title">{course.title}</h3>
+                <p className="course-card-meta">
+                  {course.modules?.length || 0} Module{course.modules?.length !== 1 ? 's' : ''}
                 </p>
-                <div className="flex gap-2">
+                <div className="course-card-actions">
                   <button
                     onClick={() => openModal(course)}
-                    className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors text-sm"
+                    className="btn-edit"
                   >
-                    <Edit className="w-4 h-4 inline mr-1" />
+                    <Edit className="w-4 h-4" />
                     Edit
                   </button>
                   <button
                     onClick={() => handleDelete(course)}
-                    className="px-3 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors text-sm"
+                    className="btn-delete"
                     title="Delete course"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -1092,466 +1463,834 @@ const CreateCommonCourses = () => {
           </div>
 
           {courses.length === 0 && !isLoading && (
-            <div className="text-center py-12">
-              <p className="text-gray-500">No common courses found. Create your first course!</p>
+            <div className="empty-state">
+              <p>No common courses found. Create your first course!</p>
             </div>
           )}
         </div>
 
         {/* Modal */}
         {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto" ref={modalRef}>
-            <div className="min-h-screen px-4 py-8">
-              <div className="bg-white rounded-lg shadow-xl max-w-4xl mx-auto p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-2xl font-bold text-gray-900">
-                    {editingCourse ? 'Edit Course' : 'Create New Common Course'}
-                  </h3>
-                  <button
-                    onClick={closeModal}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
+          <div className="modal-overlay" ref={modalRef} onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              closeModal();
+            }
+          }}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>
+                  {editingCourse ? 'Edit Course' : 'Create New Common Course'}
+                </h3>
+                <button
+                  onClick={closeModal}
+                  className="modal-close-btn"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {error && (
+                <div className="alert alert-error" style={{ margin: '1.5rem 2rem 0' }}>
+                  {error}
                 </div>
+              )}
 
-                {error && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-                    {error}
-                  </div>
-                )}
-
-                {success && (
-                  <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4">
-                    {success}
-                  </div>
-                )}
-
-                {/* Tabs */}
-                <div className="flex border-b border-gray-200 mb-6">
-                  <button
-                    onClick={() => setActiveTab('basic')}
-                    className={`px-4 py-2 font-medium ${
-                      activeTab === 'basic'
-                        ? 'text-blue-600 border-b-2 border-blue-600'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    Basic Info
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('modules')}
-                    className={`px-4 py-2 font-medium ${
-                      activeTab === 'modules'
-                        ? 'text-blue-600 border-b-2 border-blue-600'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    Modules ({formData.modules.length})
-                  </button>
+              {success && (
+                <div className="alert alert-success" style={{ margin: '1.5rem 2rem 0' }}>
+                  {success}
                 </div>
+              )}
 
+              {/* Tabs */}
+              <div className="tabs-container">
+                <button
+                  onClick={() => setActiveTab('basic')}
+                  className={`tab-button ${activeTab === 'basic' ? 'active' : ''}`}
+                >
+                  Basic Info
+                </button>
+                <button
+                  onClick={() => setActiveTab('modules')}
+                  className={`tab-button ${activeTab === 'modules' ? 'active' : ''}`}
+                >
+                  Modules ({formData.modules.length})
+                </button>
+              </div>
+
+              <div className="modal-body">
                 {/* Basic Info Tab */}
                 {activeTab === 'basic' && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Course Title *
+                  <div>
+                    <div className="form-group">
+                      <label className="form-label required">
+                        Course Title
                       </label>
                       <input
                         type="text"
                         value={formData.title}
                         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="form-input"
                         placeholder="e.g., ISP, GDPR, POSH"
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <div className="form-group">
+                      <label className="form-label">
                         Description
                       </label>
                       <textarea
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="form-textarea"
                         rows="4"
                         placeholder="Course description..."
                       />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">
+                        Course Background Image
+                      </label>
+                      <div className="file-upload-wrapper">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                          const file = e.target.files[0];
+                          if (!file) return;
+
+                          try {
+                            setIsLoading(true);
+                            setError(null);
+
+                            // Sanitize course name
+                            const courseTitle = formData.title || editingCourse?.title || 'temp';
+                            const courseName = courseTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+                            
+                            const formDataToSend = new FormData();
+                            formDataToSend.append("image", file);
+
+                            const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+                            const uploadUrl = `${API_ENDPOINTS.UPLOAD.COURSE_IMAGE}/${encodeURIComponent(courseName)}`;
+                            
+                            console.log('📤 Uploading course image to:', uploadUrl);
+
+                            const uploadResponse = await fetch(uploadUrl, {
+                              method: 'POST',
+                              body: formDataToSend,
+                              headers: {
+                                'Authorization': `Bearer ${token}`
+                              }
+                            });
+
+                            if (!uploadResponse.ok) {
+                              let errorData;
+                              try {
+                                errorData = await uploadResponse.json();
+                              } catch (e) {
+                                errorData = { error: `HTTP ${uploadResponse.status}: ${uploadResponse.statusText}` };
+                              }
+                              throw new Error(errorData.error || `Failed to upload image: ${uploadResponse.statusText}`);
+                            }
+
+                            const uploadResult = await uploadResponse.json();
+                            console.log('✅ Course image upload result:', uploadResult);
+                            
+                            if (!uploadResult.image?.url) {
+                              throw new Error('Upload succeeded but no image URL returned');
+                            }
+
+                            setFormData({
+                              ...formData,
+                              backgroundImage: file,
+                              backgroundImageUrl: uploadResult.image.url
+                            });
+                            
+                            setSuccess('Course image uploaded successfully!');
+                          } catch (err) {
+                            console.error('❌ Course image upload failed:', err);
+                            setError(`Failed to upload image: ${err.message}`);
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }}
+                          className="file-upload-input"
+                        />
+                        {formData.backgroundImageUrl && (
+                          <div className="file-upload-preview">
+                            <img 
+                              src={formData.backgroundImageUrl} 
+                              alt="Course background preview" 
+                            />
+                            <p className="form-help-text">Current course image</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">
+                        Retake Quiz Cooldown Time (Hours)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="168"
+                        value={formData.retakeQuizCooldownHours || ''}
+                        onChange={(e) => setFormData({ ...formData, retakeQuizCooldownHours: e.target.value ? parseInt(e.target.value) : '' })}
+                        className="form-input"
+                        placeholder="24"
+                      />
+                      <p className="form-help-text">
+                        Time (in hours) users must wait after failing the retake quiz before attempting again. Default: 24 hours (1 day)
+                      </p>
                     </div>
                   </div>
                 )}
 
                 {/* Modules Tab */}
                 {activeTab === 'modules' && (
-                  <div className="space-y-6">
+                  <div>
                     {/* Add Module Form */}
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <h4 className="font-semibold text-gray-900 mb-4">Add New Module</h4>
-                      <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <div className="module-form-section">
+                      <h4>{editingModuleIndex !== null ? `Edit Module ${editingModuleIndex + 1}` : 'Add New Module'}</h4>
+                      <div className="form-grid">
+                        <div className="form-group">
+                          <label className="form-label">
                             Module ID (Auto-generated if empty)
                           </label>
                           <input
                             type="text"
                             value={currentModule.m_id}
                             onChange={(e) => setCurrentModule({ ...currentModule, m_id: e.target.value })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            className="form-input"
                             placeholder="Leave empty to auto-generate"
                           />
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Module Name *
+                        <div className="form-group">
+                          <label className="form-label required">
+                            Module Name
                           </label>
                           <input
                             type="text"
                             value={currentModule.name}
                             onChange={(e) => setCurrentModule({ ...currentModule, name: e.target.value })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            className="form-input"
                             placeholder="Module name"
                           />
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <div className="form-group">
+                          <label className="form-label">
                             Duration (minutes)
                           </label>
                           <input
                             type="number"
-                            value={currentModule.duration}
-                            onChange={(e) => setCurrentModule({ ...currentModule, duration: parseInt(e.target.value) || 0 })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                            placeholder="0"
+                            min="0"
+                            value={currentModule.duration || ''}
+                            onChange={(e) => setCurrentModule({ ...currentModule, duration: e.target.value ? parseInt(e.target.value) : '' })}
+                            className="form-input"
+                            placeholder="Enter duration in minutes"
                           />
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <div className="form-group">
+                          <label className="form-label">
                             Number of Lessons
                           </label>
                           <input
                             type="number"
                             value={currentModule.lessons}
                             onChange={(e) => setCurrentModule({ ...currentModule, lessons: parseInt(e.target.value) || 1 })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            className="form-input"
                             min="1"
                           />
                         </div>
                       </div>
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <div className="form-group">
+                        <label className="form-label">
                           Module Description
                         </label>
                         <textarea
                           value={currentModule.description}
                           onChange={(e) => setCurrentModule({ ...currentModule, description: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          className="form-textarea"
                           rows="2"
                           placeholder="Module description..."
                         />
                       </div>
 
                       {/* Video Upload */}
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <div className="form-group">
+                        <label className="form-label">
                           Video (Optional)
                         </label>
-                        <input
-                          type="file"
-                          accept="video/*"
-                          ref={(el) => (videoInputRefs.current['new'] = el)}
-                          onChange={(e) => {
-                            const file = e.target.files[0];
-                            if (file) {
-                              handleVideoUpload('new', file);
-                            }
-                          }}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        <div className="file-upload-wrapper">
+                          <input
+                            type="file"
+                            accept="video/*"
+                            ref={(el) => (videoInputRefs.current['new'] = el)}
+                            onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                handleVideoUpload('new', file);
+                              }
+                            }}
+                            className="file-upload-input"
+                          />
+                          {currentModule.video && (
+                            <div className="module-badges" style={{ marginTop: '0.5rem' }}>
+                              <span className="module-badge video">
+                                <Video className="w-4 h-4" />
+                                {currentModule.video.name || currentModule.video.file?.name || 'Video selected'}
+                                {currentModule.video.pendingUpload && (
+                                  <span className="ml-2">(Pending upload)</span>
+                                )}
+                                {currentModule.video.url && (
+                                  <span className="ml-2">(Uploaded)</span>
+                                )}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Notes Section */}
+                      <div className="form-group">
+                        <label className="form-label">
+                          Video Notes (Optional)
+                        </label>
+                        <textarea
+                          value={currentModule.notes || ''}
+                          onChange={(e) => setCurrentModule({ ...currentModule, notes: e.target.value })}
+                          className="form-textarea"
+                          rows="4"
+                          placeholder="Add notes for this video module. These notes will be displayed below the video for students..."
                         />
-                        {currentModule.video && (
-                          <div className="mt-2 flex items-center text-sm text-gray-600">
-                            <Video className="w-4 h-4 mr-2" />
-                            {currentModule.video.name || currentModule.video.file?.name || 'Video selected'}
-                            {currentModule.video.pendingUpload && (
-                              <span className="ml-2 text-xs text-orange-600">(Pending upload)</span>
-                            )}
-                            {currentModule.video.url && (
-                              <span className="ml-2 text-xs text-green-600">(Uploaded)</span>
-                            )}
-                          </div>
-                        )}
+                        <p className="form-help-text">
+                          These notes will be displayed below the video in the lesson page
+                        </p>
                       </div>
 
                       {/* Quiz Section */}
-                      <div className="mb-4 border-t pt-4">
-                        <h5 className="font-semibold text-gray-900 mb-3">Quiz Questions</h5>
+                      <div className="quiz-section">
+                        <h5 className="quiz-section-title">Quiz Questions</h5>
+                        <p className="quiz-section-description">
+                          Add question pairs: one for first attempt and one for retake. Both questions will be added together.
+                        </p>
                         
-                        {/* Add Question Form */}
-                        <div className="bg-white p-3 rounded border border-gray-200 mb-3">
-                          <div className="mb-3">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Question
-                            </label>
-                            <input
-                              type="text"
-                              value={currentQuestion.question}
-                              onChange={(e) => setCurrentQuestion({ ...currentQuestion, question: e.target.value })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                              placeholder="Enter question..."
-                            />
-                          </div>
-                          <div className="mb-3">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Question Type
-                            </label>
-                            <select
-                              value={currentQuestion.type}
-                              onChange={(e) => setCurrentQuestion({ ...currentQuestion, type: e.target.value, options: e.target.value === 'multiple-choice' ? ['', '', '', ''] : [] })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                            >
-                              {questionTypes.map(type => (
-                                <option key={type} value={type}>{type}</option>
-                              ))}
-                            </select>
-                          </div>
-                          {currentQuestion.type === 'multiple-choice' && (
-                            <>
-                            <div className="mb-3">
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Options (Select the correct answer)
-                              </label>
-                              {currentQuestion.options.map((option, idx) => (
-                                <div key={idx} className="flex items-center mb-2">
-                                  <input
-                                    type="radio"
-                                    name="correctAnswer"
-                                      checked={currentQuestion.correctAnswer === option}
-                                      onChange={() => setCurrentQuestion({ ...currentQuestion, correctAnswer: option })}
-                                    className="mr-2"
-                                  />
-                                  <input
-                                    type="text"
-                                    value={option}
-                                    onChange={(e) => {
-                                      const newOptions = [...currentQuestion.options];
-                                        const oldValue = newOptions[idx];
-                                      newOptions[idx] = e.target.value;
-                                        // Update correctAnswer if the selected option text changed
-                                        const newCorrectAnswer = currentQuestion.correctAnswer === oldValue 
-                                          ? e.target.value 
-                                          : currentQuestion.correctAnswer;
-                                        setCurrentQuestion({ 
-                                          ...currentQuestion, 
-                                          options: newOptions,
-                                          correctAnswer: newCorrectAnswer
-                                        });
-                                    }}
-                                    className="flex-1 px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                                    placeholder={`Option ${idx + 1}`}
-                                  />
-                                </div>
-                              ))}
-                              </div>
-                              {currentQuestion.correctAnswer && (
-                                <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded">
-                                  <p className="text-sm text-green-700">
-                                    ✓ Correct Answer: <strong>{currentQuestion.correctAnswer}</strong>
-                                  </p>
-                            </div>
-                          )}
-                            </>
-                          )}
-                          <div className="mb-3">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Question Image (Optional)
-                            </label>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={async (e) => {
-                                const file = e.target.files[0];
-                                if (file) {
-                                  try {
-                                    setIsLoading(true);
-                                    const courseTitle = formData.title || editingCourse?.title;
-                                    if (!courseTitle) {
-                                      setError("Please enter course title before uploading question image");
-                                      setIsLoading(false);
-                                      return;
-                                    }
-
-                                    // Upload image to S3 (store in same folder as videos)
-                                    const formDataToSend = new FormData();
-                                    formDataToSend.append("image", file);
-                                    
-                                    const courseName = courseTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-                                    const moduleNumber = formData.modules.length + 1; // Current module being added
-                                    const questionIndex = currentModule.quiz.questions.length + 1;
-                                    const uploadUrl = `${API_ENDPOINTS.UPLOAD.QUIZ_IMAGE}/${encodeURIComponent(courseName)}/${moduleNumber}/${questionIndex}`;
-                                    
-                                    console.log('📤 Uploading quiz image to:', uploadUrl);
-                                    console.log('📤 Course name:', courseName);
-                                    console.log('📤 Module number:', moduleNumber);
-                                    console.log('📤 Question index:', questionIndex);
-                                    
-                                    const token = localStorage.getItem('token') || localStorage.getItem('authToken');
-                                    const uploadResponse = await fetch(uploadUrl, {
-                                      method: 'POST',
-                                      body: formDataToSend,
-                                      headers: {
-                                        'Authorization': `Bearer ${token}`
-                                      }
-                                    });
-
-                                    if (!uploadResponse.ok) {
-                                      const errorData = await uploadResponse.json();
-                                      throw new Error(errorData.error || 'Failed to upload image');
-                                    }
-
-                                    const uploadResult = await uploadResponse.json();
-                                    console.log('✅ Image uploaded:', uploadResult.imageUrl);
-                                    
-                                    setCurrentQuestion({
-                                      ...currentQuestion,
-                                      imageUrl: uploadResult.imageUrl // S3 URL
-                                    });
-                                    setSuccess('Image uploaded successfully!');
-                                  } catch (err) {
-                                    console.error('❌ Image upload failed:', err);
-                                    setError(err.message || 'Failed to upload image');
-                                  } finally {
-                                    setIsLoading(false);
-                                  }
-                                }
-                              }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                            />
-                            {currentQuestion.imageUrl && (
-                              <div className="mt-2">
-                                <img 
-                                  src={currentQuestion.imageUrl} 
-                                  alt="Question preview" 
-                                  className="max-w-xs h-auto border border-gray-300 rounded"
+                        {/* Add Question Form - Two Columns */}
+                        <div className="question-form-container">
+                          <div className="question-columns">
+                            {/* First Attempt Question */}
+                            <div className="question-column first-attempt">
+                              <h6 className="question-column-title">First Attempt Question</h6>
+                              <div className="form-group">
+                                <label className="form-label">
+                                  Question
+                                </label>
+                                <input
+                                  type="text"
+                                  value={currentQuestion.firstAttempt.question}
+                                  onChange={(e) => setCurrentQuestion({ 
+                                    ...currentQuestion, 
+                                    firstAttempt: { ...currentQuestion.firstAttempt, question: e.target.value }
+                                  })}
+                                  className="form-input"
+                                  placeholder="Enter question..."
                                 />
-                                <button
-                                  type="button"
-                                  onClick={() => setCurrentQuestion({ ...currentQuestion, imageUrl: null })}
-                                  className="mt-1 text-sm text-red-600 hover:text-red-800"
-                                >
-                                  Remove Image
-                                </button>
                               </div>
-                            )}
+                              <div className="form-group">
+                                <label className="form-label">
+                                  Question Type
+                                </label>
+                                <select
+                                  value={currentQuestion.firstAttempt.type}
+                                  onChange={(e) => setCurrentQuestion({ 
+                                    ...currentQuestion, 
+                                    firstAttempt: { 
+                                      ...currentQuestion.firstAttempt, 
+                                      type: e.target.value, 
+                                      options: e.target.value === 'multiple-choice' ? ['', '', '', ''] : []
+                                    }
+                                  })}
+                                  className="form-select"
+                                >
+                                  {questionTypes.map(type => (
+                                    <option key={type} value={type}>{type}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              {currentQuestion.firstAttempt.type === 'multiple-choice' && (
+                                <>
+                                  <div className="form-group">
+                                    <label className="form-label">
+                                      Options (Select the correct answer)
+                                    </label>
+                                    {currentQuestion.firstAttempt.options.map((option, idx) => (
+                                      <div key={idx} className="option-item">
+                                        <input
+                                          type="radio"
+                                          name="firstAttemptCorrectAnswer"
+                                          checked={currentQuestion.firstAttempt.correctAnswer === option}
+                                          onChange={() => setCurrentQuestion({ 
+                                            ...currentQuestion, 
+                                            firstAttempt: { ...currentQuestion.firstAttempt, correctAnswer: option }
+                                          })}
+                                        />
+                                        <input
+                                          type="text"
+                                          value={option}
+                                          onChange={(e) => {
+                                            const newOptions = [...currentQuestion.firstAttempt.options];
+                                            const oldValue = newOptions[idx];
+                                            newOptions[idx] = e.target.value;
+                                            const newCorrectAnswer = currentQuestion.firstAttempt.correctAnswer === oldValue 
+                                              ? e.target.value 
+                                              : currentQuestion.firstAttempt.correctAnswer;
+                                            setCurrentQuestion({ 
+                                              ...currentQuestion, 
+                                              firstAttempt: { 
+                                                ...currentQuestion.firstAttempt, 
+                                                options: newOptions,
+                                                correctAnswer: newCorrectAnswer
+                                              }
+                                            });
+                                          }}
+                                          placeholder={`Option ${idx + 1}`}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                  {currentQuestion.firstAttempt.correctAnswer && (
+                                    <div className="correct-answer-badge">
+                                      <p>
+                                        ✓ Correct Answer: <strong>{currentQuestion.firstAttempt.correctAnswer}</strong>
+                                      </p>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              {currentQuestion.firstAttempt.type === 'true-false' && (
+                                <>
+                                  <div className="form-group">
+                                    <label className="form-label">
+                                      Select Correct Answer
+                                    </label>
+                                    <div 
+                                      className={`option-item ${currentQuestion.firstAttempt.correctAnswer === 'True' ? 'checked' : ''}`}
+                                      onClick={() => setCurrentQuestion({ 
+                                        ...currentQuestion, 
+                                        firstAttempt: { ...currentQuestion.firstAttempt, correctAnswer: 'True' }
+                                      })}
+                                    >
+                                      <input
+                                        type="radio"
+                                        name="firstAttemptTrueFalse"
+                                        checked={currentQuestion.firstAttempt.correctAnswer === 'True'}
+                                        onChange={() => setCurrentQuestion({ 
+                                          ...currentQuestion, 
+                                          firstAttempt: { ...currentQuestion.firstAttempt, correctAnswer: 'True' }
+                                        })}
+                                      />
+                                      <label>True</label>
+                                    </div>
+                                    <div 
+                                      className={`option-item ${currentQuestion.firstAttempt.correctAnswer === 'False' ? 'checked' : ''}`}
+                                      onClick={() => setCurrentQuestion({ 
+                                        ...currentQuestion, 
+                                        firstAttempt: { ...currentQuestion.firstAttempt, correctAnswer: 'False' }
+                                      })}
+                                    >
+                                      <input
+                                        type="radio"
+                                        name="firstAttemptTrueFalse"
+                                        checked={currentQuestion.firstAttempt.correctAnswer === 'False'}
+                                        onChange={() => setCurrentQuestion({ 
+                                          ...currentQuestion, 
+                                          firstAttempt: { ...currentQuestion.firstAttempt, correctAnswer: 'False' }
+                                        })}
+                                      />
+                                      <label>False</label>
+                                    </div>
+                                  </div>
+                                  {currentQuestion.firstAttempt.correctAnswer && (
+                                    <div className="correct-answer-badge">
+                                      <p>
+                                        ✓ Correct Answer: <strong>{currentQuestion.firstAttempt.correctAnswer}</strong>
+                                      </p>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              {currentQuestion.firstAttempt.type === 'fill-in-blank' && (
+                                <>
+                                  <div className="form-group">
+                                    <label className="form-label">
+                                      Correct Answer
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={currentQuestion.firstAttempt.correctAnswer || ''}
+                                      onChange={(e) => setCurrentQuestion({ 
+                                        ...currentQuestion, 
+                                        firstAttempt: { ...currentQuestion.firstAttempt, correctAnswer: e.target.value }
+                                      })}
+                                      className="form-input"
+                                      placeholder="Enter the correct answer"
+                                    />
+                                  </div>
+                                  {currentQuestion.firstAttempt.correctAnswer && (
+                                    <div className="correct-answer-badge">
+                                      <p>
+                                        ✓ Correct Answer: <strong>{currentQuestion.firstAttempt.correctAnswer}</strong>
+                                      </p>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              <div className="form-group">
+                                <label className="form-label">
+                                  Points
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={currentQuestion.firstAttempt.points}
+                                  onChange={(e) => setCurrentQuestion({ 
+                                    ...currentQuestion, 
+                                    firstAttempt: { ...currentQuestion.firstAttempt, points: parseInt(e.target.value) || 1 }
+                                  })}
+                                  className="form-input"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Retake Question */}
+                            <div className="question-column retake">
+                              <h6 className="question-column-title">Retake Question</h6>
+                              <div className="form-group">
+                                <label className="form-label">
+                                  Question
+                                </label>
+                                <input
+                                  type="text"
+                                  value={currentQuestion.retake.question}
+                                  onChange={(e) => setCurrentQuestion({ 
+                                    ...currentQuestion, 
+                                    retake: { ...currentQuestion.retake, question: e.target.value }
+                                  })}
+                                  className="form-input"
+                                  placeholder="Enter question..."
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label className="form-label">
+                                  Question Type
+                                </label>
+                                <select
+                                  value={currentQuestion.retake.type}
+                                  onChange={(e) => setCurrentQuestion({ 
+                                    ...currentQuestion, 
+                                    retake: { 
+                                      ...currentQuestion.retake, 
+                                      type: e.target.value, 
+                                      options: e.target.value === 'multiple-choice' ? ['', '', '', ''] : []
+                                    }
+                                  })}
+                                  className="form-select"
+                                >
+                                  {questionTypes.map(type => (
+                                    <option key={type} value={type}>{type}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              {currentQuestion.retake.type === 'multiple-choice' && (
+                                <>
+                                  <div className="form-group">
+                                    <label className="form-label">
+                                      Options (Select the correct answer)
+                                    </label>
+                                    {currentQuestion.retake.options.map((option, idx) => (
+                                      <div key={idx} className="option-item">
+                                        <input
+                                          type="radio"
+                                          name="retakeCorrectAnswer"
+                                          checked={currentQuestion.retake.correctAnswer === option}
+                                          onChange={() => setCurrentQuestion({ 
+                                            ...currentQuestion, 
+                                            retake: { ...currentQuestion.retake, correctAnswer: option }
+                                          })}
+                                        />
+                                        <input
+                                          type="text"
+                                          value={option}
+                                          onChange={(e) => {
+                                            const newOptions = [...currentQuestion.retake.options];
+                                            const oldValue = newOptions[idx];
+                                            newOptions[idx] = e.target.value;
+                                            const newCorrectAnswer = currentQuestion.retake.correctAnswer === oldValue 
+                                              ? e.target.value 
+                                              : currentQuestion.retake.correctAnswer;
+                                            setCurrentQuestion({ 
+                                              ...currentQuestion, 
+                                              retake: { 
+                                                ...currentQuestion.retake, 
+                                                options: newOptions,
+                                                correctAnswer: newCorrectAnswer
+                                              }
+                                            });
+                                          }}
+                                          placeholder={`Option ${idx + 1}`}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                  {currentQuestion.retake.correctAnswer && (
+                                    <div className="correct-answer-badge">
+                                      <p>
+                                        ✓ Correct Answer: <strong>{currentQuestion.retake.correctAnswer}</strong>
+                                      </p>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              {currentQuestion.retake.type === 'true-false' && (
+                                <>
+                                  <div className="form-group">
+                                    <label className="form-label">
+                                      Select Correct Answer
+                                    </label>
+                                    <div 
+                                      className={`option-item ${currentQuestion.retake.correctAnswer === 'True' ? 'checked' : ''}`}
+                                      onClick={() => setCurrentQuestion({ 
+                                        ...currentQuestion, 
+                                        retake: { ...currentQuestion.retake, correctAnswer: 'True' }
+                                      })}
+                                    >
+                                      <input
+                                        type="radio"
+                                        name="retakeTrueFalse"
+                                        checked={currentQuestion.retake.correctAnswer === 'True'}
+                                        onChange={() => setCurrentQuestion({ 
+                                          ...currentQuestion, 
+                                          retake: { ...currentQuestion.retake, correctAnswer: 'True' }
+                                        })}
+                                      />
+                                      <label>True</label>
+                                    </div>
+                                    <div 
+                                      className={`option-item ${currentQuestion.retake.correctAnswer === 'False' ? 'checked' : ''}`}
+                                      onClick={() => setCurrentQuestion({ 
+                                        ...currentQuestion, 
+                                        retake: { ...currentQuestion.retake, correctAnswer: 'False' }
+                                      })}
+                                    >
+                                      <input
+                                        type="radio"
+                                        name="retakeTrueFalse"
+                                        checked={currentQuestion.retake.correctAnswer === 'False'}
+                                        onChange={() => setCurrentQuestion({ 
+                                          ...currentQuestion, 
+                                          retake: { ...currentQuestion.retake, correctAnswer: 'False' }
+                                        })}
+                                      />
+                                      <label>False</label>
+                                    </div>
+                                  </div>
+                                  {currentQuestion.retake.correctAnswer && (
+                                    <div className="correct-answer-badge">
+                                      <p>
+                                        ✓ Correct Answer: <strong>{currentQuestion.retake.correctAnswer}</strong>
+                                      </p>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              {currentQuestion.retake.type === 'fill-in-blank' && (
+                                <>
+                                  <div className="form-group">
+                                    <label className="form-label">
+                                      Correct Answer
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={currentQuestion.retake.correctAnswer || ''}
+                                      onChange={(e) => setCurrentQuestion({ 
+                                        ...currentQuestion, 
+                                        retake: { ...currentQuestion.retake, correctAnswer: e.target.value }
+                                      })}
+                                      className="form-input"
+                                      placeholder="Enter the correct answer"
+                                    />
+                                  </div>
+                                  {currentQuestion.retake.correctAnswer && (
+                                    <div className="correct-answer-badge">
+                                      <p>
+                                        ✓ Correct Answer: <strong>{currentQuestion.retake.correctAnswer}</strong>
+                                      </p>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              <div className="form-group">
+                                <label className="form-label">
+                                  Points
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={currentQuestion.retake.points}
+                                  onChange={(e) => setCurrentQuestion({ 
+                                    ...currentQuestion, 
+                                    retake: { ...currentQuestion.retake, points: parseInt(e.target.value) || 1 }
+                                  })}
+                                  className="form-input"
+                                />
+                              </div>
+                            </div>
                           </div>
-                          <div className="mb-3">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Points
-                            </label>
-                            <input
-                              type="number"
-                              min="1"
-                              value={currentQuestion.points}
-                              onChange={(e) => setCurrentQuestion({ ...currentQuestion, points: parseInt(e.target.value) || 1 })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                            />
+                          
+                          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+                            <button
+                              onClick={handleAddQuestion}
+                              className="btn-save"
+                              style={{ width: '100%' }}
+                            >
+                              Add Question Pair (First Attempt + Retake)
+                            </button>
                           </div>
-                          <button
-                            onClick={handleAddQuestion}
-                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-                          >
-                            Add Question
-                          </button>
                         </div>
 
                         {/* Existing Questions */}
-                        {currentModule.quiz.questions.length > 0 && (
-                          <div className="space-y-2">
-                            <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded">
-                              <p className="text-xs text-blue-700">
-                                <strong>Quiz Structure:</strong> Questions 1-5 for first attempt, Questions 6-10 for retake quiz.
-                                {currentModule.quiz.questions.length < 5 && ` Add ${5 - currentModule.quiz.questions.length} more for first attempt.`}
-                                {currentModule.quiz.questions.length >= 5 && currentModule.quiz.questions.length < 10 && ` Add ${10 - currentModule.quiz.questions.length} more for retake quiz.`}
-                                {currentModule.quiz.questions.length >= 10 && ' Both first attempt and retake quiz are ready!'}
-                              </p>
+                        {(currentModule.quiz.firstAttemptQuestions?.length > 0 || currentModule.quiz.retakeQuestions?.length > 0) && (
+                          <div className="existing-questions">
+                            <div className="quiz-section-description">
+                              <strong>Quiz Structure:</strong> You have {currentModule.quiz.firstAttemptQuestions?.length || 0} question pair(s).
+                              <br />
+                              <strong>Note:</strong> If a user fails the retake quiz, they must wait for the cooldown period (set in Basic Info tab) before attempting again.
                             </div>
-                            {currentModule.quiz.questions.map((q, idx) => (
-                              <div key={idx} className="bg-white p-3 rounded border border-gray-200 flex justify-between items-start">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-xs font-semibold text-gray-500">
-                                      Q{idx + 1} {idx < 5 ? '(First Attempt)' : '(Retake Quiz)'}
-                                    </span>
-                                    <span className="text-xs text-gray-500">• {q.points} point{q.points !== 1 ? 's' : ''}</span>
+                            {currentModule.quiz.firstAttemptQuestions?.map((q, idx) => {
+                              const retakeQ = currentModule.quiz.retakeQuestions?.[idx];
+                              return (
+                                <div key={idx} className="question-pair-card">
+                                  <div className="question-pair-grid">
+                                    {/* First Attempt Question Display */}
+                                    <div className="question-display first-attempt">
+                                      <div className="question-number first-attempt">
+                                        Q{idx + 1} (First Attempt) • {q.points} point{q.points !== 1 ? 's' : ''}
+                                      </div>
+                                      <p className="question-text">{q.question}</p>
+                                      {q.imageUrl && (
+                                        <img 
+                                          src={q.imageUrl} 
+                                          alt="Question" 
+                                          style={{ marginTop: '0.5rem', maxWidth: '100%', height: 'auto', border: '1px solid #e5e7eb', borderRadius: '0.5rem' }}
+                                        />
+                                      )}
+                                      {q.type === 'multiple-choice' && q.options && (
+                                        <ul className="question-options">
+                                          {q.options.map((opt, optIdx) => (
+                                            <li key={optIdx} className={opt === q.correctAnswer ? 'correct' : ''}>
+                                              {opt === q.correctAnswer ? '✓ ' : '  '}{opt}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      )}
+                                      <p style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '0.5rem' }}>
+                                        Correct Answer: <strong>{q.correctAnswer}</strong>
+                                      </p>
+                                    </div>
+                                    
+                                    {/* Retake Question Display */}
+                                    {retakeQ && (
+                                      <div className="question-display retake">
+                                        <div className="question-number retake">
+                                          Q{idx + 1} (Retake) • {retakeQ.points} point{retakeQ.points !== 1 ? 's' : ''}
+                                        </div>
+                                        <p className="question-text">{retakeQ.question}</p>
+                                        {retakeQ.imageUrl && (
+                                          <img 
+                                            src={retakeQ.imageUrl} 
+                                            alt="Question" 
+                                            style={{ marginTop: '0.5rem', maxWidth: '100%', height: 'auto', border: '1px solid #e5e7eb', borderRadius: '0.5rem' }}
+                                          />
+                                        )}
+                                        {retakeQ.type === 'multiple-choice' && retakeQ.options && (
+                                          <ul className="question-options">
+                                            {retakeQ.options.map((opt, optIdx) => (
+                                              <li key={optIdx} className={opt === retakeQ.correctAnswer ? 'correct' : ''}>
+                                                {opt === retakeQ.correctAnswer ? '✓ ' : '  '}{opt}
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        )}
+                                        <p style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '0.5rem' }}>
+                                          Correct Answer: <strong>{retakeQ.correctAnswer}</strong>
+                                        </p>
+                                      </div>
+                                    )}
                                   </div>
-                                  <p className="font-medium text-sm">{q.question}</p>
-                                  {q.imageUrl && (
-                                    <img 
-                                      src={q.imageUrl} 
-                                      alt="Question" 
-                                      className="mt-2 max-w-xs h-auto border border-gray-300 rounded"
-                                    />
-                                  )}
-                                  {q.type === 'multiple-choice' && q.options && (
-                                    <ul className="text-xs text-gray-600 mt-1">
-                                      {q.options.map((opt, optIdx) => (
-                                        <li key={optIdx} className={opt === q.correctAnswer ? 'font-semibold text-green-700' : ''}>
-                                          {opt === q.correctAnswer ? '✓ ' : '  '}{opt}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  )}
-                                  <p className="text-xs text-green-600 mt-1">
-                                    Correct Answer: <strong>{q.correctAnswer}</strong>
-                                  </p>
+                                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end' }}>
+                                    <button
+                                      onClick={() => handleRemoveQuestion(idx)}
+                                      className="btn-delete"
+                                      style={{ fontSize: '0.875rem' }}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                      Remove Question Pair
+                                    </button>
+                                  </div>
                                 </div>
-                                <button
-                                  onClick={() => handleRemoveQuestion(idx)}
-                                  className="ml-2 text-red-600 hover:text-red-800"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </div>
 
                       <button
                         onClick={handleAddModule}
-                        className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                        className="btn-save"
+                        style={{ width: '100%', marginTop: '1.5rem' }}
                       >
-                        <Plus className="w-4 h-4 inline mr-2" />
-                        Add Module
+                        <Plus className="w-4 h-4" />
+                        {editingModuleIndex !== null ? 'Update Module' : 'Add Module'}
                       </button>
                     </div>
 
                     {/* Existing Modules List */}
                     {formData.modules.length > 0 && (
-                      <div>
-                        <h4 className="font-semibold text-gray-900 mb-4">Course Modules</h4>
-                        <div className="space-y-3">
+                      <div className="modules-list">
+                        <h4 className="modules-list-title">Course Modules</h4>
+                        <div>
                           {formData.modules.map((module, index) => (
-                            <div key={index} className="bg-white p-4 rounded-lg border border-gray-200">
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <h5 className="font-semibold text-gray-900">{module.name}</h5>
-                                  <p className="text-sm text-gray-600">ID: {module.m_id}</p>
-                                  <p className="text-sm text-gray-600">Duration: {module.duration} min | Lessons: {module.lessons}</p>
+                            <div key={index} className="module-item">
+                              <div className="module-info">
+                                <h5>{module.name}</h5>
+                                <p>ID: {module.m_id}</p>
+                                <p>Duration: {module.duration} min | Lessons: {module.lessons}</p>
+                                <div className="module-badges">
                                   {module.video && (
-                                    <div className="mt-2 flex items-center text-sm text-green-600">
-                                      <Video className="w-4 h-4 mr-1" />
+                                    <span className="module-badge video">
+                                      <Video className="w-4 h-4" />
                                       Video uploaded
-                                    </div>
+                                    </span>
                                   )}
-                                  {module.quiz && module.quiz.questions.length > 0 && (
-                                    <div className="mt-2 flex items-center text-sm text-blue-600">
-                                      <FileText className="w-4 h-4 mr-1" />
-                                      {module.quiz.questions.length} questions
-                                    </div>
+                                  {module.quiz && (module.quiz.firstAttemptQuestions?.length > 0 || module.quiz.retakeQuestions?.length > 0) && (
+                                    <span className="module-badge quiz">
+                                      <FileText className="w-4 h-4" />
+                                      {(module.quiz.firstAttemptQuestions?.length || 0) + (module.quiz.retakeQuestions?.length || 0)} questions
+                                    </span>
                                   )}
                                 </div>
+                              </div>
+                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button
+                                  onClick={() => handleEditModule(index)}
+                                  className="btn-edit"
+                                  title="Edit module"
+                                >
+                                  <Edit className="w-5 h-5" />
+                                </button>
                                 <button
                                   onClick={() => handleRemoveModule(index)}
-                                  className="ml-4 text-red-600 hover:text-red-800"
+                                  className="btn-delete"
+                                  title="Delete module"
                                 >
                                   <Trash2 className="w-5 h-5" />
                                 </button>
@@ -1564,32 +2303,32 @@ const CreateCommonCourses = () => {
                   </div>
                 )}
 
-                {/* Action Buttons */}
-                <div className="flex justify-end gap-4 mt-6 pt-6 border-t border-gray-200">
-                  <button
-                    onClick={closeModal}
-                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={isLoading}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                  >
-                    {isLoading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4 mr-2" />
-                        Save Course
-                      </>
-                    )}
-                  </button>
-                </div>
+              {/* Action Buttons */}
+              <div className="modal-actions">
+                <button
+                  onClick={closeModal}
+                  className="btn-cancel"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={isLoading}
+                  className="btn-save"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="spinner" style={{ width: '1rem', height: '1rem', borderWidth: '2px' }}></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Save Course
+                    </>
+                  )}
+                </button>
+              </div>
               </div>
             </div>
           </div>

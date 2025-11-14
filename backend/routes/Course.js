@@ -58,7 +58,7 @@ router.post('/create', async (req, res) => {
   try {
     console.log('🔍 Creating common course:', req.body);
     
-    const { title, description, modules } = req.body;
+    const { title, description, modules, backgroundImageUrl, retakeQuizCooldownHours } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: 'Course title is required' });
@@ -84,6 +84,8 @@ router.post('/create', async (req, res) => {
     const newCourse = new Common_Course({
       title,
       description: description || '',
+      backgroundImageUrl: backgroundImageUrl || null,
+      retakeQuizCooldownHours: retakeQuizCooldownHours || 24,
       modules: modules.map(module => {
         const moduleData = {
           m_id: module.m_id,
@@ -99,7 +101,8 @@ router.post('/create', async (req, res) => {
             title: module.lessonDetails.title || module.name,
             videoUrl: module.lessonDetails.videoUrl || null,
             content: module.lessonDetails.content || [],
-            duration: module.lessonDetails.duration || `${module.duration || 0}min`
+            duration: module.lessonDetails.duration || `${module.duration || 0}min`,
+            notes: module.lessonDetails.notes || ''
           };
           console.log(`📋 Module ${module.m_id} lessonDetails:`, moduleData.lessonDetails);
         }
@@ -156,7 +159,7 @@ router.put('/update/:courseId', async (req, res, next) => {
   try {
     
     const { courseId } = req.params;
-    const { title, description, modules } = req.body;
+    const { title, description, modules, backgroundImageUrl, retakeQuizCooldownHours } = req.body;
 
     // Validate courseId
     const mongoose = require('mongoose');
@@ -197,6 +200,12 @@ router.put('/update/:courseId', async (req, res, next) => {
     // Update the course
     existingCourse.title = title;
     existingCourse.description = description || '';
+    if (backgroundImageUrl !== undefined) {
+      existingCourse.backgroundImageUrl = backgroundImageUrl || null;
+    }
+    if (retakeQuizCooldownHours !== undefined) {
+      existingCourse.retakeQuizCooldownHours = retakeQuizCooldownHours || 24;
+    }
     existingCourse.modules = modules.map(module => {
       // Find existing module to preserve its lessonDetails if new one doesn't have videoUrl
       const existingModule = existingCourse.modules.find(m => m.m_id === module.m_id);
@@ -355,6 +364,7 @@ router.get('/lesson/:courseId/:lessonId', async (req, res) => {
       videoUrl: module.lessonDetails?.videoUrl || null,
       content: module.lessonDetails?.content || [],
       duration: module.lessonDetails?.duration || `${module.duration}min`,
+      notes: module.lessonDetails?.notes || '',
       moduleName: module.name,
       moduleDescription: module.description
     };
@@ -375,14 +385,10 @@ router.post('/create-quiz', async (req, res) => {
   try {
     console.log('🔍 Creating quiz:', req.body);
     
-    const { courseId, mo_id, questions, passingScore } = req.body;
+    const { courseId, mo_id, questions, firstAttemptQuestions, retakeQuestions, passingScore } = req.body;
 
     if (!courseId || !mo_id) {
       return res.status(400).json({ error: 'courseId and mo_id are required' });
-    }
-
-    if (!questions || !Array.isArray(questions) || questions.length === 0) {
-      return res.status(400).json({ error: 'At least one question is required' });
     }
 
     // Check if course exists
@@ -399,16 +405,29 @@ router.post('/create-quiz', async (req, res) => {
 
     // Check if quiz already exists for this module
     const existingQuiz = await Quiz.findOne({ courseId, mo_id });
+    
+    // Helper function to map question data
+    const mapQuestion = (q) => ({
+      question: q.question,
+      type: q.type || 'multiple-choice',
+      options: q.options || [],
+      correctAnswer: q.correctAnswer,
+      points: q.points || 1,
+      imageUrl: q.imageUrl || null
+    });
+
     if (existingQuiz) {
       // Update existing quiz with new structure
-      existingQuiz.questions = questions.map(q => ({
-        question: q.question,
-        type: q.type || 'multiple-choice',
-        options: q.options || [],
-        correctAnswer: q.correctAnswer, // Now expects a string (the actual answer text)
-        points: q.points || 1,
-        imageUrl: q.imageUrl || null // Added imageUrl support
-      }));
+      if (firstAttemptQuestions && retakeQuestions) {
+        // New structure: separate question sets
+        existingQuiz.firstAttemptQuestions = firstAttemptQuestions.map(mapQuestion);
+        existingQuiz.retakeQuestions = retakeQuestions.map(mapQuestion);
+      } else if (questions) {
+        // Old structure: backward compatibility
+        existingQuiz.questions = questions.map(mapQuestion);
+      } else {
+        return res.status(400).json({ error: 'Either questions or both firstAttemptQuestions and retakeQuestions are required' });
+      }
       existingQuiz.passingScore = passingScore || 70;
       existingQuiz.updatedAt = new Date();
       const updatedQuiz = await existingQuiz.save();
@@ -421,28 +440,53 @@ router.post('/create-quiz', async (req, res) => {
     }
 
     // Create new quiz
-    const newQuiz = new Quiz({
-      courseId,
-      mo_id,
-      questions: questions.map(q => ({
-        question: q.question,
-        type: q.type || 'multiple-choice',
-        options: q.options || [],
-        correctAnswer: q.correctAnswer, // Now expects a string (the actual answer text)
-        points: q.points || 1,
-        imageUrl: q.imageUrl || null // Added imageUrl support
-      })),
-      passingScore: passingScore || 70
-    });
-
-    const savedQuiz = await newQuiz.save();
-    console.log('✅ Quiz created successfully:', savedQuiz._id);
-
-    res.status(201).json({
-      success: true,
-      message: 'Quiz created successfully',
-      quiz: savedQuiz
-    });
+    if (firstAttemptQuestions && retakeQuestions) {
+      // New structure: separate question sets
+      if (!Array.isArray(firstAttemptQuestions) || firstAttemptQuestions.length === 0) {
+        return res.status(400).json({ error: 'At least one first attempt question is required' });
+      }
+      if (!Array.isArray(retakeQuestions) || retakeQuestions.length === 0) {
+        return res.status(400).json({ error: 'At least one retake question is required' });
+      }
+      
+      const newQuiz = new Quiz({
+        courseId,
+        mo_id,
+        firstAttemptQuestions: firstAttemptQuestions.map(mapQuestion),
+        retakeQuestions: retakeQuestions.map(mapQuestion),
+        passingScore: passingScore || 70
+      });
+      
+      const savedQuiz = await newQuiz.save();
+      console.log('✅ Quiz created successfully with new structure:', savedQuiz._id);
+      return res.status(201).json({
+        success: true,
+        message: 'Quiz created successfully',
+        quiz: savedQuiz
+      });
+    } else if (questions) {
+      // Old structure: backward compatibility
+      if (!Array.isArray(questions) || questions.length === 0) {
+        return res.status(400).json({ error: 'At least one question is required' });
+      }
+      
+      const newQuiz = new Quiz({
+        courseId,
+        mo_id,
+        questions: questions.map(mapQuestion),
+        passingScore: passingScore || 70
+      });
+      
+      const savedQuiz = await newQuiz.save();
+      console.log('✅ Quiz created successfully with old structure:', savedQuiz._id);
+      return res.status(201).json({
+        success: true,
+        message: 'Quiz created successfully',
+        quiz: savedQuiz
+      });
+    } else {
+      return res.status(400).json({ error: 'Either questions or both firstAttemptQuestions and retakeQuestions are required' });
+    }
   } catch (error) {
     console.error('❌ Error creating quiz:', error);
     res.status(500).json({ 
@@ -600,16 +644,23 @@ router.post('/check-quiz-availability', async (req, res) => {
     
     console.log(`🔍 Checking quiz availability for ${employeeEmail} - ${courseName}`);
     
+    // Fetch course to get retakeQuizCooldownHours
+    const Common_Course = require('../models/common_courses');
+    const course = await Common_Course.findOne({ title: courseName });
+    const cooldownHours = course?.retakeQuizCooldownHours || 24;
+    console.log(`⏰ Course cooldown setting: ${cooldownHours} hours`);
+    
     const { canTakeQuiz, getQuizCooldownRemaining } = require('../commonUserProgressManager');
     
-    const canTake = await canTakeQuiz(employeeEmail, courseName);
-    const cooldown = await getQuizCooldownRemaining(employeeEmail, courseName);
+    const canTake = await canTakeQuiz(employeeEmail, courseName, cooldownHours);
+    const cooldown = await getQuizCooldownRemaining(employeeEmail, courseName, cooldownHours);
     
-    console.log(`📊 Quiz availability result:`, { canTake, cooldown });
+    console.log(`📊 Quiz availability result:`, { canTake, cooldown, cooldownHours });
     
     res.json({
       canTake,
       cooldown,
+      cooldownHours, // Include cooldown hours in response for frontend
       message: canTake ? 'Quiz is available' : 'Quiz is not available yet'
     });
     
@@ -723,7 +774,8 @@ router.get('/:courseId', async (req, res) => {
           title: module.lessonDetails?.title || module.name,
           videoUrl: module.lessonDetails?.videoUrl || null,
           content: module.lessonDetails?.content || [],
-          duration: module.lessonDetails?.duration || `${module.duration || 0}min`
+          duration: module.lessonDetails?.duration || `${module.duration || 0}min`,
+          notes: module.lessonDetails?.notes || ''
         };
         console.log(`📹 Module ${module.m_id} - videoUrl: ${module.lessonDetails?.videoUrl || 'null'}`);
       }

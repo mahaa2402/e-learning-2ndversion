@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import Navbar from '../components/Navbar';
 import courseData from './coursedata';
@@ -9,6 +9,7 @@ import './lessonpage.css';
 function LessonPage() {
   const { courseId, lessonId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   
   
   // useEffect(() => {
@@ -471,7 +472,8 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
     title: dbLesson.title,
     videoUrl: dbLesson.videoUrl,
     content: dbLesson.content,
-    duration: dbLesson.duration
+    duration: dbLesson.duration,
+    notes: dbLesson.notes
   } : lessons[actualLessonId];
 
   // For database courses, also check if lesson exists in dbCourse.lessons
@@ -570,12 +572,24 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
     }
   }, [courseId, lessonId, actualLessonId, navigate]);
 
-  // Fetch user progress on mount
+  // Fetch user progress on mount and when navigating from quiz
   useEffect(() => {
-    if (course) {
-      fetchUserProgress();
+    if (course || dbCourse) {
+      // If navigating from quiz page with refreshProgress flag, force refresh
+      const shouldForceRefresh = location.state?.refreshProgress;
+      
+      // Add a small delay if coming from quiz to ensure progress is saved
+      if (shouldForceRefresh) {
+        setTimeout(() => {
+          fetchUserProgress(true);
+          // Clear the state after using it
+          navigate(location.pathname, { replace: true, state: {} });
+        }, 500);
+      } else {
+        fetchUserProgress(false);
+      }
     }
-  }, [courseId, course]);
+  }, [courseId, course, dbCourse, lessonId]);
 
   // Fetch subtitle when lesson changes
   useEffect(() => {
@@ -669,9 +683,15 @@ useEffect(() => {
     const { courseName: eventCourseName, lessonUnlockStatus } = event.detail;
     console.log('🔄 Progress updated event received:', { eventCourseName, lessonUnlockStatus });
 
-    if (eventCourseName === course?.name) {
+    const currentCourseName = course?.name || course?.title || dbCourse?.title || dbCourse?.name;
+    if (eventCourseName === currentCourseName) {
       console.log('✅ Updating unlock status from progress update event...');
-      setUnlockStatus(lessonUnlockStatus);
+      if (Array.isArray(lessonUnlockStatus)) {
+        setUnlockStatus(lessonUnlockStatus);
+      } else {
+        // If lessonUnlockStatus is not provided, fetch it
+        fetchUserProgress(true);
+      }
     }
   };
 
@@ -1053,6 +1073,38 @@ const renderFormattedContent = (contentArray) => {
               </div>
             )}
           </div>
+
+          {/* Notes Section - Display below video */}
+          {(dbLesson?.notes || lesson?.notes || (dbCourse?.modules?.find(m => m.m_id === lessonId)?.lessonDetails?.notes)) && (
+            <div className="lesson-notes" style={{ 
+              padding: '20px',
+              backgroundColor: '#fff',
+              borderRadius: '8px',
+              marginTop: '20px',
+              border: '1px solid #e0e0e0',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}>
+              <h3 style={{ 
+                marginTop: 0,
+                marginBottom: '15px',
+                color: '#2c3e50',
+                fontSize: '1.3em',
+                fontWeight: 'bold',
+                borderBottom: '2px solid #3498db',
+                paddingBottom: '10px'
+              }}>
+                📝 Video Notes
+              </h3>
+              <div style={{
+                color: '#34495e',
+                lineHeight: '1.8',
+                whiteSpace: 'pre-wrap',
+                wordWrap: 'break-word'
+              }}>
+                {dbLesson?.notes || lesson?.notes || (dbCourse?.modules?.find(m => m.m_id === lessonId)?.lessonDetails?.notes)}
+              </div>
+            </div>
+          )}
         
           <div className="lesson-paragraphs" style={{ 
   padding: '20px',
@@ -1068,10 +1120,22 @@ const renderFormattedContent = (contentArray) => {
         <div className="lesson-sidebar">
           <div className="sidebar-section">
             <h4>Courses</h4>
-            {lessonKeys.map((id) => {
+            {lessonKeys.map((id, index) => {
               const unlocked = isLessonUnlocked(id);
               const completed = isLessonCompleted(id);
               const isCurrentLesson = id === actualLessonId;
+              
+              // Get module name: for database courses, use module name; for static courses, use lesson title
+              let moduleName = lessons[id]?.title || '';
+              if (dbCourse && dbCourse.modules) {
+                const module = dbCourse.modules.find(m => m.m_id === id);
+                if (module) {
+                  moduleName = module.name;
+                }
+              }
+              
+              const lessonNumber = index + 1;
+              
               return (
                 <button
                   key={id}
@@ -1083,7 +1147,7 @@ const renderFormattedContent = (contentArray) => {
                     {!unlocked && <span className="lock-icon">🔒</span>}
                     {completed && <span className="check-icon">✓</span>}
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      Lesson {id}: {lessons[id].title}
+                      Lesson {lessonNumber}: {moduleName}
                     </span>
                   </span>
                 </button>
@@ -1093,20 +1157,37 @@ const renderFormattedContent = (contentArray) => {
 
           <div className="sidebar-section">
             <h4>Practice Quiz</h4>
-            {lessonKeys.map((id) => {
+            {lessonKeys.map((id, index) => {
               const quizAvailable = isQuizAvailable(id);
               console.log("is quiz available", quizAvailable);
               const quizCompleted = isQuizCompleted(id);
               const isCurrentLesson = id === actualLessonId;
+              
+              // Get module name: for database courses, use module name; for static courses, use lesson title
+              let moduleName = lessons[id]?.title || '';
+              if (dbCourse && dbCourse.modules) {
+                const module = dbCourse.modules.find(m => m.m_id === id);
+                if (module) {
+                  moduleName = module.name;
+                }
+              }
+              
+              const quizNumber = index + 1;
+              
               return (
                 <button
                   key={id}
                   className={`quiz-button ${isCurrentLesson ? 'active' : ''} ${quizCompleted ? 'completed' : ''} ${!quizAvailable ? 'locked' : ''}`}
-                  disabled={!quizAvailable || quizCompleted}
+                  disabled={!quizAvailable}
                   onClick={async () => {
-                    // If quiz is already completed, show message and don't navigate
+                    // If quiz is already completed, show message with View Lesson button
                     if (quizCompleted) {
-                      alert('✅ You have already completed this quiz!\n\nYou cannot retake a completed quiz.');
+                      const userConfirmed = window.confirm(
+                        '✅ You have already completed this quiz!\n\nYou cannot retake a completed quiz.\n\nWould you like to view the lesson instead?'
+                      );
+                      if (userConfirmed) {
+                        navigate(`/course/${courseId}/lesson/${id}`);
+                      }
                       return;
                     }
                     
@@ -1136,7 +1217,9 @@ const renderFormattedContent = (contentArray) => {
                             // Quiz is blocked, show popup
                             const hours = result.cooldown.hours;
                             const minutes = result.cooldown.minutes;
-                            alert(`⏰ You cannot take this quiz right now!\n\nYou already failed it recently and need to wait ${hours}h ${minutes}m before retrying.\n\nThis 24-hour cooldown ensures proper learning and prevents rapid retakes.`);
+                            const cooldownHours = result.cooldownHours || 24;
+                            const hoursText = cooldownHours === 1 ? 'hour' : 'hours';
+                            alert(`⏰ You cannot take this quiz right now!\n\nYou already failed the retake quiz and need to wait ${hours}h ${minutes}m before retrying.\n\nThis ${cooldownHours}-${hoursText} cooldown ensures proper learning and prevents rapid retakes.`);
                             return;
                           }
                         }
@@ -1154,7 +1237,7 @@ const renderFormattedContent = (contentArray) => {
                     {!quizAvailable && <span className="lock-icon">🔒</span>}
                     {quizCompleted && <span className="check-icon">✓</span>}
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      Quiz {id}: {lessons[id].title}
+                      Quiz {quizNumber}: {moduleName}
                     </span>
                   </span>
                 </button>

@@ -413,11 +413,14 @@ async function getCourseCompletionStatus(employeeEmail, courseName) {
 
 /**
  * Check if employee can take quiz for a specific course
- * Returns true if quiz is available (timestamp is 0 or 24 hours have passed)
+ * Returns true if quiz is available (timestamp is 0 or cooldown hours have passed)
+ * @param {string} employeeEmail - Employee email
+ * @param {string} courseName - Course name
+ * @param {number} cooldownHours - Cooldown time in hours (default: 24)
  */
-async function canTakeQuiz(employeeEmail, courseName) {
+async function canTakeQuiz(employeeEmail, courseName, cooldownHours = 24) {
   try {
-    console.log(`🔍 Checking quiz availability for ${employeeEmail} - ${courseName}`);
+    console.log(`🔍 Checking quiz availability for ${employeeEmail} - ${courseName} (cooldown: ${cooldownHours} hours)`);
     
     const progress = await CommonUserProgress.findOne({ employeeEmail });
     if (!progress) {
@@ -439,12 +442,13 @@ async function canTakeQuiz(employeeEmail, courseName) {
     console.log(`⏰ Quiz timestamp for ${courseName}: ${quizTime}`);
     console.log(`⏰ Current time: ${now}`);
     console.log(`⏰ Hours since last attempt: ${hoursDiff.toFixed(2)}`);
+    console.log(`⏰ Required cooldown: ${cooldownHours} hours`);
     
-    if (hoursDiff >= 24) {
-      console.log(`✅ 24 hours have passed, quiz available`);
+    if (hoursDiff >= cooldownHours) {
+      console.log(`✅ ${cooldownHours} hours have passed, quiz available`);
       return true;
     } else {
-      console.log(`⏳ Quiz not available yet, ${(24 - hoursDiff).toFixed(2)} hours remaining`);
+      console.log(`⏳ Quiz not available yet, ${(cooldownHours - hoursDiff).toFixed(2)} hours remaining`);
       return false;
     }
   } catch (error) {
@@ -478,8 +482,11 @@ async function updateQuizTimestamp(employeeEmail, courseName) {
 /**
  * Get remaining time until quiz is available
  * Returns time in hours and minutes
+ * @param {string} employeeEmail - Employee email
+ * @param {string} courseName - Course name
+ * @param {number} cooldownHours - Cooldown time in hours (default: 24)
  */
-async function getQuizCooldownRemaining(employeeEmail, courseName) {
+async function getQuizCooldownRemaining(employeeEmail, courseName, cooldownHours = 24) {
   try {
     const progress = await CommonUserProgress.findOne({ employeeEmail });
     if (!progress) {
@@ -495,12 +502,12 @@ async function getQuizCooldownRemaining(employeeEmail, courseName) {
     const timeDiff = now.getTime() - quizTime.getTime();
     const hoursDiff = timeDiff / (1000 * 60 * 60);
     
-    if (hoursDiff >= 24) {
+    if (hoursDiff >= cooldownHours) {
       return { hours: 0, minutes: 0, available: true };
     }
     
-    const remainingHours = Math.floor(24 - hoursDiff);
-    const remainingMinutes = Math.floor((24 - hoursDiff - remainingHours) * 60);
+    const remainingHours = Math.floor(cooldownHours - hoursDiff);
+    const remainingMinutes = Math.floor((cooldownHours - hoursDiff - remainingHours) * 60);
     
     return {
       hours: remainingHours,

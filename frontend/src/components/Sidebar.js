@@ -84,7 +84,7 @@ const Sidebar = () => {
           <div
             key={index}
             data-label={item.label}
-            className={`sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 mb-1 ${
+            className={`sidebar-item flex items-center gap-4 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 mb-1 ${
               item.active 
                 ? 'bg-blue-50 text-blue-700 border border-blue-200' 
                 : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
@@ -97,8 +97,8 @@ const Sidebar = () => {
               minHeight: '40px'
             }}
           >
-            <item.icon className="sidebar-item-icon w-5 h-5" />
-            <span className="font-medium">{item.label}</span>
+            <item.icon className="sidebar-item-icon w-5 h-5 flex-shrink-0" />
+            <span className="font-medium flex-1">{item.label}</span>
           </div>
         ))}
       </div>
@@ -110,15 +110,15 @@ const Sidebar = () => {
         {supportItems.map((item, index) => (
           <div 
             key={index} 
-            className={`sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 mb-1 ${
+            className={`sidebar-item flex items-center gap-4 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 mb-1 ${
               item.label === 'Logout' 
                 ? 'text-red-600 hover:bg-red-50 hover:text-red-700' 
                 : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
             }`}
             onClick={item.onClick}
           >
-            <item.icon className="sidebar-item-icon w-5 h-5" />
-            <span className="font-medium">{item.label}</span>
+            <item.icon className="sidebar-item-icon w-5 h-5 flex-shrink-0" />
+            <span className="font-medium flex-1">{item.label}</span>
           </div>
         ))}
       </div>

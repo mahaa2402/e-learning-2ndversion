@@ -163,6 +163,18 @@ function LandingPage() {
   Excel: "excel.png"
 };
 
+// Helper function to get course background image
+const getCourseImage = (course) => {
+  // Priority: 1. Database image URL, 2. Static imageMap, 3. Default
+  if (course.backgroundImageUrl) {
+    return course.backgroundImageUrl;
+  }
+  if (imageMap[course.title]) {
+    return `${process.env.PUBLIC_URL}/${imageMap[course.title]}`;
+  }
+  return `${process.env.PUBLIC_URL}/course.jpg`;
+};
+
 
   // Handle scroll detection for navbar shrinking
   useEffect(() => {
@@ -469,9 +481,7 @@ function LandingPage() {
                  <div 
   className="course-image" 
   style={{
-    backgroundImage: imageMap[course.title] 
-      ? `url(${process.env.PUBLIC_URL}/${imageMap[course.title]})` 
-      : `url(${process.env.PUBLIC_URL}/course.jpg)`,
+          backgroundImage: `url(${getCourseImage(course)})`,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat'

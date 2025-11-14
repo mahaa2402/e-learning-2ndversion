@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './quiz.css';
 import { useParams, useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '../config/api';
@@ -254,6 +254,7 @@ const Quiz = () => {
   const [moduleHasQuiz, setModuleHasQuiz] = useState(true); // Track if current module has a quiz
   const [timeRemaining, setTimeRemaining] = useState(null); // Timer in seconds
   const [timerStarted, setTimerStarted] = useState(false); // Track if timer has started
+  const cooldownAlertShown = useRef(false); // Track if cooldown alert has been shown
 
   // Function to refresh progress data after quiz completion
   const refreshProgressData = async () => {
@@ -339,7 +340,9 @@ const Quiz = () => {
             if (!result.canTake) {
               setQuizBlocked(true);
               setCooldownTime(result.cooldown);
-              setError(`Quiz is not available yet. You can retry in ${result.cooldown.hours}h ${result.cooldown.minutes}m`);
+              const cooldownHours = result.cooldownHours || 24;
+              const hoursText = cooldownHours === 1 ? 'hour' : 'hours';
+              setError(`Quiz is not available yet. You can retry in ${result.cooldown.hours}h ${result.cooldown.minutes}m (cooldown: ${cooldownHours} ${hoursText})`);
               setAccessChecking(false);
               return;
             }
@@ -390,6 +393,10 @@ const Quiz = () => {
         const lessonStatus = data.lessonUnlockStatus.find(lesson => lesson.lessonId === moduleId);
         console.log('Quiz access check - lesson status for', moduleId, ':', lessonStatus);
         
+        // Find the index of this module in the unlock status array
+        const moduleIndex = data.lessonUnlockStatus.findIndex(lesson => lesson.lessonId === moduleId);
+        const isFirstQuiz = moduleIndex === 0;
+        
         if (lessonStatus) {
           // Check if module has a quiz
           const hasQuiz = lessonStatus.hasQuiz !== false; // Default to true if not specified
@@ -411,14 +418,26 @@ const Quiz = () => {
             setQuizCompleted(true);
             return { isCompleted: true, canTake: false, hasQuiz: true };
           } else {
-            console.log('Quiz access check - canTakeQuiz:', lessonStatus.canTakeQuiz);
-            setQuizAccessAllowed(lessonStatus.canTakeQuiz);
+            // Determine if user can take quiz
+            // Default to allowing access unless explicitly blocked
+            // First quiz is always available, or if canTakeQuiz is true/undefined/null
+            // Only block if canTakeQuiz is explicitly false AND it's not the first quiz
+            let canTake = true; // Default to allowing access
+            
+            if (!isFirstQuiz && lessonStatus.canTakeQuiz === false) {
+              // Only block if it's not the first quiz AND canTakeQuiz is explicitly false
+              canTake = false;
+            }
+            
+            console.log('Quiz access check - canTakeQuiz:', lessonStatus.canTakeQuiz, 'isFirstQuiz:', isFirstQuiz, 'final canTake:', canTake);
+            setQuizAccessAllowed(canTake);
             setQuizCompleted(false);
-            return { isCompleted: false, canTake: lessonStatus.canTakeQuiz, hasQuiz: true };
+            return { isCompleted: false, canTake: canTake, hasQuiz: true };
           }
         } else {
           // If lesson not found in progress, allow access (fallback)
-          console.log('Quiz access check - lesson not found, allowing access');
+          // This handles cases where the course is newly created or progress hasn't been initialized
+          console.log('Quiz access check - lesson not found in unlock status, allowing access as fallback');
           setQuizAccessAllowed(true);
           setModuleHasQuiz(true);
           return { isCompleted: false, canTake: true, hasQuiz: true };
@@ -517,10 +536,30 @@ const Quiz = () => {
 
       // Transform backend data to match our component structure
       const transformedQuestions = data.map((question, index) => {
+        const questionType = question.type || 'multiple-choice';
+        
+        // Handle options based on question type
+        let options = [];
+        if (questionType === 'true-false') {
+          // For true/false questions, ensure we have "True" and "False" options
+          if (Array.isArray(question.options) && question.options.length >= 2) {
+            options = question.options;
+          } else {
+            // Generate True/False options if not provided
+            options = ['True', 'False'];
+          }
+        } else if (questionType === 'fill-in-blank') {
+          // For fill-in-blank, we don't need options displayed, but we'll handle it in the UI
+          options = question.options || [];
+        } else {
+          // Multiple choice - use provided options
+          options = question.options || [];
+        }
+        
         // Find the index of the correct answer in the options array
         let correctAnswerId = null;
-        if (typeof question.correctAnswer === 'string' && Array.isArray(question.options)) {
-          const idx = question.options.findIndex(opt => opt === question.correctAnswer);
+        if (typeof question.correctAnswer === 'string' && Array.isArray(options)) {
+          const idx = options.findIndex(opt => opt === question.correctAnswer || opt.toString() === question.correctAnswer.toString());
           if (idx !== -1) {
             correctAnswerId = String.fromCharCode(97 + idx); // 'a', 'b', ...
           }
@@ -531,6 +570,8 @@ const Quiz = () => {
         
         console.log('==========================================');
         console.log('Processing question:', question.question);
+        console.log('Question type:', questionType);
+        console.log('Question options:', options);
         console.log('Raw imageUrl from backend:', question.imageUrl);
         console.log('Type of imageUrl:', typeof question.imageUrl);
         console.log('imageUrl === null:', question.imageUrl === null);
@@ -564,10 +605,11 @@ const Quiz = () => {
         return {
           id: question._id || question.id || index + 1,
           question: question.question,
+          type: questionType, // Store question type
           imageUrl: imageUrl, // Add image URL to question object
-          options: question.options.map((option, optIndex) => ({
+          options: options.map((option, optIndex) => ({
             id: String.fromCharCode(97 + optIndex),
-            text: option
+            text: option.toString()
           })),
           correctAnswer: correctAnswerId // always 'a', 'b', etc.
         };
@@ -633,6 +675,68 @@ const Quiz = () => {
     }
   }, [timeRemaining, timerStarted, showResults, quizCompleted, questions.length]);
 
+  // Show alert with cooldown time when retake quiz is failed
+  useEffect(() => {
+    const showCooldownAlert = async () => {
+      if (showResults && attemptNumber >= 2 && questions.length > 0 && !cooldownAlertShown.current) {
+        // Calculate if user passed using the same logic as calculateScore
+        const score = questions.filter(q => {
+          return selectedAnswers[q.id] === q.correctAnswer;
+        }).length;
+        const totalQuestions = questions.length;
+        const isPassed = score === totalQuestions; // Must get ALL questions correct
+        
+        // Only show alert if user failed (did not pass)
+        if (!isPassed) {
+          cooldownAlertShown.current = true; // Mark as shown to prevent duplicates
+          try {
+            const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+            if (token) {
+              const courseName = getCourseName();
+              
+              const cooldownResponse = await fetch('/api/courses/check-quiz-availability', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ courseName })
+              });
+              
+              if (cooldownResponse.ok) {
+                const cooldownResult = await cooldownResponse.json();
+                if (cooldownResult.cooldown) {
+                  const hours = cooldownResult.cooldown.hours;
+                  const minutes = cooldownResult.cooldown.minutes;
+                  const cooldownHours = cooldownResult.cooldownHours || 24;
+                  const hoursText = cooldownHours === 1 ? 'hour' : 'hours';
+                  
+                  alert(`⏰ You have failed the retake quiz!\n\nYou must wait for the cooldown period before attempting again.\n\n⏳ Time remaining: ${hours} hour${hours !== 1 ? 's' : ''} ${minutes} minute${minutes !== 1 ? 's' : ''}\n\nThis ${cooldownHours}-${hoursText} cooldown period is set by admin to ensure proper learning and prevent rapid retakes.`);
+                }
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error showing cooldown alert:', error);
+          }
+        }
+      }
+    };
+
+    // Small delay to ensure state is updated
+    const timer = setTimeout(() => {
+      showCooldownAlert();
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [showResults, attemptNumber, questions.length, selectedAnswers]);
+
+  // Reset cooldown alert flag when starting a new quiz attempt
+  useEffect(() => {
+    if (!showResults) {
+      cooldownAlertShown.current = false;
+    }
+  }, [showResults]);
+
   // Format time as MM:SS
   const formatTime = (seconds) => {
     if (seconds === null || seconds < 0) return '00:00';
@@ -697,7 +801,8 @@ const Quiz = () => {
 
       try {
         console.log('User passed quiz, submitting progress...');
-        console.log('Progress data:', { userEmail, courseName, m_id, passed });
+        console.log('Progress data:', { userEmail, courseName, m_id, passed, mo_id });
+        console.log('Module ID format check - mo_id:', mo_id, 'm_id:', m_id);
         
         // Submit quiz progress to backend
   const response = await fetch("/api/progress/submit-quiz", {
@@ -716,7 +821,8 @@ const Quiz = () => {
 
         if (response.ok) {
           const result = await response.json();
-          console.log('Quiz progress saved successfully:', result);
+          console.log('✅ Quiz progress saved successfully:', result);
+          console.log('✅ Saved module ID:', m_id, 'for course:', courseName);
           
           // Update local storage for backward compatibility
           let currentLevel = parseInt(localStorage.getItem("levelCleared")) || 0;
@@ -743,6 +849,8 @@ const Quiz = () => {
           try {
             console.log('🔄 Refreshing progress data to unlock next quiz...');
             await refreshProgressData();
+            // Small delay to ensure backend has processed the completion
+            await new Promise(resolve => setTimeout(resolve, 500));
           } catch (error) {
             console.warn('⚠️ Could not refresh progress data:', error);
           }
@@ -831,6 +939,36 @@ const Quiz = () => {
             
             if (response.ok) {
               console.log('✅ Quiz timestamp updated after failed retake attempt');
+              
+              // Fetch cooldown time and show alert
+              try {
+                const cooldownResponse = await fetch('/api/courses/check-quiz-availability', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                  },
+                  body: JSON.stringify({ courseName })
+                });
+                
+                if (cooldownResponse.ok) {
+                  const cooldownResult = await cooldownResponse.json();
+                  if (cooldownResult.cooldown) {
+                    const hours = cooldownResult.cooldown.hours;
+                    const minutes = cooldownResult.cooldown.minutes;
+                    const cooldownHours = cooldownResult.cooldownHours || 24;
+                    const hoursText = cooldownHours === 1 ? 'hour' : 'hours';
+                    
+                    alert(`⏰ You have failed the retake quiz!\n\nYou must wait for the cooldown period before attempting again.\n\n⏳ Time remaining: ${hours} hour${hours !== 1 ? 's' : ''} ${minutes} minute${minutes !== 1 ? 's' : ''}\n\nThis ${cooldownHours}-${hoursText} cooldown period is set by admin to ensure proper learning and prevent rapid retakes.`);
+                  }
+                }
+              } catch (cooldownError) {
+                console.error('❌ Error fetching cooldown time:', cooldownError);
+                // Still show a generic alert even if cooldown fetch fails
+                const cooldownHours = dbCourse?.retakeQuizCooldownHours || 24;
+                const hoursText = cooldownHours === 1 ? 'hour' : 'hours';
+                alert(`⏰ You have failed the retake quiz!\n\nYou must wait for the cooldown period (${cooldownHours} ${hoursText}) before attempting again.\n\nThis cooldown period is set by admin to ensure proper learning and prevent rapid retakes.`);
+              }
             } else {
               console.error('❌ Failed to update quiz timestamp');
             }
@@ -941,7 +1079,7 @@ const Quiz = () => {
             </div>
             
             <div className="blocked-note">
-              <p><strong>Note:</strong> This 24-hour cooldown is designed to ensure proper learning and prevent rapid retakes.</p>
+              <p><strong>Note:</strong> This cooldown period is designed to ensure proper learning and prevent rapid retakes.</p>
             </div>
             
             <button 
@@ -1208,187 +1346,199 @@ const Quiz = () => {
             </button>
           )}
           
-          {/* Show message if exceeded attempts */}
+          {/* Show message if exceeded attempts (failed retake quiz) */}
           {!isPassed && attemptNumber >= 2 && (
             <div className="attempt-limit-message">
-              You need to try after 1 day as your attempts are over.
+              You have failed the retake quiz. You must wait for the cooldown period (set by admin) before attempting again. Please check back later.
             </div>
           )}
           
-          {/* If passed - show appropriate button */}
+          {/* If passed - show appropriate button (works for both first and second attempt) */}
           {isPassed && (
             <>
-              {/* Check if course is completed and show certificate button */}
-              {(isCourseCompleted || localStorage.getItem('courseCompleted') === 'true') ? (
-                <div className="certificate-section">
-                  <div className="completion-message">
-                    Congratulations! You have completed the entire {getCourseName()} course!
-                  </div>
-                  <button
-                    onClick={() => {
-                      // Store courseId and lessonId for back navigation
-                      localStorage.setItem('certificateCourseId', courseId);
-                      localStorage.setItem('certificateLessonId', mo_id);
-                      
-                      // Replace quiz page in history with lesson page, then navigate to certificate
-                      // This ensures back button goes to lesson, not quiz
-                      const lessonPath = `/course/${courseId}/lesson/${mo_id}`;
-                      window.history.replaceState(
-                        { page: 'lesson', courseId, lessonId: mo_id },
-                        '',
-                        lessonPath
-                      );
-                      
-                      // Navigate to certificate page (this will push it to history)
-                      navigate('/certificate');
-                    }}
-                    className="certificate-button"
-                    style={{
-                      backgroundColor: '#28a745',
-                      color: 'white',
-                      padding: '12px 24px',
-                      fontSize: '16px',
-                      fontWeight: 'bold',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      marginTop: '16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    View Your Certificate
-                  </button>
-                </div>
-              ) : (
-                // Still has more modules to complete
-                (() => {
-                  const nextMoId = getNextMoId(mo_id);
-                  if (nextMoId) {
-                    return (
-                      <button
-                        onClick={() => {
-                          window.location.href = `/course/${courseId}/lesson/${nextMoId}`;
-                        }}
-                        className="next-course-button"
-                      >
-                        Continue to Next Module
-                      </button>
+              {(() => {
+                // Check if there's a next module in the current course
+                const nextMoId = getNextMoId(mo_id);
+                
+                if (nextMoId) {
+                  // There's a next module - show "Continue to Next Module" button
+                  return (
+                    <button
+                      onClick={async () => {
+                        // Ensure progress is saved and refreshed before navigating
+                        try {
+                          const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+                          const userEmail = localStorage.getItem('employeeEmail');
+                          const courseName = getCourseName();
+                          
+                          if (token && userEmail && courseName) {
+                            // Refresh progress to ensure it's up to date
+                            const progressResponse = await fetch(`${API_ENDPOINTS.PROGRESS.GET_PROGRESS}?userEmail=${userEmail}&courseName=${courseName}&courseId=${courseId}`, {
+                              headers: { Authorization: `Bearer ${token}` }
+                            });
+                            
+                            if (progressResponse.ok) {
+                              const progressData = await progressResponse.json();
+                              // Dispatch progressUpdated event so lesson page can update immediately
+                              window.dispatchEvent(new CustomEvent('progressUpdated', {
+                                detail: {
+                                  courseName: courseName,
+                                  lessonUnlockStatus: progressData.lessonUnlockStatus || []
+                                }
+                              }));
+                            }
+                            
+                            // Small delay to ensure event is processed
+                            await new Promise(resolve => setTimeout(resolve, 300));
+                          }
+                        } catch (error) {
+                          console.warn('Could not refresh progress before navigation:', error);
+                        }
+                        
+                        // Use React Router navigate instead of window.location for better state management
+                        navigate(`/course/${courseId}/lesson/${nextMoId}`, { 
+                          state: { refreshProgress: true } 
+                        });
+                      }}
+                      className="next-course-button"
+                    >
+                      Continue to Next Module
+                    </button>
+                  );
+                } else {
+                  // No more modules in this course - check if there's a next course or show certificate
+                  const getNextCourse = () => {
+                    if (allCourses.length === 0) return null;
+                    
+                    const currentCourseName = getCourseName();
+                    const currentIndex = allCourses.findIndex(c => 
+                      c.title === currentCourseName || c._id === courseId
                     );
-                  } else {
-                    // No more modules in this course, show "Next Course" button
-                    const getNextCourse = () => {
-                      if (allCourses.length === 0) return null;
-                      
-                      const currentCourseName = getCourseName();
-                      const currentIndex = allCourses.findIndex(c => 
-                        c.title === currentCourseName || c._id === courseId
-                      );
-                      
-                      if (currentIndex >= 0 && currentIndex < allCourses.length - 1) {
-                        return allCourses[currentIndex + 1];
+                    
+                    if (currentIndex >= 0 && currentIndex < allCourses.length - 1) {
+                      return allCourses[currentIndex + 1];
+                    }
+                    return null;
+                  };
+                  
+                  const nextCourse = getNextCourse();
+                  
+                  if (nextCourse) {
+                    // There's a next course - show "Next Course" button
+                    const nextCourseId = nextCourse.isStatic ? nextCourse.title : nextCourse._id;
+                    
+                    // Get first module of next course
+                    const getFirstModuleId = () => {
+                      if (nextCourse.isStatic) {
+                        // For static courses, use the first module ID pattern
+                        const staticModuleMap = {
+                          'ISP': 'ISP01',
+                          'GDPR': 'GDPR01',
+                          'POSH': 'POSH01',
+                          'Factory Act': 'FACT01',
+                          'Welding': 'WELD01',
+                          'CNC': 'CNC01',
+                          'Excel': 'EXL01',
+                          'VRU': 'VRU01'
+                        };
+                        return staticModuleMap[nextCourse.title] || null;
+                      } else {
+                        // For database courses, we need to fetch the course data
+                        // Return null here, will fetch in onClick handler
+                        return null;
                       }
-                      return null;
                     };
                     
-                    const nextCourse = getNextCourse();
+                    const firstModuleId = getFirstModuleId();
                     
-                    if (nextCourse) {
-                      const nextCourseId = nextCourse.isStatic ? nextCourse.title : nextCourse._id;
-                      
-                      // Get first module of next course
-                      const getFirstModuleId = () => {
-                        if (nextCourse.isStatic) {
-                          // For static courses, use the first module ID pattern
-                          const staticModuleMap = {
-                            'ISP': 'ISP01',
-                            'GDPR': 'GDPR01',
-                            'POSH': 'POSH01',
-                            'Factory Act': 'FACT01',
-                            'Welding': 'WELD01',
-                            'CNC': 'CNC01',
-                            'Excel': 'EXL01',
-                            'VRU': 'VRU01'
-                          };
-                          return staticModuleMap[nextCourse.title] || null;
-                        } else {
-                          // For database courses, we need to fetch the course data
-                          // Return null here, will fetch in onClick handler
-                          return null;
-                        }
-                      };
-                      
-                      const firstModuleId = getFirstModuleId();
-                      
-                      return (
-                        <div className="next-course-section">
-                          <div className="completion-message">
-                            Module completed! Check your dashboard for next steps.
-                          </div>
-                          <button
-                            onClick={async () => {
-                              if (firstModuleId) {
-                                // Static course - navigate directly
-                                navigate(`/course/${nextCourseId}/lesson/${firstModuleId}`);
-                              } else {
-                                // Database course - fetch course data to get first module
-                                try {
-                                  const response = await fetch(`${API_ENDPOINTS.COURSES.GET_COURSE}/${nextCourseId}`, {
-                                    method: 'GET',
-                                    headers: { 'Content-Type': 'application/json' }
-                                  });
-                                  if (response.ok) {
-                                    const courseData = await response.json();
-                                    if (courseData.modules && courseData.modules.length > 0) {
-                                      navigate(`/course/${nextCourseId}/lesson/${courseData.modules[0].m_id}`);
-                                    } else {
-                                      navigate(`/course/${nextCourseId}`);
-                                    }
-                                  } else {
-                                    navigate(`/course/${nextCourseId}`);
-                                  }
-                                } catch (error) {
-                                  console.error('Error fetching next course:', error);
-                                  navigate(`/course/${nextCourseId}`);
-                                }
-                              }
-                            }}
-                            className="next-course-button"
-                            style={{
-                              backgroundColor: '#6366f1',
-                              color: 'white',
-                              padding: '12px 24px',
-                              fontSize: '16px',
-                              fontWeight: 'bold',
-                              border: 'none',
-                              borderRadius: '8px',
-                              cursor: 'pointer',
-                              marginTop: '16px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '8px',
-                              width: '100%',
-                              maxWidth: '300px',
-                              margin: '16px auto 0'
-                            }}
-                          >
-                            Next Course: {nextCourse.title}
-                          </button>
-                        </div>
-                      );
-                    } else {
-                      return (
+                    return (
+                      <div className="next-course-section">
                         <div className="completion-message">
                           Module completed! Check your dashboard for next steps.
                         </div>
-                      );
-                    }
+                        <button
+                          onClick={async () => {
+                            if (firstModuleId) {
+                              // Static course - navigate directly
+                              navigate(`/course/${nextCourseId}/lesson/${firstModuleId}`);
+                            } else {
+                              // Database course - fetch course data to get first module
+                              try {
+                                const response = await fetch(`${API_ENDPOINTS.COURSES.GET_COURSE}/${nextCourseId}`, {
+                                  method: 'GET',
+                                  headers: { 'Content-Type': 'application/json' }
+                                });
+                                if (response.ok) {
+                                  const courseData = await response.json();
+                                  if (courseData.modules && courseData.modules.length > 0) {
+                                    navigate(`/course/${nextCourseId}/lesson/${courseData.modules[0].m_id}`);
+                                  } else {
+                                    navigate(`/course/${nextCourseId}`);
+                                  }
+                                } else {
+                                  navigate(`/course/${nextCourseId}`);
+                                }
+                              } catch (error) {
+                                console.error('Error fetching next course:', error);
+                                navigate(`/course/${nextCourseId}`);
+                              }
+                            }
+                          }}
+                          className="next-course-button"
+                        >
+                          Next Course: {nextCourse.title}
+                        </button>
+                      </div>
+                    );
+                  } else {
+                    // No next course - show certificate button (last module of last course)
+                    return (
+                      <div className="certificate-section">
+                        <div className="completion-message">
+                          Congratulations! You have completed the entire {getCourseName()} course!
+                        </div>
+                        <button
+                          onClick={() => {
+                            // Store courseId and lessonId for back navigation
+                            localStorage.setItem('certificateCourseId', courseId);
+                            localStorage.setItem('certificateLessonId', mo_id);
+                            
+                            // Replace quiz page in history with lesson page, then navigate to certificate
+                            // This ensures back button goes to lesson, not quiz
+                            const lessonPath = `/course/${courseId}/lesson/${mo_id}`;
+                            window.history.replaceState(
+                              { page: 'lesson', courseId, lessonId: mo_id },
+                              '',
+                              lessonPath
+                            );
+                            
+                            // Navigate to certificate page (this will push it to history)
+                            navigate('/certificate');
+                          }}
+                          className="certificate-button"
+                          style={{
+                            backgroundColor: '#28a745',
+                            color: 'white',
+                            padding: '12px 24px',
+                            fontSize: '16px',
+                            fontWeight: 'bold',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            marginTop: '16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px'
+                          }}
+                        >
+                          View Your Certificate
+                        </button>
+                      </div>
+                    );
                   }
-                })()
-              )}
+                }
+              })()}
             </>
           )}
         </div>
@@ -1411,7 +1561,7 @@ const Quiz = () => {
         <div className="quiz-header">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '10px' }}>
             <h1 className="question-text" style={{ margin: 0, flex: 1 }}>
-              {currentQuestion + 1} {currentQuestionData.question}
+              {currentQuestion + 1} . {currentQuestionData.question}
             </h1>
             {timeRemaining !== null && (
               <div 

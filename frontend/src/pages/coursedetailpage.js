@@ -71,6 +71,18 @@ const CourseDetailPage = () => {
     Excel: "excel.png"
   };
 
+  // Helper function to get course background image
+  const getCourseImage = (course) => {
+    // Priority: 1. Database image URL, 2. Static imageMap, 3. Default
+    if (course && course.backgroundImageUrl) {
+      return course.backgroundImageUrl;
+    }
+    if (course && imageMap[course.title]) {
+      return `${process.env.PUBLIC_URL}/${imageMap[course.title]}`;
+    }
+    return `${process.env.PUBLIC_URL}/course.jpg`;
+  };
+
   // Fetch common courses for dropdown
   useEffect(() => {
     const fetchCommonCourses = async () => {
@@ -440,9 +452,7 @@ const CourseDetailPage = () => {
 
             <div className="course-detail-thumbnail">
               <img 
-                src={imageMap[courseData.title] 
-                  ? `${process.env.PUBLIC_URL}/${imageMap[courseData.title]}` 
-                  : `${process.env.PUBLIC_URL}/course.jpg`} 
+                src={getCourseImage(courseData)} 
                 alt={courseData.title} 
               />
               <div className="course-detail-play-overlay">
@@ -455,48 +465,6 @@ const CourseDetailPage = () => {
       {/* Certificate Section */}
    
 
-      {/* Skills Section */}
-      <section className="course-detail-skills-section">
-        <div className="course-detail-skills-container">
-          <h2>Skills you will gain</h2>
-          <div className="skills-grid">
-            {(() => {
-              let skills = [];
-              switch(courseData.title) {
-                case 'ISP':
-                  skills = ['Information Security Fundamentals', 'Risk Assessment', 'Threat Identification', 'Incident Response', 'Compliance Management', 'Security Protocols'];
-                  break;
-                case 'GDPR':
-                  skills = ['Data Protection Laws', 'Privacy Impact Assessment', 'Consent Management', 'Data Subject Rights', 'Breach Notification', 'Compliance Strategies'];
-                  break;
-                case 'POSH':
-                  skills = ['Workplace Safety', 'Legal Frameworks', 'Prevention Strategies', 'Investigation Procedures', 'Employee Rights', 'Inclusive Environments'];
-                  break;
-                case 'Factory Act':
-                  skills = ['Industrial Safety', 'Factory Regulations', 'Employee Welfare', 'Safety Equipment', 'Emergency Procedures', 'Compliance Standards'];
-                  break;
-                case 'Welding':
-                  skills = ['Welding Techniques', 'Safety Protocols', 'Equipment Operation', 'Material Handling', 'Quality Control', 'Industry Standards'];
-                  break;
-                case 'CNC':
-                  skills = ['CNC Programming', 'Machine Operation', 'Tool Selection', 'Quality Control', 'Maintenance', 'Troubleshooting'];
-                  break;
-                default:
-                  skills = ['Professional Skills', 'Compliance Knowledge', 'Industry Competencies', 'Safety Protocols', 'Best Practices', 'Workplace Excellence'];
-              }
-              return skills.map((skill, index) => (
-                <div key={index} className="skill-item">
-                  {skill}
-                </div>
-              ));
-            })()}
-          </div>
-        </div>
-      </section>
-
-    
-
-     
 
       {/* Course Outline */}
       <section className="course-detail-outline-section">

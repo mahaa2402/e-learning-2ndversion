@@ -1040,10 +1040,17 @@ const TaskModulePage = () => {
         <button
           key={`quiz-${module._id || index}`}
           className={`quiz-button ${isCurrentModule ? 'active' : ''} ${quizCompleted ? 'completed' : ''} ${!isQuizUnlocked ? 'locked' : ''}`}
-          disabled={!isQuizUnlocked}
+          disabled={!isQuizUnlocked && !quizCompleted}
           onClick={async () => {
             if (quizCompleted) {
-              alert('✅ You already completed this quiz. You can’t access it again.');
+              const userConfirmed = window.confirm(
+                '✅ You have already completed this quiz!\n\nYou cannot retake a completed quiz.\n\nWould you like to view the lesson instead?'
+              );
+              if (userConfirmed) {
+                // Navigate to the lesson page for this module
+                const moduleIdentifier = module.m_id || module.title;
+                navigate(`/course/${courseId}/lesson/${moduleIdentifier}`);
+              }
               return;
             }
 

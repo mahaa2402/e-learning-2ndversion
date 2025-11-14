@@ -14,6 +14,8 @@ const courseSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     description: { type: String },                     // Course description
+    backgroundImageUrl: { type: String },            // Background image URL for the course
+    retakeQuizCooldownHours: { type: Number, default: 24 }, // Cooldown time in hours after failing retake quiz (default 24 hours = 1 day)
 
     modules: [
       {
@@ -27,7 +29,8 @@ const courseSchema = new mongoose.Schema(
           title: { type: String },                      // Lesson title
           videoUrl: { type: String },                  // Video URL for the lesson
           content: [{ type: String }],                 // Array of content strings
-          duration: { type: String }                   // Lesson duration (e.g., "30min")
+          duration: { type: String },                  // Lesson duration (e.g., "30min")
+          notes: { type: String }                      // Notes for the video lesson
         }
       }
     ]

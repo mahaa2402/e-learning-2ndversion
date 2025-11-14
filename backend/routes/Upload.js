@@ -42,6 +42,75 @@ router.get('/health', (req, res) => {
   });
 });
 
+// POST /upload-course-image/:courseName - Upload course background image
+router.post('/upload-course-image/:courseName', imageUpload.single('image'), async (req, res) => {
+  try {
+    console.log('📤 Course image upload request received');
+    console.log('📤 Course name:', req.params.courseName);
+    console.log('📤 File:', req.file ? req.file.originalname : 'No file');
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+
+    // Sanitize course name (same as video upload)
+    const courseName = decodeURIComponent(req.params.courseName)
+      .replace(/[^a-zA-Z0-9]/g, '_')
+      .toLowerCase();
+
+    // Generate unique filename
+    const fileExtension = path.extname(req.file.originalname) || '.jpg';
+    const uniqueFileName = `${Date.now()}_${generateUniqueId()}${fileExtension}`;
+    const s3Key = `e-learning/course-images/${courseName}/${uniqueFileName}`;
+
+    console.log('📤 Uploading to S3:', s3Key);
+
+    // Read the file
+    const fileContent = fs.readFileSync(req.file.path);
+
+    // Upload to S3
+    const uploadParams = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: s3Key,
+      Body: fileContent,
+      ContentType: req.file.mimetype || 'image/jpeg'
+    };
+
+    const uploadResult = await s3.upload(uploadParams).promise();
+    console.log('✅ Course image uploaded to S3:', uploadResult.Location);
+
+    // Clean up temporary file
+    fs.unlinkSync(req.file.path);
+    console.log('✅ Temporary file deleted');
+
+    res.json({
+      success: true,
+      message: 'Course image uploaded successfully',
+      image: {
+        url: uploadResult.Location,
+        s3Key: s3Key,
+        uploadedAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('❌ Course image upload error:', error);
+    
+    // Clean up temporary file if it exists
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (unlinkError) {
+        console.error('❌ Error deleting temp file:', unlinkError);
+      }
+    }
+
+    res.status(500).json({ 
+      error: 'Failed to upload course image',
+      message: error.message 
+    });
+  }
+});
+
 // API endpoint to upload video
 router.post('/upload-video', upload.single('video'), (req, res) => {
   if (!req.file) return res.status(400).json({ message: "No file uploaded" });

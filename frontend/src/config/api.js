@@ -79,7 +79,8 @@ export const API_ENDPOINTS = {
     HEALTH: `${API_BASE_URL}/videos/health`
   },
   UPLOAD: {
-    QUIZ_IMAGE: `${API_BASE_URL}/upload/upload-quiz-image`
+    QUIZ_IMAGE: `${API_BASE_URL}/upload/upload-quiz-image`,
+    COURSE_IMAGE: `${API_BASE_URL}/upload/upload-course-image`
   }
 };
 

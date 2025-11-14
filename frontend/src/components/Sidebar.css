@@ -8,7 +8,7 @@
   backdrop-filter: blur(10px);
   position: relative;
   overflow: hidden;
-  width: 280px !important; /* Extended width from 256px to 280px */
+  width: 300px !important; /* Extended width to accommodate longer text */
 }
 
 .sidebar::before {
@@ -71,6 +71,27 @@
   visibility: visible !important;
   opacity: 1 !important;
   min-height: 40px !important;
+  padding: 10px 12px !important;
+  align-items: center !important;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  gap: 1rem !important; /* Increased gap between icon and text */
+}
+
+/* Specific styling for "Create Common Courses" to prevent congestion */
+.sidebar-item[data-label="Create Common Courses"],
+.sidebar-item:has(span:contains("Create Common Courses")) {
+  min-height: 48px !important;
+  padding: 12px 14px !important;
+  line-height: 1.4 !important;
+}
+
+.sidebar-item[data-label="Create Common Courses"] span,
+.sidebar-item:has(span:contains("Create Common Courses")) span {
+  white-space: normal !important;
+  word-break: break-word !important;
+  line-height: 1.4 !important;
+  flex: 1 !important;
 }
 
 .sidebar-item:hover {
@@ -118,6 +139,11 @@
 /* Force override for all text colors in sidebar items */
 .sidebar-item span {
   color: #1f2937 !important;
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.4;
+  flex: 1;
 }
 
 /* Override gray text colors */
