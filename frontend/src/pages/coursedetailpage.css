@@ -292,6 +292,8 @@
   width: 100%;
   height: 250px;
   object-fit: cover;
+  filter: none; /* Remove any filters that might darken the image */
+  opacity: 1; /* Ensure full opacity */
 }
 
 .course-detail-play-overlay {
@@ -603,6 +605,8 @@
   width: 100%;
   height: 250px;
   object-fit: cover;
+  filter: none; /* Remove any filters that might darken the image */
+  opacity: 1; /* Ensure full opacity */
 }
 
 .course-detail-play-overlay {
@@ -611,8 +615,8 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
+  background: transparent; /* Remove dark overlay */
+  display: none; /* Hide overlay completely */
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -622,7 +626,7 @@
 }
 
 .course-detail-play-overlay:hover {
-  background: rgba(0, 0, 0, 0.8);
+  background: transparent; /* Remove dark overlay on hover */
 }
 
 .course-detail-play-icon {

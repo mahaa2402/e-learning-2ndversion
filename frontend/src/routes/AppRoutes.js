@@ -27,6 +27,7 @@ import TaskModulePage from '../pages/taskmodulepage';
 import AssignedQuizPage from '../pages/assignedquizpage';
 import CertificatePage from '../pages/certificate';
 import CertificateDetails from '../pages/certificatedetail';
+import CreateCommonCourses from '../pages/createcommoncourses';
 
 import LessonPage from "../pages/lessonpage";
 
@@ -45,6 +46,7 @@ function AppRoutes() {
         <Route path="/register" element={<Register />} />
         <Route path="/admindashboard" element={<AdminDashboard />} />
         <Route path="/admincourses" element={<AdminCourses />} />
+        <Route path="/createcommoncourses" element={<CreateCommonCourses />} />
         <Route path="/sidebar" element={<Sidebar />} />
         <Route path="/assigntask" element={<AssignTask />} />
         <Route path="/employeetracking" element={<EmployeeTracking />} />

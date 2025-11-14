@@ -46,7 +46,9 @@ export const API_ENDPOINTS = {
   },
   COURSES: {
     GET_COURSES: `${API_BASE_URL}/courses/getcourse`,
-    GET_COURSE_DETAIL: `${API_BASE_URL}/courses/getcoursedetailpage`
+    GET_COURSE_DETAIL: `${API_BASE_URL}/courses/getcoursedetailpage`,
+    GET_COURSE: `${API_BASE_URL}/courses`,
+    GET_LESSON: `${API_BASE_URL}/courses/lesson`
   },
   PROGRESS: {
     GET_PROGRESS: `${API_BASE_URL}/progress/get-with-unlocking`,
@@ -75,6 +77,9 @@ export const API_ENDPOINTS = {
   VIDEOS: {
     UPLOAD: `${API_BASE_URL}/videos/upload-video`,
     HEALTH: `${API_BASE_URL}/videos/health`
+  },
+  UPLOAD: {
+    QUIZ_IMAGE: `${API_BASE_URL}/upload/upload-quiz-image`
   }
 };
 

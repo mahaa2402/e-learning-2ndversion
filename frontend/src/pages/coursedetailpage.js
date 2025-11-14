@@ -66,8 +66,9 @@ const CourseDetailPage = () => {
     GDPR: "gdpr.jpg", 
     POSH: "posh.png",
     "Factory Act": "hsi.jpg",
-    Welding: "course.jpg",
-    CNC: "courseimg.jpeg"
+    Welding: "weilding.jpg",
+    CNC: "cnc.webp",
+    Excel: "excel.png"
   };
 
   // Fetch common courses for dropdown
@@ -238,11 +239,26 @@ const CourseDetailPage = () => {
     console.log('Current courseData:', courseData);
     console.log('Looking for title:', title);
     
+    // Helper function to normalize strings for comparison
+    const normalizeString = (str) => {
+      if (!str) return '';
+      return str.trim().toLowerCase().replace(/\s+/g, ' ');
+    };
+    
     // Find the course ID by matching the course name with static course data
     let foundCourseId = null;
+    const normalizedTitle = normalizeString(title);
+    const normalizedCourseDataTitle = normalizeString(courseData?.title);
+    
     for (const [id, course] of Object.entries(staticCourseData)) {
+      const normalizedCourseName = normalizeString(course.name);
       console.log(`Checking course ${id}: ${course.name} vs ${title}`);
-      if (course.name === title) {
+      
+      // Try multiple matching strategies
+      if (normalizedCourseName === normalizedTitle || 
+          normalizedCourseName === normalizedCourseDataTitle ||
+          course.name === title ||
+          course.name === courseData?.title) {
         foundCourseId = id;
         break;
       }
@@ -255,8 +271,39 @@ const CourseDetailPage = () => {
       console.log("sab",foundCourseId, "First lesson key:", firstLessonKey);
       navigate(`/course/${foundCourseId}/lesson/${firstLessonKey}`);
     } else {
-      console.error('Course not found in static data');
-      alert('Course not found!');
+      // If not found in static data, try to use courseData from database
+      if (courseData && courseData.modules && courseData.modules.length > 0) {
+        // Try to find course ID by matching title in static data (case-insensitive)
+        let courseIdFromStatic = null;
+        for (const [id, course] of Object.entries(staticCourseData)) {
+          const normalizedCourseName = normalizeString(course.name);
+          if (normalizedCourseName === normalizedCourseDataTitle || 
+              normalizedCourseName === normalizedTitle ||
+              course.name === courseData.title ||
+              course.name === title) {
+            courseIdFromStatic = id;
+            break;
+          }
+        }
+        
+        if (courseIdFromStatic) {
+          const course = staticCourseData[courseIdFromStatic];
+          const firstLessonKey = Object.keys(course.lessons)[0];
+          navigate(`/course/${courseIdFromStatic}/lesson/${firstLessonKey}`);
+        } else {
+          // If still not found, try to construct lesson ID from first module's m_id
+          const firstModule = courseData.modules[0];
+          if (firstModule && firstModule.m_id) {
+            navigate(`/course/${courseData._id || title}/lesson/${firstModule.m_id}`);
+          } else {
+            console.error('Course not found and no valid module data');
+            alert('Course not found! Please contact support.');
+          }
+        }
+      } else {
+        console.error('Course not found in static data and no courseData available');
+        alert('Course not found! Please contact support.');
+      }
     }
   };
 
@@ -470,19 +517,69 @@ const CourseDetailPage = () => {
                     <button 
                       className="course-detail-btn course-detail-btn-start" 
                       onClick={() => {
+                        // Helper function to normalize strings for comparison
+                        const normalizeString = (str) => {
+                          if (!str) return '';
+                          return str.trim().toLowerCase().replace(/\s+/g, ' ');
+                        };
+                        
+                        // Try to find course ID in static data
                         let foundCourseId = null;
+                        const normalizedTitle = normalizeString(title);
+                        const normalizedCourseDataTitle = normalizeString(courseData?.title);
+                        
                         for (const [id, course] of Object.entries(staticCourseData)) {
-                          if (course.name === title) {
+                          const normalizedCourseName = normalizeString(course.name);
+                          if (normalizedCourseName === normalizedTitle || 
+                              normalizedCourseName === normalizedCourseDataTitle ||
+                              course.name === title ||
+                              course.name === courseData?.title) {
                             foundCourseId = id;
                             break;
                           }
                         }
+                        
                         if (foundCourseId) {
+                          // Course found in static data - find the lesson for this specific module
                           const course = staticCourseData[foundCourseId];
-                          const firstLessonKey = Object.keys(course.lessons)[0];
-                          navigate(`/course/${foundCourseId}/lesson/${firstLessonKey}`);
+                          // Try to find lesson that matches the module's m_id
+                          const moduleLessonKey = Object.keys(course.lessons).find(lessonKey => 
+                            lessonKey === mod.m_id || lessonKey.toLowerCase() === mod.m_id?.toLowerCase()
+                          );
+                          
+                          if (moduleLessonKey) {
+                            navigate(`/course/${foundCourseId}/lesson/${moduleLessonKey}`);
+                          } else {
+                            // If no exact match, use the first lesson of the course
+                            const firstLessonKey = Object.keys(course.lessons)[0];
+                            navigate(`/course/${foundCourseId}/lesson/${firstLessonKey}`);
+                          }
                         } else {
-                          alert('Course not found!');
+                          // Course not in static data - use module's m_id directly
+                          if (mod && mod.m_id) {
+                            // Try to find course ID by matching title
+                            let courseIdFromStatic = null;
+                            for (const [id, course] of Object.entries(staticCourseData)) {
+                              const normalizedCourseName = normalizeString(course.name);
+                              if (normalizedCourseName === normalizedCourseDataTitle || 
+                                  normalizedCourseName === normalizedTitle ||
+                                  course.name === courseData?.title ||
+                                  course.name === title) {
+                                courseIdFromStatic = id;
+                                break;
+                              }
+                            }
+                            
+                            if (courseIdFromStatic) {
+                              navigate(`/course/${courseIdFromStatic}/lesson/${mod.m_id}`);
+                            } else {
+                              // Use courseData._id or title as courseId
+                              const courseId = courseData?._id || title;
+                              navigate(`/course/${courseId}/lesson/${mod.m_id}`);
+                            }
+                          } else {
+                            alert('Module information not available!');
+                          }
                         }
                       }}
                     >

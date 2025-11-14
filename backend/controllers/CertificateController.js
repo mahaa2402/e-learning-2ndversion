@@ -140,34 +140,30 @@ const checkCourseCompletion = async (employeeEmail, courseName) => {
       };
       
     } else {
-      // For common courses, check CommonUserProgress
-      console.log(`🔍 Checking CommonUserProgress for common course: ${employeeEmail} - ${courseName}`);
-      const CommonUserProgress = require('../models/CommonUserProgress');
-      const commonUserProgress = await CommonUserProgress.findOne({ employeeEmail: employeeEmail });
+      // For common courses, check UserProgress (which stores completedModules with m_id)
+      console.log(`🔍 Checking UserProgress for common course: ${employeeEmail} - ${courseName}`);
+      const UserProgress = require('../models/Userprogress');
+      const userProgress = await UserProgress.findOne({ userEmail: employeeEmail, courseName: courseName });
       
-      if (!commonUserProgress) {
-        console.log(`📊 No common progress found for ${employeeEmail}`);
-        console.log(`🔍 Searching for any common progress records for this user...`);
-        const allCommonProgress = await CommonUserProgress.find({ employeeEmail: employeeEmail });
-        console.log(`📋 All common progress records for ${employeeEmail}:`, allCommonProgress.map(p => ({ 
-          employeeEmail: p.employeeEmail, 
-          courseProgress: Object.fromEntries(p.courseProgress) 
-        })));
-        
+      if (!userProgress) {
+        console.log(`📊 No user progress found for ${employeeEmail} in ${courseName}`);
         return {
           isCompleted: false,
           completedModules: [],
           totalModules,
           completedCount: 0,
           courseModules: course.modules,
-          debug: 'No common progress found'
+          debug: 'No user progress found'
         };
       }
       
-      const completedModulesCount = commonUserProgress.courseProgress.get(courseName) || 0;
-      console.log(`📊 Found common progress for ${courseName}:`, {
-        employeeEmail: commonUserProgress.employeeEmail,
-        courseProgress: Object.fromEntries(commonUserProgress.courseProgress),
+      // Get completed module IDs from UserProgress
+      const completedModuleIds = userProgress.completedModules.map(mod => mod.m_id);
+      const completedModulesCount = completedModuleIds.length;
+      
+      console.log(`📊 Found user progress for ${courseName}:`, {
+        employeeEmail: userProgress.userEmail,
+        completedModuleIds: completedModuleIds,
         completedModulesCount: completedModulesCount,
         totalModules: totalModules,
         courseModules: course.modules.map(m => ({ m_id: m.m_id, name: m.name }))
@@ -175,27 +171,19 @@ const checkCourseCompletion = async (employeeEmail, courseName) => {
       
       console.log(`📊 Completed modules: ${completedModulesCount}/${totalModules}`);
       
-      // For Factory Act, if user says there are only 3 modules, check if 3 is enough
-      // This is a temporary fix until we verify the actual course structure
-      let requiredModules = totalModules;
-      if (courseName === 'Factory Act' && completedModulesCount >= 3) {
-        console.log(`🔧 Factory Act special case: User has completed 3 modules, treating as completed`);
-        requiredModules = 3;
-      }
+      const isCompleted = completedModulesCount >= totalModules;
+      console.log(`✅ Course completion status: ${isCompleted ? 'COMPLETED' : 'IN PROGRESS'} (${completedModulesCount}/${totalModules})`);
       
-      const isCompleted = completedModulesCount >= requiredModules;
-      console.log(`✅ Course completion status: ${isCompleted ? 'COMPLETED' : 'IN PROGRESS'} (${completedModulesCount}/${requiredModules})`);
-      
-      // Create completed modules array for certificate
+      // Create completed modules array for certificate using actual completed modules
       const completedModules = [];
-      for (let i = 0; i < completedModulesCount; i++) {
-        if (course.modules[i]) {
+      course.modules.forEach((module, index) => {
+        if (completedModuleIds.includes(module.m_id)) {
           completedModules.push({
-            m_id: course.modules[i].m_id || `Module ${i + 1}`,
-            title: course.modules[i].name || `Module ${i + 1}`
+            m_id: module.m_id,
+            title: module.name || module.title || `Module ${index + 1}`
           });
         }
-      }
+      });
       
       return {
         isCompleted,

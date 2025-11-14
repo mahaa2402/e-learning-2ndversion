@@ -33,24 +33,40 @@ router.get("/get", async (req, res) => {
       return res.status(400).json({ error: "Invalid moduleIndex" });
     }
 
-    // ✅ S3 path: e-learning/videos/{courseName}/Module{N}/
-    const prefix = `e-learning/videos/${courseName}/Module${moduleNumber}/`;
+    // ✅ S3 path: e-learning/videos/{courseName}/mod{N}/ (VideoUpload uses mod{N})
+    // Also check Module{N} format for backward compatibility
+    const prefix1 = `e-learning/videos/${courseName}/mod${moduleNumber}/`;
+    const prefix2 = `e-learning/videos/${courseName}/Module${moduleNumber}/`;
 
-    console.log("🔎 Looking in S3 prefix:", prefix);
+    console.log("🔎 Looking in S3 prefix (mod{N}):", prefix1);
+    console.log("🔎 Also checking (Module{N}):", prefix2);
 
-    const list = await s3
+    // Try mod{N} format first (used by VideoUpload)
+    let list = await s3
       .listObjectsV2({
         Bucket: BUCKET,
-        Prefix: prefix,
+        Prefix: prefix1,
       })
       .promise();
 
-    console.log("✅ S3 list result count:", list.Contents?.length || 0);
+    console.log("✅ S3 list result count (mod{N}):", list.Contents?.length || 0);
+
+    // If not found, try Module{N} format (backward compatibility)
+    if (!list.Contents || list.Contents.length === 0) {
+      console.log("🔎 Trying Module{N} format...");
+      list = await s3
+        .listObjectsV2({
+          Bucket: BUCKET,
+          Prefix: prefix2,
+        })
+        .promise();
+      console.log("✅ S3 list result count (Module{N}):", list.Contents?.length || 0);
+    }
 
     if (!list.Contents || list.Contents.length === 0) {
       return res
         .status(404)
-        .json({ error: "No files in S3", lookedIn: prefix });
+        .json({ error: "No files in S3", lookedIn: [prefix1, prefix2] });
     }
 
     // ✅ Filter only video files

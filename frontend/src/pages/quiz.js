@@ -22,9 +22,79 @@ if (thisLesson === currentLevel + 1) {
 const Quiz = () => {
   const { courseId, mo_id } = useParams();
   const navigate = useNavigate();
+  const [dbCourseName, setDbCourseName] = useState(null);
+  const [dbCourse, setDbCourse] = useState(null);
+  const [allCourses, setAllCourses] = useState([]);
+
+  // Fetch course name and data from database if courseId is a MongoDB ObjectId
+  useEffect(() => {
+    const fetchCourseData = async () => {
+      // Check if courseId looks like a MongoDB ObjectId (24 hex characters)
+      const isObjectId = /^[0-9a-fA-F]{24}$/.test(courseId);
+      
+      if (isObjectId) {
+        try {
+          console.log('🔍 Fetching course data from database for courseId:', courseId);
+          const response = await fetch(`${API_ENDPOINTS.COURSES.GET_COURSE}/${courseId}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (response.ok) {
+            const courseData = await response.json();
+            console.log('✅ Course data fetched:', courseData);
+            setDbCourseName(courseData.title || courseData.name);
+            setDbCourse(courseData);
+          }
+        } catch (error) {
+          console.error('❌ Error fetching course data:', error);
+        }
+      }
+    };
+
+    fetchCourseData();
+  }, [courseId]);
+
+  // Fetch all courses to determine next course
+  useEffect(() => {
+    const fetchAllCourses = async () => {
+      try {
+        // Fetch common courses from database
+        const response = await fetch(API_ENDPOINTS.COURSES.GET_COURSES, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const courses = await response.json();
+          // Also include static courses
+          const staticCourses = ['ISP', 'GDPR', 'POSH', 'Factory Act', 'Welding', 'CNC', 'Excel', 'VRU'];
+          const allCoursesList = [
+            ...staticCourses.map(title => ({ title, _id: title, isStatic: true })),
+            ...courses.map(course => ({ ...course, isStatic: false }))
+          ];
+          setAllCourses(allCoursesList);
+          console.log('✅ All courses fetched for next course navigation:', allCoursesList);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching all courses:', error);
+      }
+    };
+
+    fetchAllCourses();
+  }, []);
 
   // Function to determine course name based on module ID or course ID
   const getCourseName = () => {
+    // If we have the course name from database, use it
+    if (dbCourseName) {
+      return dbCourseName;
+    }
+
     // First try to determine from module ID
     if (mo_id) {
       const moduleIdUpper = mo_id.toUpperCase();
@@ -74,7 +144,17 @@ const Quiz = () => {
   };
 
   // Map lesson keys to module IDs for backend compatibility
+  // For newly created common courses, mo_id is already the m_id, so return as-is
+  // For static courses, use the mapping
   const getModuleIdFromLessonKey = (lessonKey) => {
+    // For newly created common courses (courseId is MongoDB ObjectId), mo_id is already m_id
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(courseId);
+    if (isObjectId) {
+      console.log('📋 Database course detected, using lessonKey as m_id:', lessonKey);
+      return lessonKey;
+    }
+    
+    // For static courses, use the hardcoded mapping
     const moduleMapping = {
       'ISP01': 'ISP01',
       'ISP02': 'ISP02', 
@@ -126,6 +206,16 @@ const Quiz = () => {
     
     console.log('Checking if final module:', { mo_id, courseName });
     
+    // For newly created common courses, check against database course data
+    if (dbCourse && dbCourse.modules) {
+      const modules = dbCourse.modules;
+      const currentModuleIndex = modules.findIndex(m => m.m_id === mo_id);
+      const isFinal = currentModuleIndex === modules.length - 1;
+      console.log('Is final module (database course)?', isFinal, `(${currentModuleIndex + 1}/${modules.length})`);
+      return isFinal;
+    }
+    
+    // For static courses, use hardcoded logic
     const moduleNumber = parseInt(mo_id.match(/\d+/)?.[0] || '0');
     console.log('Extracted module number:', moduleNumber);
     
@@ -162,6 +252,8 @@ const Quiz = () => {
   const [cooldownTime, setCooldownTime] = useState({ hours: 0, minutes: 0 });
   const [noQuizInDB, setNoQuizInDB] = useState(false); // State to track if no quiz exists in database
   const [moduleHasQuiz, setModuleHasQuiz] = useState(true); // Track if current module has a quiz
+  const [timeRemaining, setTimeRemaining] = useState(null); // Timer in seconds
+  const [timerStarted, setTimerStarted] = useState(false); // Track if timer has started
 
   // Function to refresh progress data after quiz completion
   const refreshProgressData = async () => {
@@ -447,23 +539,23 @@ const Quiz = () => {
         
         if (question.hasOwnProperty('imageUrl')) {
           // imageUrl field exists in the question
-          if (question.imageUrl === null || question.imageUrl === 'null') {
-            // Explicitly null - no image
+          if (question.imageUrl === null || question.imageUrl === 'null' || question.imageUrl === '') {
+            // Explicitly null or empty - no image
             imageUrl = null;
-            console.log('ImageUrl is null - NO IMAGE will be shown');
+            console.log('ImageUrl is null/empty - NO IMAGE will be shown');
           } else if (typeof question.imageUrl === 'string' && question.imageUrl.trim().length > 0) {
-            // Valid string URL
+            // Valid string URL - use it
             imageUrl = question.imageUrl.trim();
             console.log('Using provided imageUrl:', imageUrl);
           } else {
-            // Empty string or other falsy value - use default
-            imageUrl = "https://northfleet.in/wp-content/uploads/2024/10/Types-of-Cars-in-India.webp";
-            console.log('Using default imageUrl (empty/invalid value)');
+            // Invalid value - no image
+            imageUrl = null;
+            console.log('Invalid imageUrl value - NO IMAGE will be shown');
           }
         } else {
-          // No imageUrl field - use default
-          imageUrl = "https://northfleet.in/wp-content/uploads/2024/10/Types-of-Cars-in-India.webp";
-          console.log('Using default imageUrl (field not found)');
+          // No imageUrl field - no image
+          imageUrl = null;
+          console.log('No imageUrl field - NO IMAGE will be shown');
         }
         
         console.log('Final imageUrl decision:', imageUrl);
@@ -484,6 +576,11 @@ const Quiz = () => {
       console.log("Transformed questions:", transformedQuestions);
       setQuestions(transformedQuestions);
       setLoading(false);
+      
+      // Initialize timer when questions are loaded (15 minutes = 900 seconds)
+      const quizTimeLimit = 15 * 60; // 15 minutes in seconds
+      setTimeRemaining(quizTimeLimit);
+      setTimerStarted(true);
 
     } catch (err) {
       console.error("Error fetching questions:", err);
@@ -508,6 +605,41 @@ const Quiz = () => {
       fetchQuestions(attemptNumber);
     }
   }, [courseId, mo_id, quizAccessAllowed]);
+
+  // Timer countdown effect
+  useEffect(() => {
+    if (!timerStarted || timeRemaining === null || showResults || quizCompleted) {
+      return;
+    }
+
+    const timerInterval = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) {
+          clearInterval(timerInterval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timerInterval);
+  }, [timerStarted, timeRemaining, showResults, quizCompleted]);
+
+  // Auto-submit when timer reaches 0
+  useEffect(() => {
+    if (timeRemaining === 0 && timerStarted && !showResults && !quizCompleted && questions.length > 0) {
+      setTimerStarted(false);
+      handleSubmit();
+    }
+  }, [timeRemaining, timerStarted, showResults, quizCompleted, questions.length]);
+
+  // Format time as MM:SS
+  const formatTime = (seconds) => {
+    if (seconds === null || seconds < 0) return '00:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
 
   const handleAnswerSelect = (questionId, optionId) => {
     setSelectedAnswers(prev => ({
@@ -539,6 +671,9 @@ const Quiz = () => {
   };
 
   const handleSubmit = async () => {
+    // Stop timer when submitting
+    setTimerStarted(false);
+    
     const score = calculateScore();
     const percentage = (score / questions.length) * 100;
     const passed = percentage >= 100; // Changed to 100% (5/5 correct answers required)
@@ -710,12 +845,30 @@ const Quiz = () => {
   };
 
   const getNextMoId = (mo_id) => {
+    // For database courses, get next module from dbCourse.modules
+    if (dbCourse && dbCourse.modules && Array.isArray(dbCourse.modules)) {
+      const currentModuleIndex = dbCourse.modules.findIndex(m => m.m_id === mo_id);
+      if (currentModuleIndex >= 0 && currentModuleIndex < dbCourse.modules.length - 1) {
+        const nextModule = dbCourse.modules[currentModuleIndex + 1];
+        console.log('📋 Database course - next module:', nextModule.m_id, 'from index', currentModuleIndex + 1);
+        return nextModule.m_id;
+      }
+      console.log('📋 Database course - no next module (current index:', currentModuleIndex, 'total:', dbCourse.modules.length, ')');
+      return null;
+    }
+    
+    // For static courses, use pattern matching (ISP01 -> ISP02, etc.)
     const match = mo_id.match(/^(\D+)(\d+)$/);
-    if (!match) return null;
+    if (!match) {
+      console.log('⚠️ getNextMoId: Could not parse module ID pattern:', mo_id);
+      return null;
+    }
 
     const [, prefix, numberPart] = match;
     const next = (parseInt(numberPart) + 1).toString().padStart(numberPart.length, '0');
-    return `${prefix}${next}`;
+    const nextMoId = `${prefix}${next}`;
+    console.log('📋 Static course - next module:', nextMoId, 'from', mo_id);
+    return nextMoId;
   };
 
   // Handle retake quiz button click
@@ -725,12 +878,14 @@ const Quiz = () => {
       setCurrentQuestion(0);
       setSelectedAnswers({});
       setShowResults(false);
+      setTimerStarted(false);
+      setTimeRemaining(null);
       
       // Increment attempt number for next set of questions
       const nextAttempt = attemptNumber + 1;
       setAttemptNumber(nextAttempt);
       
-      // Fetch new questions for the next attempt
+      // Fetch new questions for the next attempt (timer will be reset in fetchQuestions)
       await fetchQuestions(nextAttempt);
       
     } catch (error) {
@@ -1071,7 +1226,21 @@ const Quiz = () => {
                   </div>
                   <button
                     onClick={() => {
-                      window.location.href = '/certificate';
+                      // Store courseId and lessonId for back navigation
+                      localStorage.setItem('certificateCourseId', courseId);
+                      localStorage.setItem('certificateLessonId', mo_id);
+                      
+                      // Replace quiz page in history with lesson page, then navigate to certificate
+                      // This ensures back button goes to lesson, not quiz
+                      const lessonPath = `/course/${courseId}/lesson/${mo_id}`;
+                      window.history.replaceState(
+                        { page: 'lesson', courseId, lessonId: mo_id },
+                        '',
+                        lessonPath
+                      );
+                      
+                      // Navigate to certificate page (this will push it to history)
+                      navigate('/certificate');
                     }}
                     className="certificate-button"
                     style={{
@@ -1097,20 +1266,127 @@ const Quiz = () => {
                 // Still has more modules to complete
                 (() => {
                   const nextMoId = getNextMoId(mo_id);
-                  return nextMoId ? (
-                    <button
-                      onClick={() => {
-                        window.location.href = `/course/${courseId}/lesson/${nextMoId}`;
-                      }}
-                      className="next-course-button"
-                    >
-                      Continue to Next Module
-                    </button>
-                  ) : (
-                    <div className="completion-message">
-                      Module completed! Check your dashboard for next steps.
-                    </div>
-                  );
+                  if (nextMoId) {
+                    return (
+                      <button
+                        onClick={() => {
+                          window.location.href = `/course/${courseId}/lesson/${nextMoId}`;
+                        }}
+                        className="next-course-button"
+                      >
+                        Continue to Next Module
+                      </button>
+                    );
+                  } else {
+                    // No more modules in this course, show "Next Course" button
+                    const getNextCourse = () => {
+                      if (allCourses.length === 0) return null;
+                      
+                      const currentCourseName = getCourseName();
+                      const currentIndex = allCourses.findIndex(c => 
+                        c.title === currentCourseName || c._id === courseId
+                      );
+                      
+                      if (currentIndex >= 0 && currentIndex < allCourses.length - 1) {
+                        return allCourses[currentIndex + 1];
+                      }
+                      return null;
+                    };
+                    
+                    const nextCourse = getNextCourse();
+                    
+                    if (nextCourse) {
+                      const nextCourseId = nextCourse.isStatic ? nextCourse.title : nextCourse._id;
+                      
+                      // Get first module of next course
+                      const getFirstModuleId = () => {
+                        if (nextCourse.isStatic) {
+                          // For static courses, use the first module ID pattern
+                          const staticModuleMap = {
+                            'ISP': 'ISP01',
+                            'GDPR': 'GDPR01',
+                            'POSH': 'POSH01',
+                            'Factory Act': 'FACT01',
+                            'Welding': 'WELD01',
+                            'CNC': 'CNC01',
+                            'Excel': 'EXL01',
+                            'VRU': 'VRU01'
+                          };
+                          return staticModuleMap[nextCourse.title] || null;
+                        } else {
+                          // For database courses, we need to fetch the course data
+                          // Return null here, will fetch in onClick handler
+                          return null;
+                        }
+                      };
+                      
+                      const firstModuleId = getFirstModuleId();
+                      
+                      return (
+                        <div className="next-course-section">
+                          <div className="completion-message">
+                            Module completed! Check your dashboard for next steps.
+                          </div>
+                          <button
+                            onClick={async () => {
+                              if (firstModuleId) {
+                                // Static course - navigate directly
+                                navigate(`/course/${nextCourseId}/lesson/${firstModuleId}`);
+                              } else {
+                                // Database course - fetch course data to get first module
+                                try {
+                                  const response = await fetch(`${API_ENDPOINTS.COURSES.GET_COURSE}/${nextCourseId}`, {
+                                    method: 'GET',
+                                    headers: { 'Content-Type': 'application/json' }
+                                  });
+                                  if (response.ok) {
+                                    const courseData = await response.json();
+                                    if (courseData.modules && courseData.modules.length > 0) {
+                                      navigate(`/course/${nextCourseId}/lesson/${courseData.modules[0].m_id}`);
+                                    } else {
+                                      navigate(`/course/${nextCourseId}`);
+                                    }
+                                  } else {
+                                    navigate(`/course/${nextCourseId}`);
+                                  }
+                                } catch (error) {
+                                  console.error('Error fetching next course:', error);
+                                  navigate(`/course/${nextCourseId}`);
+                                }
+                              }
+                            }}
+                            className="next-course-button"
+                            style={{
+                              backgroundColor: '#6366f1',
+                              color: 'white',
+                              padding: '12px 24px',
+                              fontSize: '16px',
+                              fontWeight: 'bold',
+                              border: 'none',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              marginTop: '16px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                              width: '100%',
+                              maxWidth: '300px',
+                              margin: '16px auto 0'
+                            }}
+                          >
+                            Next Course: {nextCourse.title}
+                          </button>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="completion-message">
+                          Module completed! Check your dashboard for next steps.
+                        </div>
+                      );
+                    }
+                  }
                 })()
               )}
             </>
@@ -1133,12 +1409,32 @@ const Quiz = () => {
 
       <div className="quiz-card">
         <div className="quiz-header">
-          <h1 className="question-text">
-            {currentQuestion + 1} {currentQuestionData.question}
-          </h1>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '10px' }}>
+            <h1 className="question-text" style={{ margin: 0, flex: 1 }}>
+              {currentQuestion + 1} {currentQuestionData.question}
+            </h1>
+            {timeRemaining !== null && (
+              <div 
+                className="quiz-timer"
+                style={{
+                  fontSize: '1.2rem',
+                  fontWeight: 'bold',
+                  color: timeRemaining <= 60 ? '#dc3545' : timeRemaining <= 300 ? '#ffc107' : '#28a745',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  backgroundColor: timeRemaining <= 60 ? '#fff5f5' : timeRemaining <= 300 ? '#fffbf0' : '#f0fdf4',
+                  border: `2px solid ${timeRemaining <= 60 ? '#dc3545' : timeRemaining <= 300 ? '#ffc107' : '#28a745'}`,
+                  minWidth: '80px',
+                  textAlign: 'center'
+                }}
+              >
+                ⏱️ {formatTime(timeRemaining)}
+              </div>
+            )}
+          </div>
           {attemptNumber > 1 && (
             <div className="attempt-indicator">
-              Retake Attempt {attemptNumber} - Different Questions
+              Retake Attempt {attemptNumber} 
             </div>
           )}
         </div>

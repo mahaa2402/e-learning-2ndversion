@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart, Zap, Users, Activity, LogOut } from 'lucide-react';
+import { BarChart, Zap, Users, Activity, LogOut, BookOpen } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.css';
 
@@ -39,6 +39,13 @@ const Sidebar = () => {
       path: '/admincourses',
       active: location.pathname === '/admincourses',
       onClick: () => navigate('/admincourses'),
+    },
+    {
+      icon: BookOpen,
+      label: 'Create Common Courses',
+      path: '/createcommoncourses',
+      active: location.pathname === '/createcommoncourses',
+      onClick: () => navigate('/createcommoncourses'),
     },
     { 
       icon: Users, 

@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import './certificate.css';
 import { API_ENDPOINTS } from '../config/api';
 
 const CertificatePage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [certificateData, setCertificateData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [courseCompleted, setCourseCompleted] = useState(false);
+  const [courseId, setCourseId] = useState(null);
+  const [lessonId, setLessonId] = useState(null);
 
   // Get employee data from localStorage or user session
   const getEmployeeData = () => {
@@ -40,10 +45,57 @@ const CertificatePage = () => {
   const { employeeName, employeeId } = getEmployeeData();
 
   useEffect(() => {
+    // Prevent browser back button from going to quiz page
+    const savedCourseId = localStorage.getItem('certificateCourseId');
+    const savedLessonId = localStorage.getItem('certificateLessonId');
+    
+    // Set courseId and lessonId state
+    if (savedCourseId) setCourseId(savedCourseId);
+    if (savedLessonId) setLessonId(savedLessonId);
+    
+    // Handle browser back button - redirect to lesson page instead of quiz
+    const handlePopState = (event) => {
+      if (savedCourseId && savedLessonId) {
+        // Navigate to lesson page instead of going back to quiz
+        navigate(`/course/${savedCourseId}/lesson/${savedLessonId}`, { replace: true });
+      }
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    
+    // Replace current history entry to prevent going back to quiz
+    if (savedCourseId && savedLessonId) {
+      // Replace the quiz page entry with lesson page in history
+      window.history.replaceState(
+        { page: 'lesson', courseId: savedCourseId, lessonId: savedLessonId },
+        '',
+        `/course/${savedCourseId}/lesson/${savedLessonId}`
+      );
+      
+      // Then push certificate page
+      window.history.pushState(
+        { page: 'certificate', courseId: savedCourseId, lessonId: savedLessonId },
+        '',
+        window.location.pathname
+      );
+    }
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [navigate]);
+
+  useEffect(() => {
     const initializeCertificate = async () => {
       try {
         setLoading(true);
         setError(null);
+
+        // Get courseId and lessonId from localStorage (set when navigating from lesson page)
+        const savedCourseId = localStorage.getItem('certificateCourseId');
+        const savedLessonId = localStorage.getItem('certificateLessonId');
+        if (savedCourseId) setCourseId(savedCourseId);
+        if (savedLessonId) setLessonId(savedLessonId);
 
         // Check if this is a newly completed course or a selected certificate from dashboard
         const isCourseCompleted = localStorage.getItem('courseCompleted') === 'true';
@@ -65,6 +117,12 @@ const CertificatePage = () => {
           localStorage.removeItem('completedCourseName');
           localStorage.removeItem('lastGeneratedCertificate');
           
+          // Get courseId and lessonId for back navigation
+          const certCourseId = localStorage.getItem('certificateCourseId');
+          const certLessonId = localStorage.getItem('certificateLessonId');
+          if (certCourseId) setCourseId(certCourseId);
+          if (certLessonId) setLessonId(certLessonId);
+          
           console.log('🎉 Displaying selected certificate from dashboard:', certificate);
           return;
         }
@@ -82,6 +140,12 @@ const CertificatePage = () => {
           localStorage.removeItem('courseCompleted');
           localStorage.removeItem('completedCourseName');
           localStorage.removeItem('lastGeneratedCertificate');
+          
+          // Get courseId and lessonId for back navigation
+          const certCourseId = localStorage.getItem('certificateCourseId');
+          const certLessonId = localStorage.getItem('certificateLessonId');
+          if (certCourseId) setCourseId(certCourseId);
+          if (certLessonId) setLessonId(certLessonId);
           
           console.log('🎉 Displaying newly generated certificate:', certificate);
           return;
@@ -416,7 +480,47 @@ const CertificatePage = () => {
           </div>
         </div>
 
-        <button className="print-button" onClick={() => window.print()}>Print Certificate</button>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px' }}>
+          {courseId && lessonId && (
+            <button 
+              onClick={() => {
+                // Navigate back to lesson page
+                navigate(`/course/${courseId}/lesson/${lessonId}`);
+                // Clear stored course/lesson IDs
+                localStorage.removeItem('certificateCourseId');
+                localStorage.removeItem('certificateLessonId');
+              }}
+              style={{
+                backgroundColor: '#007bff',
+                color: 'white',
+                padding: '10px 20px',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                marginRight: '10px'
+              }}
+            >
+              ⬅ Back to Lesson
+            </button>
+          )}
+          <button 
+            onClick={() => navigate('/userdashboard')}
+            style={{
+              backgroundColor: '#28a745',
+              color: 'white',
+              padding: '10px 20px',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              marginRight: '10px'
+            }}
+          >
+            📚 Go to Dashboard
+          </button>
+          <button className="print-button" onClick={() => window.print()}>🖨️ Print Certificate</button>
+        </div>
       </div>
     </div>
   );

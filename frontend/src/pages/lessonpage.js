@@ -30,10 +30,119 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
   const [subtitleCues, setSubtitleCues] = useState([]);
   const videoRef = useRef(null);
 
-  const course = courseData[courseId];
+  // State for database course/lesson data
+  const [dbCourse, setDbCourse] = useState(null);
+  const [dbLesson, setDbLesson] = useState(null);
+  const [fetchingFromDb, setFetchingFromDb] = useState(false);
+
+  // Try to get course from static data first (for backward compatibility)
+  const staticCourse = courseData[courseId];
+  
+  // Determine which course data to use
+  const course = dbCourse || staticCourse;
   const lessons = course?.lessons || {};
   const lessonKeys = Object.keys(lessons);
   const firstLessonId = lessonKeys[0];
+
+  // Fetch course and lesson data from database if not in static data
+  useEffect(() => {
+    const fetchCourseFromDatabase = async () => {
+      // If course exists in static data, don't fetch from database
+      if (staticCourse) {
+        console.log('✅ Course found in static data, using static data');
+        return;
+      }
+
+      // Try to fetch from database
+      try {
+        setFetchingFromDb(true);
+        console.log('🔍 Course not in static data, fetching from database:', courseId);
+        
+        // First, try to fetch the full course data
+        const courseResponse = await fetch(`${API_ENDPOINTS.COURSES.GET_COURSE}/${courseId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (courseResponse.ok) {
+          const courseData = await courseResponse.json();
+          console.log('✅ Course data fetched from database:', courseData);
+          console.log('📹 Lessons in course data:', courseData.lessons);
+          console.log('📹 Modules in course data:', courseData.modules);
+          // Log video URLs for each lesson
+          if (courseData.lessons) {
+            Object.keys(courseData.lessons).forEach(lessonKey => {
+              console.log(`📹 Lesson ${lessonKey} videoUrl:`, courseData.lessons[lessonKey].videoUrl);
+            });
+          }
+          setDbCourse(courseData);
+        } else if (courseResponse.status === 404) {
+          console.log('⚠️ Course not found in database either');
+        } else {
+          throw new Error(`Failed to fetch course: ${courseResponse.status}`);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching course from database:', error);
+      } finally {
+        setFetchingFromDb(false);
+      }
+    };
+
+    fetchCourseFromDatabase();
+  }, [courseId, staticCourse]);
+
+  // Fetch specific lesson data from database if needed
+  useEffect(() => {
+    const fetchLessonFromDatabase = async () => {
+      // If lesson exists in static course data, don't fetch from database
+      if (staticCourse && staticCourse.lessons && staticCourse.lessons[lessonId]) {
+        return;
+      }
+
+      // If we have database course but lesson not found, fetch specific lesson
+      if (dbCourse && !dbCourse.lessons[lessonId]) {
+        try {
+          console.log('🔍 Fetching specific lesson from database:', { courseId, lessonId });
+          const lessonResponse = await fetch(`${API_ENDPOINTS.COURSES.GET_LESSON}/${courseId}/${lessonId}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (lessonResponse.ok) {
+            const lessonData = await lessonResponse.json();
+            console.log('✅ Lesson data fetched from database:', lessonData);
+            setDbLesson(lessonData);
+            
+            // Update dbCourse with this lesson
+            if (dbCourse) {
+              setDbCourse({
+                ...dbCourse,
+                lessons: {
+                  ...dbCourse.lessons,
+                  [lessonId]: {
+                    title: lessonData.title,
+                    videoUrl: lessonData.videoUrl,
+                    content: lessonData.content,
+                    duration: lessonData.duration
+                  }
+                }
+              });
+            }
+          }
+        } catch (error) {
+          console.error('❌ Error fetching lesson from database:', error);
+        }
+      }
+    };
+
+    if (dbCourse && lessonId) {
+      fetchLessonFromDatabase();
+    }
+  }, [courseId, lessonId, dbCourse, staticCourse]);
 
   // Fetch common courses for dropdown
   useEffect(() => {
@@ -128,13 +237,14 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
 
   // Fetch subtitle from backend
   const fetchSubtitle = async () => {
-    if (!course?.name || !lessonId) return;
+    const courseName = course?.name || course?.title || dbCourse?.title || dbCourse?.name;
+    if (!courseName || !lessonId) return;
     
     try {
       const moduleIndex = getModuleIndexFromLessonId(lessonId);
       const res = await axios.get("/api/video/subtitle", {
         params: {
-          courseName: course.name,
+          courseName: courseName,
           moduleIndex: moduleIndex,
         },
       });
@@ -354,7 +464,42 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
   };
   
   const actualLessonId = getLessonKeyFromId(lessonId);
-  const lesson = lessons[actualLessonId];
+  console.log('🔍 Lesson lookup:', { lessonId, actualLessonId, hasDbLesson: !!dbLesson, hasLessonsKey: !!lessons[actualLessonId] });
+  
+  // Use database lesson if available, otherwise use static lesson
+  let lesson = dbLesson ? {
+    title: dbLesson.title,
+    videoUrl: dbLesson.videoUrl,
+    content: dbLesson.content,
+    duration: dbLesson.duration
+  } : lessons[actualLessonId];
+
+  // For database courses, also check if lesson exists in dbCourse.lessons
+  if (dbCourse && !lesson && dbCourse.lessons && dbCourse.lessons[lessonId]) {
+    console.log('📋 Using lesson from dbCourse.lessons:', lessonId);
+    lesson = dbCourse.lessons[lessonId];
+  }
+
+  // If lesson still doesn't have videoUrl, try to get it from dbCourse.lessons directly
+  if (lesson && !lesson.videoUrl && dbCourse && dbCourse.lessons && dbCourse.lessons[lessonId]) {
+    console.log('📋 Getting videoUrl from dbCourse.lessons:', dbCourse.lessons[lessonId].videoUrl);
+    lesson.videoUrl = dbCourse.lessons[lessonId].videoUrl;
+  }
+
+  console.log('📹 Final lesson data:', { 
+    title: lesson?.title, 
+    hasVideoUrl: !!lesson?.videoUrl, 
+    videoUrl: lesson?.videoUrl 
+  });
+
+  // NOTE: The PRIMARY flow is: Upload → S3 → Save URL to DB → Fetch from DB → Display
+  // If videoUrl is missing from the database, it means the video hasn't been uploaded yet.
+  // No fallback needed - the video should be uploaded and saved to the database.
+  if (!lesson?.videoUrl && dbCourse) {
+    const courseName = course.name || course.title || '';
+    console.warn(`⚠️ Video URL missing from database for course: "${courseName}", module: "${lessonId}"`);
+    console.warn(`⚠️ Please upload the video for this module in the admin panel.`);
+  }
 
   // Debounce mechanism to prevent excessive API calls
   const [fetchTimeout, setFetchTimeout] = useState(null);
@@ -379,8 +524,9 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
         return;
       }
 
+      const courseName = course?.name || course?.title || dbCourse?.title || dbCourse?.name || courseId;
       const response = await fetch(
-        `${API_ENDPOINTS.PROGRESS.GET_PROGRESS}?userEmail=${userEmail}&courseName=${course.name}&courseId=${courseId}`,
+        `${API_ENDPOINTS.PROGRESS.GET_PROGRESS}?userEmail=${userEmail}&courseName=${courseName}&courseId=${courseId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -542,7 +688,16 @@ useEffect(() => {
 }, [courseId, course?.name, fetchUserProgress]);
 
   // Map lesson keys to backend IDs
+  // For newly created common courses, lessonKey is already the m_id, so return as-is
+  // For static courses, use the mapping
   const getModuleIdFromLessonKey = (lessonKey) => {
+    // For database courses (newly created common courses), lessonKey is already m_id
+    if (dbCourse) {
+      console.log('📋 Database course detected, using lessonKey as m_id:', lessonKey);
+      return lessonKey;
+    }
+    
+    // For static courses, use the hardcoded mapping
     const moduleMapping = {
       'ISP01': 'ISP01', 'ISP02': 'ISP02', 'ISP03': 'ISP03', 'ISP04': 'ISP04',
       'POSH01': 'POSH01', 'POSH02': 'POSH02', 'POSH03': 'POSH03', 'POSH04': 'POSH04',
@@ -709,6 +864,10 @@ useEffect(() => {
         localStorage.setItem('completedCourseName', course?.name);
       }
       
+      // Store courseId and lessonId for back navigation
+      localStorage.setItem('certificateCourseId', courseId);
+      localStorage.setItem('certificateLessonId', lessonId);
+      
       // Navigate to certificate page
       navigate('/certificate');
     } catch (error) {
@@ -747,11 +906,12 @@ useEffect(() => {
     );
   }
 
-  if (loading) {
+  if (loading || fetchingFromDb) {
     return (
       <div className="lesson-wrapper">
         <div className="loading-container">
           <h2>Loading lesson...</h2>
+          {fetchingFromDb && <p>Fetching course data from database...</p>}
         </div>
       </div>
     );
@@ -852,7 +1012,13 @@ const renderFormattedContent = (contentArray) => {
                 }
               }}
             >
-            <source src={lesson.videoUrl} type="video/mp4" />
+            {lesson?.videoUrl ? (
+              <source src={lesson.videoUrl} type="video/mp4" />
+            ) : (
+              <p style={{ padding: '20px', color: 'red' }}>
+                ⚠️ Video URL not found. Please check that the video was uploaded correctly.
+              </p>
+            )}
               {subtitleUrl && (
                 <track 
                   kind="captions" 
@@ -936,8 +1102,14 @@ const renderFormattedContent = (contentArray) => {
                 <button
                   key={id}
                   className={`quiz-button ${isCurrentLesson ? 'active' : ''} ${quizCompleted ? 'completed' : ''} ${!quizAvailable ? 'locked' : ''}`}
-                  disabled={!quizAvailable}
+                  disabled={!quizAvailable || quizCompleted}
                   onClick={async () => {
+                    // If quiz is already completed, show message and don't navigate
+                    if (quizCompleted) {
+                      alert('✅ You have already completed this quiz!\n\nYou cannot retake a completed quiz.');
+                      return;
+                    }
+                    
                     if (!quizAvailable) return;
                     
                     // Check quiz availability before navigating

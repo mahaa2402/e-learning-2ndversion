@@ -16,6 +16,7 @@ const assignedCourseProgressRoutes = require('./routes/AssignedCourseProgress');
 const certificateRoutes = require('./routes/CertificateRoutes');
 const videoUploadRoutes = require('./routes/VideoUpload');
 const videoFetchRoutes = require('./routes/Videofetch');
+const uploadRoutes = require('./routes/Upload');
 const { initializeEmailService } = require('./services/emailService');
 
 const app = express();
@@ -38,15 +39,24 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Debug middleware
+// Debug middleware - MUST be after body parsing but before routes
 app.use((req, res, next) => {
-  console.log(`📝 ${req.method} ${req.url}`);
-  console.log(`   Origin: ${req.headers.origin || 'No origin'}`);
-  console.log(`   User-Agent: ${req.headers['user-agent'] || 'No user-agent'}`);
-  if (['POST','PUT','PATCH'].includes(req.method)) {
-    console.log(`   Body: ${JSON.stringify(req.body, null, 2)}`);
+  // Log ALL requests, especially PUT requests
+  if (req.method === 'PUT' || req.url.includes('/update/')) {
+    console.log('🚨 ========================================');
+    console.log(`🚨 ${req.method} ${req.url}`);
+    console.log(`🚨 Original URL: ${req.originalUrl}`);
+    console.log(`🚨 Path: ${req.path}`);
+    console.log(`🚨 Base URL: ${req.baseUrl || 'N/A'}`);
+    console.log(`🚨 Origin: ${req.headers.origin || 'No origin'}`);
+    console.log(`🚨 User-Agent: ${req.headers['user-agent']?.substring(0, 50) || 'No user-agent'}`);
+    if (['POST','PUT','PATCH'].includes(req.method)) {
+      console.log(`🚨 Body: ${JSON.stringify(req.body, null, 2)}`);
+    }
+    console.log('🚨 ========================================\n');
+  } else {
+    console.log(`📝 ${req.method} ${req.url}`);
   }
-  console.log('   ========================\n');
   next();
 });
 
@@ -100,9 +110,12 @@ mongoose.connect(process.env.MONGO_URI, {
 });
 
 // Routes
+console.log('📋 Registering routes...');
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+console.log('📋 Registering /api/courses routes...');
 app.use('/api/courses', courseRoutes);
+console.log('✅ All routes registered');
 app.use('/api/employee', employeeRoutes);
 app.use('/api', assignedTaskRoutes);
 app.use('/api/progress', progressRoutes);
@@ -111,6 +124,7 @@ app.use('/api/certificate', certificateRoutes);
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/videos', videoUploadRoutes);
 app.use('/api/video', videoFetchRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Health check
 app.get('/health', async (req, res) => {

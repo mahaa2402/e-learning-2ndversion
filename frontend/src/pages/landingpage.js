@@ -158,8 +158,9 @@ function LandingPage() {
   GDPR: "gdpr.jpg", 
   POSH: "posh.png",
   "Factory Act": "hsi.jpg",
-  Welding: "course.jpg",
-  CNC: "courseimg.jpeg"
+  Welding: "weilding.jpg",
+  CNC: "cnc.webp",
+  Excel: "excel.png"
 };
 
 
@@ -482,7 +483,6 @@ function LandingPage() {
                       
                         <div className="course-badges">
                           <span className="course-modules-badge">{course.modules ? course.modules.length : 0} Modules</span>
-                          <span className={`course-level-badge ${(course.level || 'beginner').toLowerCase()}`}>{course.level || 'Beginner'}</span>
                         </div>
                       </div>
                       <div className="course-content">

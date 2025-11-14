@@ -55,8 +55,9 @@ const quizSchema = new mongoose.Schema({
         default: 'multiple-choice'
       },
       options: [String],
-      correctAnswer: { type: mongoose.Schema.Types.Mixed, required: true },
-      points: { type: Number, default: 1 }
+      correctAnswer: { type: String, required: true }, // Changed to String to store the actual answer text
+      points: { type: Number, default: 1 },
+      imageUrl: { type: String, default: null } // Added imageUrl field for question images
     }
   ],
   passingScore: { type: Number, default: 70 },

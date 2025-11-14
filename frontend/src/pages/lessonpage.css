@@ -589,6 +589,16 @@
   line-height: 1.4;
 }
 
+/* Disabled state for completed quizzes */
+.quiz-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.quiz-button:disabled:hover {
+  background: #f3f3f3;
+}
+
 /* Locked state styles */
 .lesson-item.locked,
 .quiz-item.locked {
