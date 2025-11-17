@@ -6,6 +6,13 @@ const initializeEmailService = () => {
   try {
     const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, FROM_EMAIL } = process.env;
     
+    // Log email configuration (without sensitive data)
+    console.log('📧 Email Configuration:');
+    console.log('  SMTP_HOST:', SMTP_HOST ? 'Set' : 'Missing');
+    console.log('  SMTP_PORT:', SMTP_PORT || 'Missing');
+    console.log('  SMTP_USER:', SMTP_USER ? SMTP_USER : 'Missing');
+    console.log('  FROM_EMAIL:', FROM_EMAIL || 'Not set (will use SMTP_USER)');
+    
     if (SMTP_HOST && SMTP_PORT && SMTP_USER && SMTP_PASS) {
       transporter = nodemailer.createTransport({
         host: SMTP_HOST,
@@ -34,15 +41,19 @@ const sendOTPEmail = async (email, otp, purpose = 'signup') => {
     const emailConfigured = transporter !== null;
 
     if (emailConfigured) {
+      // Read FROM_EMAIL fresh from process.env each time (in case .env was updated)
+      const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER;
+      
       const mailOptions = {
-        from: process.env.FROM_EMAIL || process.env.SMTP_USER,
+        from: fromEmail,
         to: email,
         subject: getOTPSubject(purpose),
         html: getOTPContent(otp, purpose)
       };
 
+      console.log(`📧 Sending email from: ${fromEmail} to: ${email}`);
       await transporter.sendMail(mailOptions);
-      console.log(`✅ OTP email sent to ${email}`);
+      console.log(`✅ OTP email sent to ${email} from ${fromEmail}`);
       return true;
     } else {
       // Development mode: log OTP to console
