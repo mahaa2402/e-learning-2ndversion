@@ -119,10 +119,8 @@ function Register() {
 
       setIsOTPVerified(true);
       setSuccess('Email verified successfully! You can now register.');
-      // Automatically proceed to registration
-      setTimeout(() => {
-        handleRegister();
-      }, 500);
+      // Don't auto-call registration - let user click "Complete Registration" button
+      // This ensures the backend has time to save the verified OTP
     } catch (err) {
       const errorData = err.response?.data || {};
       setError(errorData.details || errorData.error || 'Invalid OTP');
@@ -172,6 +170,9 @@ function Register() {
     setSuccess('');
 
     try {
+      // Small delay to ensure backend has saved the verified OTP
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       const res = await axios.post(API_ENDPOINTS.AUTH.REGISTER, formData);
       setSuccess(res.data.message || 'Registration successful');
       setTimeout(() => navigate('/login'), 2000);

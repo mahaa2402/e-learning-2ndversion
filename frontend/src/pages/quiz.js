@@ -90,6 +90,23 @@ const Quiz = () => {
 
   // Function to determine course name based on module ID or course ID
   const getCourseName = () => {
+    // For database courses (ObjectId), always use dbCourseName or dbCourse title/name
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(courseId);
+    if (isObjectId) {
+      if (dbCourseName) {
+        console.log('📋 Using dbCourseName for course name:', dbCourseName);
+        return dbCourseName;
+      }
+      if (dbCourse?.title) {
+        console.log('📋 Using dbCourse.title for course name:', dbCourse.title);
+        return dbCourse.title;
+      }
+      if (dbCourse?.name) {
+        console.log('📋 Using dbCourse.name for course name:', dbCourse.name);
+        return dbCourse.name;
+      }
+    }
+    
     // If we have the course name from database, use it
     if (dbCourseName) {
       return dbCourseName;
@@ -794,18 +811,30 @@ const Quiz = () => {
     if (passed) {
       // User passed the quiz - submit progress
       const token = localStorage.getItem('authToken') || localStorage.getItem('token');
-      const userEmail = email;
+      // Always get email from localStorage to ensure we use the current logged-in user's email
+      const userEmail = localStorage.getItem('employeeEmail');
+      if (!userEmail) {
+        console.error('❌ No employeeEmail found in localStorage');
+        setError('User email not found. Please log in again.');
+        return;
+      }
+      
+      // Log the email being used to help debug user mismatch issues
+      console.log('👤 Using email from localStorage:', userEmail);
+      console.log('🔍 Verifying email matches current user...');
+      
       const courseName = getCourseName();
       const m_id = getModuleIdFromLessonKey(mo_id);
       const completedAt = new Date().toISOString();
 
       try {
-        console.log('User passed quiz, submitting progress...');
-        console.log('Progress data:', { userEmail, courseName, m_id, passed, mo_id });
-        console.log('Module ID format check - mo_id:', mo_id, 'm_id:', m_id);
+        console.log('✅ User passed quiz, submitting progress...');
+        console.log('📊 Progress data:', { userEmail, courseName, m_id, passed, mo_id });
+        console.log('🔍 Module ID format check - mo_id:', mo_id, 'm_id:', m_id);
+        console.log('🔍 Course ID:', courseId, 'Is ObjectId:', /^[0-9a-fA-F]{24}$/.test(courseId));
         
         // Submit quiz progress to backend
-  const response = await fetch("/api/progress/submit-quiz", {
+        const response = await fetch(API_ENDPOINTS.PROGRESS.SUBMIT_QUIZ, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -823,6 +852,13 @@ const Quiz = () => {
           const result = await response.json();
           console.log('✅ Quiz progress saved successfully:', result);
           console.log('✅ Saved module ID:', m_id, 'for course:', courseName);
+          console.log('✅ Backend response details:', {
+            success: result.success,
+            savedCourseName: result.savedCourseName,
+            savedUserEmail: result.savedUserEmail,
+            progressFound: !!result.progress,
+            completedModules: result.progress?.completedModules?.map(m => m.m_id) || []
+          });
           
           // Update local storage for backward compatibility
           let currentLevel = parseInt(localStorage.getItem("levelCleared")) || 0;
@@ -831,6 +867,95 @@ const Quiz = () => {
           
           console.log('Updated level cleared to:', updatedLevel);
           
+          // Use the saved progress from the response, then refresh to get unlock status
+          const savedProgress = result.progress;
+          const savedCourseName = result.savedCourseName || courseName;
+          
+          // Wait a bit for database to fully commit, then refresh to get unlock status
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Refresh progress data to get unlock status
+          try {
+            console.log('🔄 Refreshing progress data to get unlock status...');
+            
+            // Refresh progress with the exact courseName that was saved
+            let refreshedData = null;
+            let progressRefreshed = false;
+            
+            // Try multiple times with increasing delays to ensure progress is updated
+            for (let i = 0; i < 8; i++) {
+              // Wait before each attempt (except first)
+              if (i > 0) {
+                const delay = Math.min(400 + (i * 200), 1200); // 400ms, 600ms, 800ms, 1000ms, 1200ms...
+                console.log(`⏳ Waiting ${delay}ms before attempt ${i + 1}...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+              }
+              
+              refreshedData = await refreshProgressData();
+              
+              // Check if we got valid progress data with the completed module
+              if (refreshedData?.progress && refreshedData.progress.completedModules?.some(mod => mod.m_id === m_id)) {
+                console.log(`✅ Progress confirmed updated on attempt ${i + 1}`);
+                progressRefreshed = true;
+                break;
+              } else if (refreshedData?.progress && savedProgress) {
+                // If we have progress but it doesn't include our module yet, check if it's at least a valid progress object
+                console.log(`⏳ Progress found but module not yet included on attempt ${i + 1}, will retry...`);
+                console.log('📊 Current progress modules:', refreshedData.progress.completedModules?.map(m => m.m_id) || []);
+              } else {
+                console.log(`⏳ Progress not found on attempt ${i + 1}, will retry...`);
+              }
+            }
+            
+            // Use refreshed data if available, otherwise use saved progress from response
+            const progressToUse = refreshedData?.progress || savedProgress;
+            const unlockStatusToUse = refreshedData?.lessonUnlockStatus || [];
+            
+            if (progressToUse) {
+              console.log('✅ Using progress data:', {
+                hasProgress: !!progressToUse,
+                completedModules: progressToUse.completedModules?.map(m => m.m_id) || [],
+                hasUnlockStatus: unlockStatusToUse.length > 0
+              });
+              
+              // Dispatch progressUpdated event with the progress data
+              window.dispatchEvent(new CustomEvent('progressUpdated', { 
+                detail: { 
+                  progress: progressToUse,
+                  lessonUnlockStatus: unlockStatusToUse,
+                  courseName: savedCourseName,
+                  courseId: courseId
+                } 
+              }));
+            } else {
+              console.warn('⚠️ No progress data available, but quiz was saved successfully');
+              // Still dispatch event with saved progress if available
+              if (savedProgress) {
+                window.dispatchEvent(new CustomEvent('progressUpdated', { 
+                  detail: { 
+                    progress: savedProgress,
+                    lessonUnlockStatus: [],
+                    courseName: savedCourseName,
+                    courseId: courseId
+                  } 
+                }));
+              }
+            }
+          } catch (error) {
+            console.warn('⚠️ Could not refresh progress data:', error);
+            // Still dispatch event with saved progress from response
+            if (savedProgress) {
+              window.dispatchEvent(new CustomEvent('progressUpdated', { 
+                detail: { 
+                  progress: savedProgress,
+                  lessonUnlockStatus: [],
+                  courseName: savedCourseName,
+                  courseId: courseId
+                } 
+              }));
+            }
+          }
+
           // Trigger refresh event for taskmodulepage to update completion status
           console.log('🎉 Dispatching quizCompleted event:', { 
             moduleId: m_id, 
@@ -844,23 +969,16 @@ const Quiz = () => {
               courseName: courseName 
             } 
           }));
-
-          // Refresh progress data to unlock next quiz immediately
-          try {
-            console.log('🔄 Refreshing progress data to unlock next quiz...');
-            await refreshProgressData();
-            // Small delay to ensure backend has processed the completion
-            await new Promise(resolve => setTimeout(resolve, 500));
-          } catch (error) {
-            console.warn('⚠️ Could not refresh progress data:', error);
-          }
+          
+          // Additional delay to ensure all components have processed the events
+          await new Promise(resolve => setTimeout(resolve, 500));
 
           // Check if course is completed - ALWAYS check, not just for final module
           const currentCourseName = getCourseName();
           
           try {
             console.log('Checking if course is completed after this module...');
-            const certificateResponse = await fetch("/api/certificate/check-course-completion", {
+            const certificateResponse = await fetch(API_ENDPOINTS.CERTIFICATES.CHECK_COURSE_COMPLETION, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -1120,7 +1238,7 @@ const Quiz = () => {
                     
                     if (token && userEmail && courseName) {
                       // Mark current module as completed
-                      const response = await fetch("/api/progress/submit-quiz", {
+                      const response = await fetch(API_ENDPOINTS.PROGRESS.SUBMIT_QUIZ, {
                         method: "POST",
                         headers: {
                           "Content-Type": "application/json",
@@ -1367,37 +1485,66 @@ const Quiz = () => {
                       onClick={async () => {
                         // Ensure progress is saved and refreshed before navigating
                         try {
-                          const token = localStorage.getItem('authToken') || localStorage.getItem('token');
-                          const userEmail = localStorage.getItem('employeeEmail');
                           const courseName = getCourseName();
+                          const savedM_id = getModuleIdFromLessonKey(mo_id);
                           
-                          if (token && userEmail && courseName) {
-                            // Refresh progress to ensure it's up to date
-                            const progressResponse = await fetch(`${API_ENDPOINTS.PROGRESS.GET_PROGRESS}?userEmail=${userEmail}&courseName=${courseName}&courseId=${courseId}`, {
-                              headers: { Authorization: `Bearer ${token}` }
-                            });
+                          console.log('🔄 Refreshing progress before navigation to next module...');
+                          
+                          // Wait longer to ensure backend has fully processed the quiz completion
+                          await new Promise(resolve => setTimeout(resolve, 1000));
+                          
+                          // Refresh progress multiple times to ensure it's up to date
+                          let progressData = null;
+                          for (let i = 0; i < 5; i++) {
+                            progressData = await refreshProgressData();
                             
-                            if (progressResponse.ok) {
-                              const progressData = await progressResponse.json();
-                              // Dispatch progressUpdated event so lesson page can update immediately
-                              window.dispatchEvent(new CustomEvent('progressUpdated', {
-                                detail: {
-                                  courseName: courseName,
-                                  lessonUnlockStatus: progressData.lessonUnlockStatus || []
-                                }
-                              }));
+                            if (progressData) {
+                              console.log(`🔄 Progress fetch attempt ${i + 1}:`, progressData);
+                              
+                              // Check if progress includes the completed module
+                              const hasCompletedModule = progressData.progress?.completedModules?.some(mod => mod.m_id === savedM_id);
+                              if (hasCompletedModule) {
+                                console.log(`✅ Progress confirmed with completed module on attempt ${i + 1}`);
+                                break;
+                              } else {
+                                console.log(`⏳ Progress found but module not yet included on attempt ${i + 1}, retrying...`);
+                                console.log('📊 Current completed modules:', progressData.progress?.completedModules?.map(m => m.m_id) || []);
+                              }
+                            } else {
+                              console.log(`⏳ Progress not found on attempt ${i + 1}, retrying...`);
                             }
                             
-                            // Small delay to ensure event is processed
-                            await new Promise(resolve => setTimeout(resolve, 300));
+                            // Wait before next attempt (except on last iteration)
+                            if (i < 4) {
+                              await new Promise(resolve => setTimeout(resolve, 600));
+                            }
                           }
+                          
+                          if (progressData) {
+                            // Dispatch progressUpdated event so lesson page can update immediately
+                            console.log('📢 Dispatching progressUpdated event with data:', progressData);
+                            window.dispatchEvent(new CustomEvent('progressUpdated', {
+                              detail: {
+                                courseName: courseName,
+                                courseId: courseId,
+                                lessonUnlockStatus: progressData.lessonUnlockStatus || [],
+                                progress: progressData.progress
+                              }
+                            }));
+                          } else {
+                            console.warn('⚠️ Could not fetch progress data, but proceeding with navigation');
+                          }
+                          
+                          // Additional delay to ensure event is processed
+                          await new Promise(resolve => setTimeout(resolve, 500));
                         } catch (error) {
-                          console.warn('Could not refresh progress before navigation:', error);
+                          console.warn('⚠️ Could not refresh progress before navigation:', error);
                         }
                         
+                        console.log('🚀 Navigating to next module:', nextMoId);
                         // Use React Router navigate instead of window.location for better state management
                         navigate(`/course/${courseId}/lesson/${nextMoId}`, { 
-                          state: { refreshProgress: true } 
+                          state: { refreshProgress: true, fromQuiz: true } 
                         });
                       }}
                       className="next-course-button"

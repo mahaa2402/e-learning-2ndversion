@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart, Zap, Users, Activity, LogOut, BookOpen } from 'lucide-react';
+import { BarChart, Users, Activity, LogOut, BookOpen } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.css';
 
@@ -32,13 +32,6 @@ const Sidebar = () => {
       path: '/admindashboard', 
       active: location.pathname === '/admindashboard',
       onClick: () => navigate('/admindashboard'),
-    },
-    {
-      icon: Zap,
-      label: 'Customization',
-      path: '/admincourses',
-      active: location.pathname === '/admincourses',
-      onClick: () => navigate('/admincourses'),
     },
     {
       icon: BookOpen,

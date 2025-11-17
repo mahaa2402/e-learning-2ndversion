@@ -538,10 +538,7 @@ const getCourseImage = (course) => {
                   </p>
                 </div>
                 <div className="stats-grid">
-                  <div className="stat-item">
-                    <div className="stat-number">100+</div>
-                    <div className="stat-label">Learners Trained</div>
-                  </div>
+              
                   <div className="stat-item">
                     <div className="stat-number">5+</div>
                     <div className="stat-label">Courses</div>
@@ -570,23 +567,17 @@ const getCourseImage = (course) => {
                     <div className="feature-icon">📱</div>
                     <div className="feature-content">
                       <h4>Flexible Learning</h4>
-                      <p>Learn at your own pace with our mobile-friendly platform that allows you to access content anytime, anywhere.</p>
+                      <p>Learn at your own pace with our platform that allows you to access content anytime, anywhere.</p>
                     </div>
                   </div>
                   <div className="feature-item">
                     <div className="feature-icon">🏆</div>
                     <div className="feature-content">
                       <h4>Recognized Certifications</h4>
-                      <p>Earn certificates that are recognized by industry leaders and add real value to your professional profile.</p>
+                      <p>Earn certificates that are recognized and add real value to your professional profile.</p>
                     </div>
                   </div>
-                  <div className="feature-item">
-                    <div className="feature-icon">🤝</div>
-                    <div className="feature-content">
-                      <h4>Personalized Support</h4>
-                      <p>Get dedicated support from our learning specialists who are committed to your success throughout your learning journey.</p>
-                    </div>
-                  </div>
+                 
                 </div>
               </div>
             </div>

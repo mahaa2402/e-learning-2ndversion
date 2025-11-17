@@ -507,7 +507,7 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
   const [fetchTimeout, setFetchTimeout] = useState(null);
 
   // Fetch user progress and unlock status
-  const fetchUserProgress = async (force = false) => {
+  const fetchUserProgress = async (force = false, retryCount = 0) => {
     // If not forced and there's already a pending fetch, skip this one
     if (!force && fetchTimeout) {
       console.log('⏳ Fetch already in progress, skipping...');
@@ -526,9 +526,19 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
         return;
       }
 
-      const courseName = course?.name || course?.title || dbCourse?.title || dbCourse?.name || courseId;
+      // For database courses, prioritize dbCourse title/name to match quiz.js
+      const isObjectId = /^[0-9a-fA-F]{24}$/.test(courseId);
+      let courseName;
+      if (isObjectId) {
+        courseName = dbCourse?.title || dbCourse?.name || course?.name || course?.title || courseId;
+        console.log('📋 Database course detected, using courseName:', courseName, 'from dbCourse:', { title: dbCourse?.title, name: dbCourse?.name });
+      } else {
+        courseName = course?.name || course?.title || dbCourse?.title || dbCourse?.name || courseId;
+      }
+      
+      console.log('📊 Fetching progress with courseName:', courseName, 'courseId:', courseId);
       const response = await fetch(
-        `${API_ENDPOINTS.PROGRESS.GET_PROGRESS}?userEmail=${userEmail}&courseName=${courseName}&courseId=${courseId}`,
+        `${API_ENDPOINTS.PROGRESS.GET_PROGRESS}?userEmail=${userEmail}&courseName=${encodeURIComponent(courseName)}&courseId=${courseId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -538,6 +548,23 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
 
         if (Array.isArray(data.lessonUnlockStatus)) {
           setUnlockStatus(data.lessonUnlockStatus);
+          console.log('✅ Unlock status set:', data.lessonUnlockStatus);
+          
+          // If forced refresh and retry count is less than 1, check if we need to retry once
+          // This helps ensure progress is fully updated for newly created courses
+          if (force && retryCount < 1) {
+            // Check if the progress seems incomplete (e.g., no unlock status)
+            const hasUnlockStatus = data.lessonUnlockStatus?.length > 0;
+            
+            // Only retry once if we don't have unlock status
+            if (!hasUnlockStatus) {
+              const delay = 1500;
+              console.log(`🔄 Progress might be incomplete, retrying in ${delay}ms...`);
+              setTimeout(() => {
+                fetchUserProgress(true, retryCount + 1);
+              }, delay);
+            }
+          }
         } else {
           console.warn("Unexpected lessonUnlockStatus format:", data.lessonUnlockStatus);
           setUnlockStatus([]);
@@ -572,21 +599,52 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
     }
   }, [courseId, lessonId, actualLessonId, navigate]);
 
-  // Fetch user progress on mount and when navigating from quiz
+  // Fetch progress when dbCourse is loaded (especially important for newly created courses)
+  useEffect(() => {
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(courseId);
+    if (isObjectId && dbCourse && !unlockStatus.length) {
+      // If this is a database course and dbCourse just loaded, fetch progress
+      console.log('🔄 dbCourse loaded, fetching progress for newly created course...');
+      setTimeout(() => {
+        fetchUserProgress(true);
+      }, 300);
+    }
+  }, [dbCourse, courseId]);
+
+  // Fetch user progress on mount and when navigating from quiz or when lesson changes
   useEffect(() => {
     if (course || dbCourse) {
-      // If navigating from quiz page with refreshProgress flag, force refresh
+      // If navigating from quiz page with refreshProgress flag, force refresh with retry
       const shouldForceRefresh = location.state?.refreshProgress;
+      const fromQuiz = location.state?.fromQuiz;
       
-      // Add a small delay if coming from quiz to ensure progress is saved
-      if (shouldForceRefresh) {
+      // Add a delay if coming from quiz to ensure progress is saved, with minimal retry
+      if (shouldForceRefresh || fromQuiz) {
+        console.log('🔄 Coming from quiz page, will refresh progress...');
+        
+        // Single fetch after a delay to ensure backend has processed
         setTimeout(() => {
+          console.log('🔄 Fetching progress after quiz completion...');
           fetchUserProgress(true);
-          // Clear the state after using it
-          navigate(location.pathname, { replace: true, state: {} });
-        }, 500);
+        }, 1000);
+        
+        // One retry only if needed (handled by fetchUserProgress internal retry logic)
+        const retryTimeout = setTimeout(() => {
+          console.log('🔄 Retry: Fetching progress after quiz completion...');
+          fetchUserProgress(true);
+        }, 3000);
+        
+        // Clear the state after using it
+        navigate(location.pathname, { replace: true, state: {} });
+        
+        return () => {
+          clearTimeout(retryTimeout);
+        };
       } else {
-        fetchUserProgress(false);
+        // Always refresh progress when lesson changes to ensure unlock status is up to date
+        console.log('🔄 Lesson changed, refreshing progress...', { lessonId, courseId });
+        // Single fetch only
+        fetchUserProgress(true);
       }
     }
   }, [courseId, course, dbCourse, lessonId]);
@@ -667,30 +725,91 @@ useEffect(() => {
     const { moduleId, courseId: eventCourseId, courseName } = event.detail;
     console.log('🎉 Quiz completed event received:', { moduleId, courseId: eventCourseId, courseName });
 
-    const currentCourseName = course?.name;
-    if (eventCourseId === courseId || courseName === currentCourseName) {
-      console.log('🔄 Refreshing unlock status for current course...');
+    // Use the same course name resolution logic as quiz.js
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(courseId);
+    let currentCourseName;
+    if (isObjectId) {
+      // For database courses, prioritize dbCourse title/name to match quiz.js
+      currentCourseName = dbCourse?.title || dbCourse?.name || course?.title || course?.name;
+    } else {
+      currentCourseName = course?.name || course?.title || dbCourse?.title || dbCourse?.name;
+    }
+    const currentCourseId = courseId;
+    
+    // Check if this event is for the current course (by name or ID)
+    const eventNameNormalized = courseName?.trim().toLowerCase();
+    const currentNameNormalized = currentCourseName?.trim().toLowerCase();
+    const isCurrentCourse = eventCourseId === currentCourseId || 
+        (courseName && currentCourseName && eventNameNormalized === currentNameNormalized);
+    
+    if (isCurrentCourse) {
+      console.log('🔄 Refreshing unlock status for current course after quiz completion...');
       if (refreshTimeout) {
         clearTimeout(refreshTimeout);
       }
+      // Use force refresh once to ensure progress is fully updated
       refreshTimeout = setTimeout(() => {
-        fetchUserProgress();
+        fetchUserProgress(true);
       }, 500);
     }
   };
 
   const handleProgressUpdated = (event) => {
-    const { courseName: eventCourseName, lessonUnlockStatus } = event.detail;
-    console.log('🔄 Progress updated event received:', { eventCourseName, lessonUnlockStatus });
+    const { courseName: eventCourseName, courseId: eventCourseId, lessonUnlockStatus, progress } = event.detail || {};
+    console.log('🔄 Progress updated event received:', { eventCourseName, eventCourseId, lessonUnlockStatus, progress });
 
-    const currentCourseName = course?.name || course?.title || dbCourse?.title || dbCourse?.name;
-    if (eventCourseName === currentCourseName) {
+    // Use the same course name resolution logic as quiz.js
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(courseId);
+    let currentCourseName;
+    if (isObjectId) {
+      // For database courses, prioritize dbCourse title/name to match quiz.js
+      currentCourseName = dbCourse?.title || dbCourse?.name || course?.title || course?.name;
+      console.log('📋 Database course detected, using courseName:', currentCourseName, 'from dbCourse:', { title: dbCourse?.title, name: dbCourse?.name });
+    } else {
+      currentCourseName = course?.name || course?.title || dbCourse?.title || dbCourse?.name;
+    }
+    const currentCourseId = courseId;
+    
+    // Check if this event is for the current course (by name or ID)
+    // Use trim() and case-insensitive comparison to handle whitespace issues
+    const eventNameNormalized = eventCourseName?.trim().toLowerCase();
+    const currentNameNormalized = currentCourseName?.trim().toLowerCase();
+    const isCurrentCourse = (eventCourseName && currentCourseName && 
+        eventNameNormalized === currentNameNormalized) ||
+        (eventCourseId && currentCourseId && eventCourseId === currentCourseId);
+    
+    console.log('🔍 Course name comparison:', {
+      eventCourseName,
+      currentCourseName,
+      eventNameNormalized,
+      currentNameNormalized,
+      isCurrentCourse,
+      eventCourseId,
+      currentCourseId
+    });
+    
+    if (isCurrentCourse) {
       console.log('✅ Updating unlock status from progress update event...');
-      if (Array.isArray(lessonUnlockStatus)) {
+      if (Array.isArray(lessonUnlockStatus) && lessonUnlockStatus.length > 0) {
         setUnlockStatus(lessonUnlockStatus);
+        console.log('✅ Unlock status updated from event:', lessonUnlockStatus);
+        setLoading(false); // Ensure loading is cleared
       } else {
-        // If lessonUnlockStatus is not provided, fetch it
-        fetchUserProgress(true);
+        // If lessonUnlockStatus is not provided or empty, fetch it once
+        console.log('🔄 lessonUnlockStatus not provided or empty, fetching progress...');
+        // Single fetch with delay to allow backend to process
+        setTimeout(() => {
+          fetchUserProgress(true);
+        }, 500);
+      }
+    } else {
+      console.log('⚠️ Course name/ID mismatch or missing:', { eventCourseName, currentCourseName, eventCourseId, currentCourseId });
+      // Even if names don't match, if courseId matches, still try to fetch progress
+      if (eventCourseId && currentCourseId && eventCourseId === currentCourseId) {
+        console.log('🔄 Course IDs match, fetching progress anyway...');
+        setTimeout(() => {
+          fetchUserProgress(true);
+        }, 500);
       }
     }
   };
@@ -1048,28 +1167,10 @@ const renderFormattedContent = (contentArray) => {
                 />
               )}
           </video>
-            <div className="video-controls-overlay">
-              <button 
-                className={`captions-button ${showCaptions ? 'active' : ''}`}
-                onClick={handleCaptionsToggle}
-                title={showCaptions ? 'Hide Captions' : 'Show Captions'}
-              >
-                {showCaptions ? '🔤' : '📝'}
-              </button>
-            </div>
             {/* Subtitle display below video */}
             {subtitleUrl && subtitleText && (
               <div className="subtitle-display">
                 <p className="subtitle-text">{subtitleText}</p>
-              </div>
-            )}
-            {/* Show message when no subtitles available */}
-            {!subtitleUrl && (
-              <div className="subtitle-info-message">
-                <p className="subtitle-info-text">
-                 
-                
-                </p>
               </div>
             )}
           </div>

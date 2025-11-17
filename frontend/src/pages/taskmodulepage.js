@@ -700,7 +700,7 @@ const TaskModulePage = () => {
       
       // Try to generate certificate from backend first
       try {
-        const generateResponse = await fetch('/api/certificate/check-course-completion', {
+        const generateResponse = await fetch(API_ENDPOINTS.CERTIFICATES.CHECK_COURSE_COMPLETION, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

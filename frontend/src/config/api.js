@@ -52,7 +52,8 @@ export const API_ENDPOINTS = {
   },
   PROGRESS: {
     GET_PROGRESS: `${API_BASE_URL}/progress/get-with-unlocking`,
-    UPDATE_PROGRESS: `${API_BASE_URL}/progress/update-progress`
+    UPDATE_PROGRESS: `${API_BASE_URL}/progress/update-progress`,
+    SUBMIT_QUIZ: `${API_BASE_URL}/progress/submit-quiz`
   },
   PROFILE: {
     GET_PROFILE: `${API_BASE_URL}/profile`

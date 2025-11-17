@@ -9,6 +9,7 @@ const CreateCommonCourses = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
   const [editingModuleIndex, setEditingModuleIndex] = useState(null);
+  const [editingQuestionIndex, setEditingQuestionIndex] = useState(null);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -16,6 +17,10 @@ const CreateCommonCourses = () => {
   const [expandedModules, setExpandedModules] = useState({});
   
   const videoInputRefs = useRef({});
+  const questionImageInputRefs = useRef({
+    firstAttempt: null,
+    retake: null
+  });
   const modalRef = useRef(null);
 
   const [formData, setFormData] = useState({
@@ -61,7 +66,7 @@ const CreateCommonCourses = () => {
     }
   });
 
-  const questionTypes = ['multiple-choice', 'true-false', 'fill-in-blank'];
+  const questionTypes = ['multiple-choice', 'true-false'];
 
   // Fetch existing common courses
   const fetchCourses = async () => {
@@ -131,12 +136,12 @@ const CreateCommonCourses = () => {
     });
     setCurrentQuestion({
       firstAttempt: {
-        question: '',
-        type: 'multiple-choice',
-        options: ['', '', '', ''],
-        correctAnswer: '',
-        points: 1,
-        imageUrl: null
+      question: '',
+      type: 'multiple-choice',
+      options: ['', '', '', ''],
+      correctAnswer: '',
+      points: 1,
+      imageUrl: null
       },
       retake: {
         question: '',
@@ -201,8 +206,8 @@ const CreateCommonCourses = () => {
   };
 
   const handleAddModule = async () => {
-    if (!currentModule.name) {
-      setError("Please provide module name");
+    if (!currentModule.name || !currentModule.name.trim()) {
+      setError("⚠️ Please provide a module name before adding the module");
       return;
     }
 
@@ -415,10 +420,36 @@ const CreateCommonCourses = () => {
         passingScore: 70
       }
     });
+    // Reset current question to clear form fields
+    setCurrentQuestion({
+      firstAttempt: {
+        question: '',
+        type: 'multiple-choice',
+        options: ['', '', '', ''],
+        correctAnswer: '',
+        points: 1,
+        imageUrl: null
+      },
+      retake: {
+        question: '',
+        type: 'multiple-choice',
+        options: ['', '', '', ''],
+        correctAnswer: '',
+        points: 1,
+        imageUrl: null
+      }
+    });
     setEditingModuleIndex(null); // Clear editing state
     // Clear the video input field
     if (videoInputRefs.current['new']) {
       videoInputRefs.current['new'].value = '';
+    }
+    // Clear the question image input fields
+    if (questionImageInputRefs.current.firstAttempt) {
+      questionImageInputRefs.current.firstAttempt.value = '';
+    }
+    if (questionImageInputRefs.current.retake) {
+      questionImageInputRefs.current.retake.value = '';
     }
     setError(null);
   };
@@ -457,6 +488,19 @@ const CreateCommonCourses = () => {
     const moduleToEdit = formData.modules[index];
     setEditingModuleIndex(index);
     
+    // Ensure quiz structure is properly set with arrays
+    const quizData = moduleToEdit.quiz || {};
+    const normalizedQuiz = {
+      firstAttemptQuestions: Array.isArray(quizData.firstAttemptQuestions) ? quizData.firstAttemptQuestions : [],
+      retakeQuestions: Array.isArray(quizData.retakeQuestions) ? quizData.retakeQuestions : [],
+      passingScore: quizData.passingScore || 70
+    };
+    
+    console.log('📝 Editing module:', moduleToEdit.name);
+    console.log('📝 Quiz data:', normalizedQuiz);
+    console.log('📝 First attempt questions count:', normalizedQuiz.firstAttemptQuestions.length);
+    console.log('📝 Retake questions count:', normalizedQuiz.retakeQuestions.length);
+    
     // Populate currentModule with the module data
     setCurrentModule({
       m_id: moduleToEdit.m_id || '',
@@ -466,10 +510,29 @@ const CreateCommonCourses = () => {
       lessons: moduleToEdit.lessons || 1,
       video: moduleToEdit.video || null,
       notes: moduleToEdit.notes || '',
-      quiz: moduleToEdit.quiz || {
-        firstAttemptQuestions: [],
-        retakeQuestions: [],
-        passingScore: 70
+      quiz: normalizedQuiz
+    });
+    
+    // Clear question editing state when editing a module
+    setEditingQuestionIndex(null);
+    
+    // Reset currentQuestion to empty when editing a module (admin can edit individual questions using Edit button)
+    setCurrentQuestion({
+      firstAttempt: {
+        question: '',
+        type: 'multiple-choice',
+        options: ['', '', '', ''],
+        correctAnswer: '',
+        points: 1,
+        imageUrl: null
+      },
+      retake: {
+        question: '',
+        type: 'multiple-choice',
+        options: ['', '', '', ''],
+        correctAnswer: '',
+        points: 1,
+        imageUrl: null
       }
     });
     
@@ -637,10 +700,37 @@ const CreateCommonCourses = () => {
         passingScore: 70
       }
     });
+    // Reset current question to clear any previous question data (including images)
+    setCurrentQuestion({
+      firstAttempt: {
+        question: '',
+        type: 'multiple-choice',
+        options: ['', '', '', ''],
+        correctAnswer: '',
+        points: 1,
+        imageUrl: null
+      },
+      retake: {
+        question: '',
+        type: 'multiple-choice',
+        options: ['', '', '', ''],
+        correctAnswer: '',
+        points: 1,
+        imageUrl: null
+      }
+    });
     setEditingModuleIndex(null);
+    setEditingQuestionIndex(null);
     // Clear the video input field
     if (videoInputRefs.current['new']) {
       videoInputRefs.current['new'].value = '';
+    }
+    // Clear the question image input fields
+    if (questionImageInputRefs.current.firstAttempt) {
+      questionImageInputRefs.current.firstAttempt.value = '';
+    }
+    if (questionImageInputRefs.current.retake) {
+      questionImageInputRefs.current.retake.value = '';
     }
     setError(null);
   };
@@ -779,54 +869,44 @@ const CreateCommonCourses = () => {
   const handleAddQuestion = () => {
     // Validate first attempt question
     if (!currentQuestion.firstAttempt.question.trim()) {
-      setError("Please provide a question for first attempt");
+      setError("⚠️ Please provide a question text for the first attempt question");
       return;
     }
 
     if (currentQuestion.firstAttempt.type === 'multiple-choice') {
       if (currentQuestion.firstAttempt.options.some(opt => !opt.trim())) {
-        setError("Please fill all options for first attempt multiple-choice question");
+        setError("⚠️ Please fill all 4 options for the first attempt multiple-choice question");
         return;
       }
       if (!currentQuestion.firstAttempt.correctAnswer || !currentQuestion.firstAttempt.correctAnswer.trim()) {
-        setError("Please select a correct answer for first attempt question");
+        setError("⚠️ Please select a correct answer for the first attempt question");
         return;
       }
     } else if (currentQuestion.firstAttempt.type === 'true-false') {
       if (!currentQuestion.firstAttempt.correctAnswer || (currentQuestion.firstAttempt.correctAnswer !== 'True' && currentQuestion.firstAttempt.correctAnswer !== 'False')) {
-        setError("Please select True or False for first attempt question");
-        return;
-      }
-    } else if (currentQuestion.firstAttempt.type === 'fill-in-blank') {
-      if (!currentQuestion.firstAttempt.correctAnswer || !currentQuestion.firstAttempt.correctAnswer.trim()) {
-        setError("Please provide a correct answer for first attempt fill-in-blank question");
+        setError("⚠️ Please select True or False as the correct answer for the first attempt question");
         return;
       }
     }
 
     // Validate retake question
     if (!currentQuestion.retake.question.trim()) {
-      setError("Please provide a question for retake attempt");
+      setError("⚠️ Please provide a question text for the retake question");
       return;
     }
 
     if (currentQuestion.retake.type === 'multiple-choice') {
       if (currentQuestion.retake.options.some(opt => !opt.trim())) {
-        setError("Please fill all options for retake multiple-choice question");
+        setError("⚠️ Please fill all 4 options for the retake multiple-choice question");
         return;
       }
       if (!currentQuestion.retake.correctAnswer || !currentQuestion.retake.correctAnswer.trim()) {
-        setError("Please select a correct answer for retake question");
+        setError("⚠️ Please select a correct answer for the retake question");
         return;
       }
     } else if (currentQuestion.retake.type === 'true-false') {
       if (!currentQuestion.retake.correctAnswer || (currentQuestion.retake.correctAnswer !== 'True' && currentQuestion.retake.correctAnswer !== 'False')) {
-        setError("Please select True or False for retake question");
-        return;
-      }
-    } else if (currentQuestion.retake.type === 'fill-in-blank') {
-      if (!currentQuestion.retake.correctAnswer || !currentQuestion.retake.correctAnswer.trim()) {
-        setError("Please provide a correct answer for retake fill-in-blank question");
+        setError("⚠️ Please select True or False as the correct answer for the retake question");
         return;
       }
     }
@@ -849,14 +929,45 @@ const CreateCommonCourses = () => {
       imageUrl: currentQuestion.retake.imageUrl || null
     };
 
-    setCurrentModule({
-      ...currentModule,
-      quiz: {
-        ...currentModule.quiz,
-        firstAttemptQuestions: [...currentModule.quiz.firstAttemptQuestions, newFirstAttemptQuestion],
-        retakeQuestions: [...currentModule.quiz.retakeQuestions, newRetakeQuestion]
-      }
-    });
+    // Check if we're editing a specific question
+    const existingFirstQuestions = currentModule.quiz.firstAttemptQuestions || [];
+    const existingRetakeQuestions = currentModule.quiz.retakeQuestions || [];
+    const isEditingQuestion = editingQuestionIndex !== null && editingQuestionIndex >= 0;
+
+    if (isEditingQuestion) {
+      // Update the specific question at editingQuestionIndex
+      const updatedFirstAttempt = [...existingFirstQuestions];
+      updatedFirstAttempt[editingQuestionIndex] = newFirstAttemptQuestion;
+      
+      const updatedRetake = [...existingRetakeQuestions];
+      updatedRetake[editingQuestionIndex] = newRetakeQuestion;
+
+      setCurrentModule({
+        ...currentModule,
+        quiz: {
+          ...currentModule.quiz,
+          firstAttemptQuestions: updatedFirstAttempt,
+          retakeQuestions: updatedRetake
+        }
+      });
+      
+      setEditingQuestionIndex(null); // Clear editing state
+      setSuccess(`Question pair updated!`);
+    } else {
+      // Add new question pair
+      setCurrentModule({
+        ...currentModule,
+        quiz: {
+          ...currentModule.quiz,
+          firstAttemptQuestions: [...existingFirstQuestions, newFirstAttemptQuestion],
+          retakeQuestions: [...existingRetakeQuestions, newRetakeQuestion]
+        }
+      });
+      
+      // Calculate success message
+      const totalQuestionPairs = existingFirstQuestions.length + 1;
+      setSuccess(`Question pair added! (Total: ${totalQuestionPairs} question pairs - ${totalQuestionPairs} for first attempt, ${totalQuestionPairs} for retake)`);
+    }
 
     setCurrentQuestion({
       firstAttempt: {
@@ -876,24 +987,209 @@ const CreateCommonCourses = () => {
         imageUrl: null
       }
     });
+    // Clear editing state after adding/updating question
+    setEditingQuestionIndex(null);
+    // Clear the question image input fields after adding question
+    if (questionImageInputRefs.current.firstAttempt) {
+      questionImageInputRefs.current.firstAttempt.value = '';
+    }
+    if (questionImageInputRefs.current.retake) {
+      questionImageInputRefs.current.retake.value = '';
+    }
     setError(null);
+  };
+
+  const handleEditQuestion = (questionIndex) => {
+    const firstAttemptQ = currentModule.quiz?.firstAttemptQuestions?.[questionIndex];
+    const retakeQ = currentModule.quiz?.retakeQuestions?.[questionIndex];
     
-    // Calculate success message
-    const totalQuestionPairs = currentModule.quiz.firstAttemptQuestions.length + 1;
-    setSuccess(`Question pair added! (Total: ${totalQuestionPairs} question pairs - ${totalQuestionPairs} for first attempt, ${totalQuestionPairs} for retake)`);
+    if (firstAttemptQ || retakeQ) {
+      setEditingQuestionIndex(questionIndex);
+      setCurrentQuestion({
+        firstAttempt: firstAttemptQ ? {
+          question: firstAttemptQ.question || '',
+          type: firstAttemptQ.type || 'multiple-choice',
+          options: firstAttemptQ.options || (firstAttemptQ.type === 'multiple-choice' ? ['', '', '', ''] : []),
+          correctAnswer: firstAttemptQ.correctAnswer || '',
+          points: firstAttemptQ.points || 1,
+          imageUrl: firstAttemptQ.imageUrl || null
+        } : {
+          question: '',
+          type: 'multiple-choice',
+          options: ['', '', '', ''],
+          correctAnswer: '',
+          points: 1,
+          imageUrl: null
+        },
+        retake: retakeQ ? {
+          question: retakeQ.question || '',
+          type: retakeQ.type || 'multiple-choice',
+          options: retakeQ.options || (retakeQ.type === 'multiple-choice' ? ['', '', '', ''] : []),
+          correctAnswer: retakeQ.correctAnswer || '',
+          points: retakeQ.points || 1,
+          imageUrl: retakeQ.imageUrl || null
+        } : {
+          question: '',
+          type: 'multiple-choice',
+          options: ['', '', '', ''],
+          correctAnswer: '',
+          points: 1,
+          imageUrl: null
+        }
+      });
+      
+      // Scroll to the question form
+      const formElement = document.querySelector('.question-form-container');
+      if (formElement) {
+        formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
   };
 
   const handleRemoveQuestion = (questionIndex) => {
-    const updatedFirstAttempt = currentModule.quiz.firstAttemptQuestions.filter((_, i) => i !== questionIndex);
-    const updatedRetake = currentModule.quiz.retakeQuestions.filter((_, i) => i !== questionIndex);
-    setCurrentModule({
-      ...currentModule,
-      quiz: {
-        ...currentModule.quiz,
-        firstAttemptQuestions: updatedFirstAttempt,
-        retakeQuestions: updatedRetake
+    if (window.confirm('Are you sure you want to delete this question pair? This action cannot be undone.')) {
+      const updatedFirstAttempt = currentModule.quiz.firstAttemptQuestions.filter((_, i) => i !== questionIndex);
+      const updatedRetake = currentModule.quiz.retakeQuestions.filter((_, i) => i !== questionIndex);
+      
+      // If we were editing this question, clear the editing state
+      if (editingQuestionIndex === questionIndex) {
+        setEditingQuestionIndex(null);
+        setCurrentQuestion({
+          firstAttempt: {
+            question: '',
+            type: 'multiple-choice',
+            options: ['', '', '', ''],
+            correctAnswer: '',
+            points: 1,
+            imageUrl: null
+          },
+          retake: {
+            question: '',
+            type: 'multiple-choice',
+            options: ['', '', '', ''],
+            correctAnswer: '',
+            points: 1,
+            imageUrl: null
+          }
+        });
+      } else if (editingQuestionIndex !== null && editingQuestionIndex > questionIndex) {
+        // Adjust editing index if a question before it was removed
+        setEditingQuestionIndex(editingQuestionIndex - 1);
       }
-    });
+      
+      setCurrentModule({
+        ...currentModule,
+        quiz: {
+          ...currentModule.quiz,
+          firstAttemptQuestions: updatedFirstAttempt,
+          retakeQuestions: updatedRetake
+        }
+      });
+      
+      setSuccess('Question pair deleted successfully!');
+    }
+  };
+
+  const handleQuestionImageUpload = async (file, questionType) => {
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      setError("Please select a valid image file");
+      return;
+    }
+
+    // Check file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Image file size must be less than 10MB");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const courseTitle = formData.title || editingCourse?.title;
+      if (!courseTitle) {
+        setError("Please enter course title before uploading question image");
+        setIsLoading(false);
+        return;
+      }
+
+      // Determine module number
+      // If editing an existing module, use editingModuleIndex + 1 (1-based)
+      // If adding a new module, use formData.modules.length + 1
+      let moduleNumber;
+      if (editingModuleIndex !== null) {
+        moduleNumber = editingModuleIndex + 1; // Convert 0-based to 1-based
+      } else {
+        moduleNumber = formData.modules.length + 1; // New module will be next in sequence
+      }
+
+      // Determine question index (use current number of questions + 1, or "new" as placeholder)
+      const currentQuestionCount = currentModule.quiz?.firstAttemptQuestions?.length || 0;
+      const questionIndex = currentQuestionCount + 1; // Next question number
+
+      const formDataToSend = new FormData();
+      formDataToSend.append("image", file);
+
+      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+      const uploadUrl = `${API_ENDPOINTS.UPLOAD.QUIZ_IMAGE}/${encodeURIComponent(courseTitle)}/${moduleNumber}/${questionIndex}`;
+      
+      console.log('📤 Uploading question image to:', uploadUrl);
+      console.log('📤 Module number:', moduleNumber, 'Question index:', questionIndex);
+
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'POST',
+        body: formDataToSend,
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!uploadResponse.ok) {
+        let errorData;
+        try {
+          errorData = await uploadResponse.json();
+        } catch (e) {
+          errorData = { error: `HTTP ${uploadResponse.status}: ${uploadResponse.statusText}` };
+        }
+        throw new Error(errorData.error || `Failed to upload image: ${uploadResponse.statusText}`);
+      }
+
+      const uploadResult = await uploadResponse.json();
+      console.log('✅ Question image upload result:', uploadResult);
+      
+      if (!uploadResult.imageUrl) {
+        throw new Error('Upload succeeded but no image URL returned');
+      }
+
+      // Update the appropriate question with the image URL
+      if (questionType === 'firstAttempt') {
+        setCurrentQuestion({
+          ...currentQuestion,
+          firstAttempt: {
+            ...currentQuestion.firstAttempt,
+            imageUrl: uploadResult.imageUrl
+          }
+        });
+      } else if (questionType === 'retake') {
+        setCurrentQuestion({
+          ...currentQuestion,
+          retake: {
+            ...currentQuestion.retake,
+            imageUrl: uploadResult.imageUrl
+          }
+        });
+      }
+      
+      setSuccess('Question image uploaded successfully!');
+      setIsLoading(false);
+    } catch (err) {
+      console.error('❌ Question image upload failed:', err);
+      setError(`Failed to upload image: ${err.message}`);
+      setIsLoading(false);
+    }
   };
 
   const handleSave = async () => {
@@ -1360,9 +1656,7 @@ const CreateCommonCourses = () => {
       // Construct the delete URL
       const baseUrl = API_ENDPOINTS.COURSES.GET_COURSES.replace('/getcourse', '');
       const deleteUrl = `${baseUrl}/delete/${course._id}`;
-      console.log('🗑️ Delete URL:', deleteUrl);
-      console.log('🗑️ Base URL:', baseUrl);
-      console.log('🗑️ Course ID:', course._id);
+      
       
       const response = await fetch(deleteUrl, {
         method: 'DELETE',
@@ -1372,9 +1666,6 @@ const CreateCommonCourses = () => {
         }
       });
       
-      console.log('🗑️ Delete response status:', response.status);
-      console.log('🗑️ Delete response URL:', response.url);
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to delete course');
@@ -1479,48 +1770,48 @@ const CreateCommonCourses = () => {
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h3>
-                  {editingCourse ? 'Edit Course' : 'Create New Common Course'}
-                </h3>
-                <button
-                  onClick={closeModal}
+                    {editingCourse ? 'Edit Course' : 'Create New Common Course'}
+                  </h3>
+                  <button
+                    onClick={closeModal}
                   className="modal-close-btn"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
 
-              {error && (
+                {error && (
                 <div className="alert alert-error" style={{ margin: '1.5rem 2rem 0' }}>
-                  {error}
-                </div>
-              )}
+                    {error}
+                  </div>
+                )}
 
-              {success && (
+                {success && (
                 <div className="alert alert-success" style={{ margin: '1.5rem 2rem 0' }}>
-                  {success}
-                </div>
-              )}
+                    {success}
+                  </div>
+                )}
 
-              {/* Tabs */}
+                {/* Tabs */}
               <div className="tabs-container">
-                <button
-                  onClick={() => setActiveTab('basic')}
+                  <button
+                    onClick={() => setActiveTab('basic')}
                   className={`tab-button ${activeTab === 'basic' ? 'active' : ''}`}
-                >
-                  Basic Info
-                </button>
-                <button
-                  onClick={() => setActiveTab('modules')}
+                  >
+                    Basic Info
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('modules')}
                   className={`tab-button ${activeTab === 'modules' ? 'active' : ''}`}
-                >
-                  Modules ({formData.modules.length})
-                </button>
-              </div>
+                  >
+                    Modules ({formData.modules.length})
+                  </button>
+                </div>
 
               <div className="modal-body">
                 {/* Basic Info Tab */}
                 {activeTab === 'basic' && (
-                  <div>
+                    <div>
                     <div className="form-group">
                       <label className="form-label required">
                         Course Title
@@ -1550,10 +1841,10 @@ const CreateCommonCourses = () => {
                         Course Background Image
                       </label>
                       <div className="file-upload-wrapper">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={async (e) => {
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
                           const file = e.target.files[0];
                           if (!file) return;
 
@@ -1613,17 +1904,17 @@ const CreateCommonCourses = () => {
                           }
                         }}
                           className="file-upload-input"
-                        />
-                        {formData.backgroundImageUrl && (
+                      />
+                      {formData.backgroundImageUrl && (
                           <div className="file-upload-preview">
-                            <img 
-                              src={formData.backgroundImageUrl} 
-                              alt="Course background preview" 
-                            />
+                          <img 
+                            src={formData.backgroundImageUrl} 
+                            alt="Course background preview" 
+                          />
                             <p className="form-help-text">Current course image</p>
-                          </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
+                    </div>
                     </div>
                     <div className="form-group">
                       <label className="form-label">
@@ -1647,7 +1938,7 @@ const CreateCommonCourses = () => {
 
                 {/* Modules Tab */}
                 {activeTab === 'modules' && (
-                  <div>
+                        <div>
                     {/* Add Module Form */}
                     <div className="module-form-section">
                       <h4>{editingModuleIndex !== null ? `Edit Module ${editingModuleIndex + 1}` : 'Add New Module'}</h4>
@@ -1689,18 +1980,6 @@ const CreateCommonCourses = () => {
                             placeholder="Enter duration in minutes"
                           />
                         </div>
-                        <div className="form-group">
-                          <label className="form-label">
-                            Number of Lessons
-                          </label>
-                          <input
-                            type="number"
-                            value={currentModule.lessons}
-                            onChange={(e) => setCurrentModule({ ...currentModule, lessons: parseInt(e.target.value) || 1 })}
-                            className="form-input"
-                            min="1"
-                          />
-                        </div>
                       </div>
                       <div className="form-group">
                         <label className="form-label">
@@ -1718,35 +1997,35 @@ const CreateCommonCourses = () => {
                       {/* Video Upload */}
                       <div className="form-group">
                         <label className="form-label">
-                          Video (Optional)
+                          Video 
                         </label>
                         <div className="file-upload-wrapper">
-                          <input
-                            type="file"
-                            accept="video/*"
-                            ref={(el) => (videoInputRefs.current['new'] = el)}
-                            onChange={(e) => {
-                              const file = e.target.files[0];
-                              if (file) {
-                                handleVideoUpload('new', file);
-                              }
-                            }}
+                        <input
+                          type="file"
+                          accept="video/*"
+                          ref={(el) => (videoInputRefs.current['new'] = el)}
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              handleVideoUpload('new', file);
+                            }
+                          }}
                             className="file-upload-input"
-                          />
-                          {currentModule.video && (
+                        />
+                        {currentModule.video && (
                             <div className="module-badges" style={{ marginTop: '0.5rem' }}>
                               <span className="module-badge video">
                                 <Video className="w-4 h-4" />
-                                {currentModule.video.name || currentModule.video.file?.name || 'Video selected'}
-                                {currentModule.video.pendingUpload && (
+                            {currentModule.video.name || currentModule.video.file?.name || 'Video selected'}
+                            {currentModule.video.pendingUpload && (
                                   <span className="ml-2">(Pending upload)</span>
-                                )}
-                                {currentModule.video.url && (
+                            )}
+                            {currentModule.video.url && (
                                   <span className="ml-2">(Uploaded)</span>
-                                )}
+                            )}
                               </span>
-                            </div>
-                          )}
+                          </div>
+                        )}
                         </div>
                       </div>
 
@@ -1918,32 +2197,6 @@ const CreateCommonCourses = () => {
                                   )}
                                 </>
                               )}
-                              {currentQuestion.firstAttempt.type === 'fill-in-blank' && (
-                                <>
-                                  <div className="form-group">
-                                    <label className="form-label">
-                                      Correct Answer
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={currentQuestion.firstAttempt.correctAnswer || ''}
-                                      onChange={(e) => setCurrentQuestion({ 
-                                        ...currentQuestion, 
-                                        firstAttempt: { ...currentQuestion.firstAttempt, correctAnswer: e.target.value }
-                                      })}
-                                      className="form-input"
-                                      placeholder="Enter the correct answer"
-                                    />
-                                  </div>
-                                  {currentQuestion.firstAttempt.correctAnswer && (
-                                    <div className="correct-answer-badge">
-                                      <p>
-                                        ✓ Correct Answer: <strong>{currentQuestion.firstAttempt.correctAnswer}</strong>
-                                      </p>
-                                    </div>
-                                  )}
-                                </>
-                              )}
                               <div className="form-group">
                                 <label className="form-label">
                                   Points
@@ -1958,6 +2211,38 @@ const CreateCommonCourses = () => {
                                   })}
                                   className="form-input"
                                 />
+                              </div>
+                              <div className="form-group">
+                                <label className="form-label">
+                                  Question Image (Optional)
+                                </label>
+                                <div className="file-upload-wrapper">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    ref={(el) => (questionImageInputRefs.current.firstAttempt = el)}
+                                    onChange={(e) => {
+                                      const file = e.target.files[0];
+                                      if (file) {
+                                        handleQuestionImageUpload(file, 'firstAttempt');
+                                      }
+                                    }}
+                                    className="file-upload-input"
+                                  />
+                                  {currentQuestion.firstAttempt.imageUrl && (
+                                    <div className="file-upload-preview" style={{ marginTop: '0.5rem' }}>
+                                      <img 
+                                        src={currentQuestion.firstAttempt.imageUrl} 
+                                        alt="Question preview" 
+                                        style={{ maxWidth: '200px', height: 'auto', border: '1px solid #e5e7eb', borderRadius: '0.5rem' }}
+                                      />
+                                      <p className="form-help-text">Question image uploaded</p>
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="form-help-text">
+                                  Optional: Upload an image to display with this question in the quiz
+                                </p>
                               </div>
                             </div>
 
@@ -2102,32 +2387,6 @@ const CreateCommonCourses = () => {
                                   )}
                                 </>
                               )}
-                              {currentQuestion.retake.type === 'fill-in-blank' && (
-                                <>
-                                  <div className="form-group">
-                                    <label className="form-label">
-                                      Correct Answer
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={currentQuestion.retake.correctAnswer || ''}
-                                      onChange={(e) => setCurrentQuestion({ 
-                                        ...currentQuestion, 
-                                        retake: { ...currentQuestion.retake, correctAnswer: e.target.value }
-                                      })}
-                                      className="form-input"
-                                      placeholder="Enter the correct answer"
-                                    />
-                                  </div>
-                                  {currentQuestion.retake.correctAnswer && (
-                                    <div className="correct-answer-badge">
-                                      <p>
-                                        ✓ Correct Answer: <strong>{currentQuestion.retake.correctAnswer}</strong>
-                                      </p>
-                                    </div>
-                                  )}
-                                </>
-                              )}
                               <div className="form-group">
                                 <label className="form-label">
                                   Points
@@ -2143,30 +2402,146 @@ const CreateCommonCourses = () => {
                                   className="form-input"
                                 />
                               </div>
+                              <div className="form-group">
+                                <label className="form-label">
+                                  Question Image (Optional)
+                                </label>
+                                <div className="file-upload-wrapper">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    ref={(el) => (questionImageInputRefs.current.retake = el)}
+                                    onChange={(e) => {
+                                      const file = e.target.files[0];
+                                      if (file) {
+                                        handleQuestionImageUpload(file, 'retake');
+                                      }
+                                    }}
+                                    className="file-upload-input"
+                                  />
+                                  {currentQuestion.retake.imageUrl && (
+                                    <div className="file-upload-preview" style={{ marginTop: '0.5rem' }}>
+                                      <img 
+                                        src={currentQuestion.retake.imageUrl} 
+                                        alt="Question preview" 
+                                        style={{ maxWidth: '200px', height: 'auto', border: '1px solid #e5e7eb', borderRadius: '0.5rem' }}
+                                      />
+                                      <p className="form-help-text">Question image uploaded</p>
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="form-help-text">
+                                  Optional: Upload an image to display with this question in the quiz
+                                </p>
+                              </div>
                             </div>
                           </div>
                           
-                          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+                          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb', display: 'flex', gap: '0.5rem' }}>
+                            {editingQuestionIndex !== null && (
+                              <button
+                                onClick={() => {
+                                  setEditingQuestionIndex(null);
+                                  setCurrentQuestion({
+                                    firstAttempt: {
+                                      question: '',
+                                      type: 'multiple-choice',
+                                      options: ['', '', '', ''],
+                                      correctAnswer: '',
+                                      points: 1,
+                                      imageUrl: null
+                                    },
+                                    retake: {
+                                      question: '',
+                                      type: 'multiple-choice',
+                                      options: ['', '', '', ''],
+                                      correctAnswer: '',
+                                      points: 1,
+                                      imageUrl: null
+                                    }
+                                  });
+                                  // Clear image input fields
+                                  if (questionImageInputRefs.current.firstAttempt) {
+                                    questionImageInputRefs.current.firstAttempt.value = '';
+                                  }
+                                  if (questionImageInputRefs.current.retake) {
+                                    questionImageInputRefs.current.retake.value = '';
+                                  }
+                                }}
+                                className="btn-delete"
+                                style={{ flex: 1 }}
+                              >
+                                <X className="w-4 h-4" />
+                                Cancel Edit
+                              </button>
+                            )}
                             <button
                               onClick={handleAddQuestion}
                               className="btn-save"
-                              style={{ width: '100%' }}
+                              style={{ flex: editingQuestionIndex !== null ? 1 : 1, width: editingQuestionIndex === null ? '100%' : 'auto' }}
                             >
-                              Add Question Pair (First Attempt + Retake)
+                              {editingQuestionIndex !== null
+                                ? 'Update Question Pair (First Attempt + Retake)'
+                                : 'Add Question Pair (First Attempt + Retake)'}
                             </button>
                           </div>
                         </div>
 
                         {/* Existing Questions */}
-                        {(currentModule.quiz.firstAttemptQuestions?.length > 0 || currentModule.quiz.retakeQuestions?.length > 0) && (
-                          <div className="existing-questions">
-                            <div className="quiz-section-description">
-                              <strong>Quiz Structure:</strong> You have {currentModule.quiz.firstAttemptQuestions?.length || 0} question pair(s).
-                              <br />
-                              <strong>Note:</strong> If a user fails the retake quiz, they must wait for the cooldown period (set in Basic Info tab) before attempting again.
+                        {(() => {
+                          // Handle different possible quiz structures
+                          const quiz = currentModule.quiz || {};
+                          const firstAttemptQuestions = Array.isArray(quiz.firstAttemptQuestions) 
+                            ? quiz.firstAttemptQuestions 
+                            : (Array.isArray(quiz.questions) ? quiz.questions : []);
+                          const retakeQuestions = Array.isArray(quiz.retakeQuestions) 
+                            ? quiz.retakeQuestions 
+                            : [];
+                          
+                          const hasFirstAttempt = firstAttemptQuestions.length > 0;
+                          const hasRetake = retakeQuestions.length > 0;
+                          
+                          console.log('🔍 Checking existing questions visibility:', {
+                            hasFirstAttempt,
+                            hasRetake,
+                            firstAttemptCount: firstAttemptQuestions.length,
+                            retakeCount: retakeQuestions.length,
+                            quiz: quiz,
+                            currentModuleQuiz: currentModule.quiz
+                          });
+                          
+                          return hasFirstAttempt || hasRetake;
+                        })() && (
+                          <div className="existing-questions" style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '2px solid #e5e7eb' }}>
+                            <div className="quiz-section-description" style={{ marginBottom: '1.5rem' }}>
+                                <h5 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1f2937', marginBottom: '0.5rem' }}>
+                                  📝 Existing Questions ({(() => {
+                                    const quiz = currentModule.quiz || {};
+                                    const firstAttemptQuestions = Array.isArray(quiz.firstAttemptQuestions) 
+                                      ? quiz.firstAttemptQuestions 
+                                      : (Array.isArray(quiz.questions) ? quiz.questions : []);
+                                    return firstAttemptQuestions.length;
+                                  })()} question pair{(() => {
+                                    const quiz = currentModule.quiz || {};
+                                    const firstAttemptQuestions = Array.isArray(quiz.firstAttemptQuestions) 
+                                      ? quiz.firstAttemptQuestions 
+                                      : (Array.isArray(quiz.questions) ? quiz.questions : []);
+                                    return firstAttemptQuestions.length !== 1 ? 's' : '';
+                                  })()})
+                                </h5>
                             </div>
-                            {currentModule.quiz.firstAttemptQuestions?.map((q, idx) => {
-                              const retakeQ = currentModule.quiz.retakeQuestions?.[idx];
+                            {(() => {
+                              // Get questions arrays, handling different structures
+                              const quiz = currentModule.quiz || {};
+                              const firstAttemptQuestions = Array.isArray(quiz.firstAttemptQuestions) 
+                                ? quiz.firstAttemptQuestions 
+                                : (Array.isArray(quiz.questions) ? quiz.questions : []);
+                              const retakeQuestions = Array.isArray(quiz.retakeQuestions) 
+                                ? quiz.retakeQuestions 
+                                : [];
+                              
+                              return firstAttemptQuestions.map((q, idx) => {
+                                const retakeQ = retakeQuestions[idx];
                               return (
                                 <div key={idx} className="question-pair-card">
                                   <div className="question-pair-grid">
@@ -2226,19 +2601,28 @@ const CreateCommonCourses = () => {
                                       </div>
                                     )}
                                   </div>
-                                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end' }}>
+                                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                                    <button
+                                      onClick={() => handleEditQuestion(idx)}
+                                      className="btn-edit"
+                                      style={{ fontSize: '0.875rem' }}
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                      Edit Question
+                                    </button>
                                     <button
                                       onClick={() => handleRemoveQuestion(idx)}
                                       className="btn-delete"
                                       style={{ fontSize: '0.875rem' }}
                                     >
                                       <Trash2 className="w-4 h-4" />
-                                      Remove Question Pair
+                                      Delete Question
                                     </button>
                                   </div>
                                 </div>
                               );
-                            })}
+                            });
+                            })()}
                           </div>
                         )}
                       </div>
@@ -2257,7 +2641,7 @@ const CreateCommonCourses = () => {
                     {formData.modules.length > 0 && (
                       <div className="modules-list">
                         <h4 className="modules-list-title">Course Modules</h4>
-                        <div>
+                      <div>
                           {formData.modules.map((module, index) => (
                             <div key={index} className="module-item">
                               <div className="module-info">
@@ -2303,32 +2687,32 @@ const CreateCommonCourses = () => {
                   </div>
                 )}
 
-              {/* Action Buttons */}
+                {/* Action Buttons */}
               <div className="modal-actions">
-                <button
-                  onClick={closeModal}
+                  <button
+                    onClick={closeModal}
                   className="btn-cancel"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={isLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={isLoading}
                   className="btn-save"
-                >
-                  {isLoading ? (
-                    <>
+                  >
+                    {isLoading ? (
+                      <>
                       <div className="spinner" style={{ width: '1rem', height: '1rem', borderWidth: '2px' }}></div>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
+                        Saving...
+                      </>
+                    ) : (
+                      <>
                       <Save className="w-4 h-4" />
-                      Save Course
-                    </>
-                  )}
-                </button>
-              </div>
+                        Save Course
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

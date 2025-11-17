@@ -69,7 +69,8 @@ const TaskAssignment = () => {
           return;
         }
 
-          const response = await fetch('/api/admin/courses', {
+        // Fetch common courses instead of admin courses
+        const response = await fetch('/api/courses/getcourse', {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -84,13 +85,11 @@ const TaskAssignment = () => {
         }
 
         const result = await response.json();
-        console.log('Courses API Response:', result);
+        console.log('Common Courses API Response:', result);
         
         let courseData;
         if (result && Array.isArray(result)) {
           courseData = result;
-        } else if (result && result.courses && Array.isArray(result.courses)) {
-          courseData = result.courses;
         } else {
           console.error('Unexpected courses response format:', result);
           setError('Unexpected response format from courses server.');
@@ -99,11 +98,12 @@ const TaskAssignment = () => {
           return;
         }
 
-        const courseNames = courseData.map(course => course.name).filter(Boolean);
-        setCourses(courseNames);
-        console.log('Available course names:', courseNames);
+        // Extract title from common courses (common courses use 'title', not 'name')
+        const courseTitles = courseData.map(course => course.title).filter(Boolean);
+        setCourses(courseTitles);
+        console.log('Available common course titles:', courseTitles);
       } catch (err) {
-        console.error('Error fetching courses:', err);
+        console.error('Error fetching common courses:', err);
         setError(`Failed to load courses: ${err.message}`);
         setCourses([]);
       } finally {
@@ -386,28 +386,18 @@ const TaskAssignment = () => {
                           className="form-select"
                           required
                         >
-                          <option value="">Select a course for task</option>
+                          <option value="">Select a common course to assign</option>
                           {courses.map((course, index) => (
                             <option key={index} value={course}>{course}</option>
                           ))}
-                          <option value="custom">+ Add Custom Task Title</option>
                         </select>
-                        {formData.taskTitle === 'custom' && (
-                          <input
-                            type="text"
-                            name="customTaskTitle"
-                            placeholder="Enter custom task title..."
-                            className="form-input mt-2"
-                            onChange={(e) => setFormData(prev => ({ ...prev, taskTitle: e.target.value }))}
-                          />
-                        )}
                       </>
                     )}
                     {courses.length === 0 && !coursesLoading && (
-                      <p className="text-sm text-gray-500 mt-1">No courses available. Please add courses first.</p>
+                      <p className="text-sm text-gray-500 mt-1">No common courses available. Please create common courses first.</p>
                     )}
                     {error && error.includes('courses') && (
-                      <p className="text-sm text-red-500 mt-1">Failed to load courses. You can still enter a custom task title.</p>
+                      <p className="text-sm text-red-500 mt-1">Failed to load common courses. Please try again or create a common course first.</p>
                     )}
                   </div>
 

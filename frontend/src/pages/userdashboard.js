@@ -517,8 +517,51 @@ const fetchAdminProfile = async () => {
                             <td className="table-cell actions">
                               <button 
                                 className="btn btn-start-learning"
-                                onClick={() => {
-                                  navigate('/taskdetailpage', { state: { task } });
+                                onClick={async () => {
+                                  try {
+                                    // Fetch the common course by title to get course ID
+                                    const token = localStorage.getItem('token');
+                                    const response = await fetch(`${API_ENDPOINTS.COURSES.GET_COURSES}`, {
+                                      method: 'GET',
+                                      headers: {
+                                        'Authorization': `Bearer ${token}`,
+                                        'Content-Type': 'application/json'
+                                      }
+                                    });
+
+                                    if (response.ok) {
+                                      const courses = await response.json();
+                                      // Find the course with matching title
+                                      const course = courses.find(c => c.title === task.taskTitle || c.name === task.taskTitle);
+                                      
+                                      if (course) {
+                                        const courseId = course._id || course.id;
+                                        // Get the first module/lesson ID
+                                        if (course.modules && course.modules.length > 0) {
+                                          const firstModuleId = course.modules[0].m_id || course.modules[0]._id || '1';
+                                          navigate(`/course/${courseId}/lesson/${firstModuleId}`);
+                                        } else if (course.lessons && Object.keys(course.lessons).length > 0) {
+                                          const firstLessonId = Object.keys(course.lessons)[0];
+                                          navigate(`/course/${courseId}/lesson/${firstLessonId}`);
+                                        } else {
+                                          // Fallback: navigate to course detail page
+                                          navigate(`/course/${courseId}`);
+                                        }
+                                      } else {
+                                        // If course not found, fallback to task detail page
+                                        console.warn('Course not found for task:', task.taskTitle);
+                                        navigate('/taskdetailpage', { state: { task } });
+                                      }
+                                    } else {
+                                      // If API call fails, fallback to task detail page
+                                      console.error('Failed to fetch courses');
+                                      navigate('/taskdetailpage', { state: { task } });
+                                    }
+                                  } catch (error) {
+                                    console.error('Error navigating to course:', error);
+                                    // Fallback to task detail page on error
+                                    navigate('/taskdetailpage', { state: { task } });
+                                  }
                                 }}
                               >
                                 {task.status === 'in-progress' ? 'Continue' : 'START'}

@@ -431,21 +431,16 @@ const CertificatePage = () => {
   return (
     <div className="certificate-container">
       <div className="certificate">
-        {success && (
-          <div style={{ 
-            backgroundColor: '#d4edda', 
-            color: '#155724', 
-            padding: '10px', 
-            borderRadius: '5px', 
-            marginBottom: '20px' 
-          }}>
-            {courseCompleted && (
-              <p>🎉 Congratulations! You have successfully completed the {courseTitle} course!</p>
-            )}
-          </div>
-        )}
+        {/* Logo in top right corner */}
+        <div className="certificate-logo">
+          <img 
+            src="/logo_new.jpg" 
+            alt="VISTA Logo"
+            className="vista-logo-img"
+          />
+        </div>
         
-        <h1 className="certificate-title">Certificate of Completion</h1>
+        <h1 className="certificate-title">Certificate of  Completion</h1>
         <p className="certificate-text">This is to certify that</p>
         <h2 className="employee-name">{employeeName}</h2>
         <p className="certificate-text">has successfully completed the course</p>
@@ -471,55 +466,29 @@ const CertificatePage = () => {
         )}
         
         <p className="date">Date: {date}</p>
-        <p className="certificate-id">Certificate ID: {certificateId}</p>
 
-        <div className="signature-section">
-          <div className="signature">
-            <p>Authorized Signature</p>
-            <hr />
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px' }}>
-          {courseId && lessonId && (
-            <button 
-              onClick={() => {
-                // Navigate back to lesson page
+        {/* Action buttons */}
+        <div className="certificate-actions">
+          <button 
+            className="back-to-lesson-btn"
+            onClick={() => {
+              if (courseId && lessonId) {
                 navigate(`/course/${courseId}/lesson/${lessonId}`);
-                // Clear stored course/lesson IDs
                 localStorage.removeItem('certificateCourseId');
                 localStorage.removeItem('certificateLessonId');
-              }}
-              style={{
-                backgroundColor: '#007bff',
-                color: 'white',
-                padding: '10px 20px',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                marginRight: '10px'
-              }}
-            >
-              ⬅ Back to Lesson
-            </button>
-          )}
-          <button 
-            onClick={() => navigate('/userdashboard')}
-            style={{
-              backgroundColor: '#28a745',
-              color: 'white',
-              padding: '10px 20px',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              marginRight: '10px'
+              } else {
+                navigate('/userdashboard');
+              }
             }}
           >
-            📚 Go to Dashboard
+            ← Back to Lesson
           </button>
-          <button className="print-button" onClick={() => window.print()}>🖨️ Print Certificate</button>
+          <button 
+            className="print-certificate-btn"
+            onClick={() => window.print()}
+          >
+            🖨️ Print Certificate
+          </button>
         </div>
       </div>
     </div>
