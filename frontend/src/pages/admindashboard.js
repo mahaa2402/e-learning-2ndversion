@@ -182,16 +182,7 @@ const AdminDashboard = () => {
               </div>
             </div>
             
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-              <div className="flex items-center">
-                <Award className="w-8 h-8 text-purple-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Assessments Completed Today</p>
-                  <p className="text-2xl font-bold text-gray-900">{data.assessmentsCompletedToday}</p>
-                </div>
-              </div>
-            </div>
-            
+           
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
               <div className="flex items-center">
                 <Award className="w-8 h-8 text-orange-600" />
@@ -215,9 +206,7 @@ const AdminDashboard = () => {
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-8">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">No of Employees Learnt</h3>
-              <select className="px-3 py-1 border border-gray-300 rounded text-sm">
-                <option>Topic</option>
-              </select>
+           
             </div>
             {data.employeeData && data.employeeData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>

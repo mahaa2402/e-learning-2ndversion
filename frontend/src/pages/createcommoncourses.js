@@ -1694,7 +1694,7 @@ const CreateCommonCourses = () => {
       <Sidebar />
       <div className="flex-1 overflow-auto">
         <div className="course-header p-6">
-          <h2>Create Common Courses</h2>
+          <h2>Create Courses</h2>
           <div className="header-actions">
             <button
               onClick={() => openModal()}

@@ -35,7 +35,7 @@ const Sidebar = () => {
     },
     {
       icon: BookOpen,
-      label: 'Create Common Courses',
+      label: 'Create Courses',
       path: '/createcommoncourses',
       active: location.pathname === '/createcommoncourses',
       onClick: () => navigate('/createcommoncourses'),
