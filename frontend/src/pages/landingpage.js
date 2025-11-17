@@ -311,41 +311,45 @@ const getCourseImage = (course) => {
           <div className="top-nav-right">
             <nav className="top-nav-links">
               <a href="#" onClick={handleHomeClick}>Home</a>
-              <div className="dropdown">
-                <a href="#" onClick={(e) => {
-                  e.preventDefault();
-                  handleCoursesDropdownToggle();
-                }}>
-                  Courses
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M7 10l5 5 5-5z"/>
-                  </svg>
-                </a>
-                {showCoursesDropdown && (
-                  <div className="dropdown-menu">
-                    {commonCourses.length > 0 ? (
-                      commonCourses.map((course, index) => (
-                        <div
-                          key={course._id || index}
-                          className="dropdown-item"
-                          onClick={() => handleCourseSelect(course.title)}
-                        >
-                          {course.title}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="dropdown-item">No courses available</div>
-                    )}
-                  </div>
-                )}
-              </div>
+              {isLoggedIn && (
+                <div className="dropdown">
+                  <a href="#" onClick={(e) => {
+                    e.preventDefault();
+                    handleCoursesDropdownToggle();
+                  }}>
+                    Courses
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M7 10l5 5 5-5z"/>
+                    </svg>
+                  </a>
+                  {showCoursesDropdown && (
+                    <div className="dropdown-menu">
+                      {commonCourses.length > 0 ? (
+                        commonCourses.map((course, index) => (
+                          <div
+                            key={course._id || index}
+                            className="dropdown-item"
+                            onClick={() => handleCourseSelect(course.title)}
+                          >
+                            {course.title}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="dropdown-item">No courses available</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
               {isLoggedIn && <Link to="/userdashboard">Dashboard</Link>}
-              <a href="#aboutus" onClick={(e) => {
-                e.preventDefault();
-                document.getElementById('aboutus')?.scrollIntoView({ behavior: 'smooth' });
-              }}>
-                About
-              </a>
+              {isLoggedIn && (
+                <a href="#aboutus" onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('aboutus')?.scrollIntoView({ behavior: 'smooth' });
+                }}>
+                  About
+                </a>
+              )}
               <div className="nav-auth">
                 {!isLoggedIn ? (
                   <>
@@ -374,7 +378,8 @@ const getCourseImage = (course) => {
             </div>
           </div>
           <div className="bottom-navbar-right">
-            <div className="search-sidebar">
+            {isLoggedIn && (
+              <div className="search-sidebar">
                 <form onSubmit={handleSearchSubmit} className="search-sidebar-form">
                   <input
                     type="text"
@@ -415,6 +420,7 @@ const getCourseImage = (course) => {
                   </div>
                 )}
               </div>
+            )}
           </div>
         </div>
       </header>
