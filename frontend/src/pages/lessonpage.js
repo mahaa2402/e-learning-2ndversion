@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import axios from 'axios';
 import Navbar from '../components/Navbar';
 import courseData from './coursedata';
 import { API_ENDPOINTS } from '../config/api';
@@ -26,9 +25,6 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [showCaptions, setShowCaptions] = useState(false);
-  const [subtitleUrl, setSubtitleUrl] = useState(null);
-  const [subtitleText, setSubtitleText] = useState('');
-  const [subtitleCues, setSubtitleCues] = useState([]);
   const videoRef = useRef(null);
 
   // State for database course/lesson data
@@ -236,124 +232,6 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
     return 0;
   };
 
-  // Fetch subtitle from backend
-  const fetchSubtitle = async () => {
-    const courseName = course?.name || course?.title || dbCourse?.title || dbCourse?.name;
-    if (!courseName || !lessonId) return;
-    
-    try {
-      const moduleIndex = getModuleIndexFromLessonId(lessonId);
-      const res = await axios.get("/api/video/subtitle", {
-        params: {
-          courseName: courseName,
-          moduleIndex: moduleIndex,
-        },
-      });
-
-      if (res.data && res.data.success && res.data.url) {
-        setSubtitleUrl(res.data.url);
-        // Fetch and parse the VTT file
-        await parseSubtitleFile(res.data.url);
-        console.log("✅ Subtitle loaded successfully");
-      } else {
-        setSubtitleUrl(null);
-        setSubtitleCues([]);
-      }
-    } catch (err) {
-      if (err.response && err.response.status === 404) {
-        console.log("ℹ️ No subtitle file found for this lesson (this is normal)");
-      } else {
-        console.log("⚠️ Could not fetch subtitle:", err.message);
-      }
-      setSubtitleUrl(null);
-      setSubtitleCues([]);
-    }
-  };
-
-  // Parse VTT subtitle file
-  const parseSubtitleFile = async (url) => {
-    try {
-      const response = await fetch(url);
-      const vttText = await response.text();
-      
-      // Parse VTT format
-      const cues = [];
-      const lines = vttText.split('\n');
-      let currentCue = null;
-      
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        
-        // Skip WEBVTT header and empty lines
-        if (line === 'WEBVTT' || line === '' || line.startsWith('NOTE')) {
-          continue;
-        }
-        
-        // Check if line is a timestamp (format: 00:00:00.000 --> 00:00:03.500)
-        const timestampRegex = /(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})\.(\d{3})/;
-        const match = line.match(timestampRegex);
-        
-        if (match) {
-          // Parse start and end times
-          const startTime = parseTimeToSeconds(match[1], match[2], match[3], match[4]);
-          const endTime = parseTimeToSeconds(match[5], match[6], match[7], match[8]);
-          
-          currentCue = {
-            start: startTime,
-            end: endTime,
-            text: ''
-          };
-        } else if (currentCue && line) {
-          // This is subtitle text
-          currentCue.text += (currentCue.text ? ' ' : '') + line;
-        } else if (currentCue && line === '' && currentCue.text) {
-          // Empty line after text means cue is complete
-          cues.push(currentCue);
-          currentCue = null;
-        }
-      }
-      
-      // Add last cue if exists
-      if (currentCue && currentCue.text) {
-        cues.push(currentCue);
-      }
-      
-      setSubtitleCues(cues);
-      console.log(`✅ Parsed ${cues.length} subtitle cues`);
-    } catch (error) {
-      console.error('Error parsing subtitle file:', error);
-      setSubtitleCues([]);
-    }
-  };
-
-  // Convert time string to seconds
-  const parseTimeToSeconds = (hours, minutes, seconds, milliseconds) => {
-    return parseInt(hours) * 3600 + 
-           parseInt(minutes) * 60 + 
-           parseInt(seconds) + 
-           parseInt(milliseconds) / 1000;
-  };
-
-  // Get current subtitle text based on video time
-  const getCurrentSubtitle = (currentTime) => {
-    if (!subtitleCues || subtitleCues.length === 0) return '';
-    
-    const activeCue = subtitleCues.find(cue => 
-      currentTime >= cue.start && currentTime < cue.end
-    );
-    
-    return activeCue ? activeCue.text : '';
-  };
-
-  // Handle video time update to sync subtitles
-  const handleVideoTimeUpdate = (e) => {
-    const video = e.target || videoRef.current;
-    if (video) {
-      const currentTime = video.currentTime;
-      const currentSubtitle = getCurrentSubtitle(currentTime);
-      setSubtitleText(currentSubtitle);
-    }
-  };
 
   // Extract audio and generate captions from video
   const generateAudioCaptions = async () => {
@@ -649,12 +527,6 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
     }
   }, [courseId, course, dbCourse, lessonId]);
 
-  // Fetch subtitle when lesson changes
-  useEffect(() => {
-    if (course && lessonId) {
-      fetchSubtitle();
-    }
-  }, [courseId, lessonId, course?.name]);
 
   // Only refresh on lesson change for ISP course (removed excessive triggers)
   useEffect(() => {
@@ -1018,13 +890,25 @@ useEffect(() => {
     }
   };
 
-  if (!course) {
+  // Only show "course not found" after loading is complete
+  if (!course && !loading && !fetchingFromDb) {
     return (
       <div className="lesson-wrapper">
         <div className="error-container">
           <h2>Course not found</h2>
           <p>The course you're looking for doesn't exist.</p>
           <button onClick={() => navigate('/userdashboard')}>Go to Dashboard</button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state while fetching
+  if ((loading || fetchingFromDb) && !course) {
+    return (
+      <div className="lesson-wrapper">
+        <div className="loading-container">
+          <p>Loading course...</p>
         </div>
       </div>
     );
@@ -1142,7 +1026,6 @@ const renderFormattedContent = (contentArray) => {
               width="100%" 
               height="auto" 
               controls
-              onTimeUpdate={handleVideoTimeUpdate}
               ref={(video) => {
                 videoRef.current = video;
                 if (video && video.textTracks.length > 0) {
@@ -1158,21 +1041,7 @@ const renderFormattedContent = (contentArray) => {
                 ⚠️ Video URL not found. Please check that the video was uploaded correctly.
               </p>
             )}
-              {subtitleUrl && (
-                <track 
-                  kind="captions" 
-                  srcLang="en" 
-                  label="English" 
-                  src={subtitleUrl}
-                />
-              )}
           </video>
-            {/* Subtitle display below video */}
-            {subtitleUrl && subtitleText && (
-              <div className="subtitle-display">
-                <p className="subtitle-text">{subtitleText}</p>
-              </div>
-            )}
           </div>
 
           {/* Notes Section - Display below video */}

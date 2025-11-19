@@ -2,6 +2,8 @@ const express = require('express');
 const AWS = require('aws-sdk');
 const multer = require('multer');
 const multerS3 = require('multer-s3');
+const path = require('path');
+const fs = require('fs');
 
 const router = express.Router();
 
@@ -25,9 +27,15 @@ const upload = multer({
 });
 
 // Image upload configuration - use temp storage then upload to S3 (same as VideoUpload.js)
-const imageUpload = multer({ dest: "uploads/" });
-const path = require('path');
-const fs = require('fs');
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log('✅ Created uploads directory:', uploadsDir);
+}
+
+const imageUpload = multer({ dest: uploadsDir });
+
 // Use a simple unique ID generator if uuid is not available
 const generateUniqueId = () => {
   return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -49,6 +57,31 @@ router.post('/upload-course-image/:courseName', imageUpload.single('image'), asy
     console.log('📤 Course name:', req.params.courseName);
     console.log('📤 File:', req.file ? req.file.originalname : 'No file');
 
+    // Check AWS credentials first
+    if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_BUCKET_NAME || !process.env.AWS_REGION) {
+      console.error('❌ AWS credentials not configured');
+      console.error('❌ Missing:', {
+        AWS_ACCESS_KEY_ID: !process.env.AWS_ACCESS_KEY_ID,
+        AWS_SECRET_ACCESS_KEY: !process.env.AWS_SECRET_ACCESS_KEY,
+        AWS_BUCKET_NAME: !process.env.AWS_BUCKET_NAME,
+        AWS_REGION: !process.env.AWS_REGION
+      });
+      
+      // Clean up temp file if it exists
+      if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (unlinkError) {
+          console.error('❌ Error deleting temp file:', unlinkError);
+        }
+      }
+      
+      return res.status(500).json({ 
+        error: 'AWS S3 not configured. Please check environment variables.',
+        details: 'Missing AWS credentials or bucket configuration'
+      });
+    }
+
     if (!req.file) {
       return res.status(400).json({ error: 'No image file provided' });
     }
@@ -64,9 +97,17 @@ router.post('/upload-course-image/:courseName', imageUpload.single('image'), asy
     const s3Key = `e-learning/course-images/${courseName}/${uniqueFileName}`;
 
     console.log('📤 Uploading to S3:', s3Key);
+    console.log('📤 Bucket:', process.env.AWS_BUCKET_NAME);
+    console.log('📤 Region:', process.env.AWS_REGION);
+
+    // Check if file exists and is readable
+    if (!fs.existsSync(req.file.path)) {
+      throw new Error('Temporary file not found after upload');
+    }
 
     // Read the file
     const fileContent = fs.readFileSync(req.file.path);
+    console.log('📤 File read, size:', fileContent.length, 'bytes');
 
     // Upload to S3
     const uploadParams = {
@@ -76,12 +117,21 @@ router.post('/upload-course-image/:courseName', imageUpload.single('image'), asy
       ContentType: req.file.mimetype || 'image/jpeg'
     };
 
+    console.log('📤 Uploading to S3 with params:', {
+      Bucket: uploadParams.Bucket,
+      Key: uploadParams.Key,
+      ContentType: uploadParams.ContentType,
+      BodySize: fileContent.length
+    });
+
     const uploadResult = await s3.upload(uploadParams).promise();
     console.log('✅ Course image uploaded to S3:', uploadResult.Location);
 
     // Clean up temporary file
-    fs.unlinkSync(req.file.path);
-    console.log('✅ Temporary file deleted');
+    if (fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+      console.log('✅ Temporary file deleted');
+    }
 
     res.json({
       success: true,
@@ -94,11 +144,18 @@ router.post('/upload-course-image/:courseName', imageUpload.single('image'), asy
     });
   } catch (error) {
     console.error('❌ Course image upload error:', error);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code
+    });
     
     // Clean up temporary file if it exists
     if (req.file && req.file.path && fs.existsSync(req.file.path)) {
       try {
         fs.unlinkSync(req.file.path);
+        console.log('✅ Cleaned up temporary file after error');
       } catch (unlinkError) {
         console.error('❌ Error deleting temp file:', unlinkError);
       }
@@ -106,7 +163,9 @@ router.post('/upload-course-image/:courseName', imageUpload.single('image'), asy
 
     res.status(500).json({ 
       error: 'Failed to upload course image',
-      message: error.message 
+      message: error.message,
+      code: error.code || 'UNKNOWN_ERROR',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });

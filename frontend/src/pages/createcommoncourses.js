@@ -1852,8 +1852,15 @@ const CreateCommonCourses = () => {
                             setIsLoading(true);
                             setError(null);
 
+                            // Validate course title is provided
+                            const courseTitle = formData.title || editingCourse?.title;
+                            if (!courseTitle || courseTitle.trim() === '') {
+                              setError('Please enter a course title before uploading an image');
+                              setIsLoading(false);
+                              return;
+                            }
+
                             // Sanitize course name
-                            const courseTitle = formData.title || editingCourse?.title || 'temp';
                             const courseName = courseTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
                             
                             const formDataToSend = new FormData();
@@ -1863,6 +1870,8 @@ const CreateCommonCourses = () => {
                             const uploadUrl = `${API_ENDPOINTS.UPLOAD.COURSE_IMAGE}/${encodeURIComponent(courseName)}`;
                             
                             console.log('📤 Uploading course image to:', uploadUrl);
+                            console.log('📤 Course title:', courseTitle);
+                            console.log('📤 Course name (sanitized):', courseName);
 
                             const uploadResponse = await fetch(uploadUrl, {
                               method: 'POST',
@@ -1876,10 +1885,40 @@ const CreateCommonCourses = () => {
                               let errorData;
                               try {
                                 errorData = await uploadResponse.json();
+                                console.error('❌ Backend error response:', errorData);
                               } catch (e) {
-                                errorData = { error: `HTTP ${uploadResponse.status}: ${uploadResponse.statusText}` };
+                                console.error('❌ Failed to parse error response:', e);
+                                errorData = { 
+                                  error: `HTTP ${uploadResponse.status}: ${uploadResponse.statusText}`,
+                                  details: 'Could not parse server response'
+                                };
                               }
-                              throw new Error(errorData.error || `Failed to upload image: ${uploadResponse.statusText}`);
+                              
+                              // Show detailed error message
+                              const errorMessage = errorData.details || errorData.message || errorData.error || `Failed to upload image: ${uploadResponse.statusText}`;
+                              const errorCode = errorData.code || 'UNKNOWN_ERROR';
+                              
+                              console.error('❌ Upload error details:', {
+                                status: uploadResponse.status,
+                                statusText: uploadResponse.statusText,
+                                error: errorData,
+                                code: errorCode,
+                                message: errorMessage
+                              });
+                              
+                              // Provide user-friendly error messages
+                              let userMessage = errorMessage;
+                              if (errorCode === 'INVALID_AWS_ACCESS_KEY' || errorMessage.includes('Access Key Id')) {
+                                userMessage = 'AWS credentials are not configured correctly. Please contact administrator.';
+                              } else if (errorCode === 'INVALID_AWS_SECRET_KEY' || errorMessage.includes('Signature')) {
+                                userMessage = 'AWS credentials are invalid. Please contact administrator.';
+                              } else if (errorCode === 'BUCKET_NOT_FOUND' || errorMessage.includes('bucket')) {
+                                userMessage = 'AWS S3 bucket not found. Please contact administrator.';
+                              } else if (errorMessage.includes('AWS') || errorMessage.includes('S3')) {
+                                userMessage = 'AWS configuration error. Please contact administrator.';
+                              }
+                              
+                              throw new Error(userMessage);
                             }
 
                             const uploadResult = await uploadResponse.json();
@@ -1898,6 +1937,7 @@ const CreateCommonCourses = () => {
                             setSuccess('Course image uploaded successfully!');
                           } catch (err) {
                             console.error('❌ Course image upload failed:', err);
+                            console.error('❌ Error stack:', err.stack);
                             setError(`Failed to upload image: ${err.message}`);
                           } finally {
                             setIsLoading(false);

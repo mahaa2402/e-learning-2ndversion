@@ -176,15 +176,33 @@ const getCourseImage = (course) => {
 };
 
 
-  // Handle scroll detection for navbar shrinking
+  // Handle scroll detection for navbar shrinking with throttling and hysteresis to prevent flickering
   useEffect(() => {
+    let ticking = false;
+    let lastScrollY = window.scrollY;
+    let currentScrolledState = false;
+    
     const handleScroll = () => {
-      const scrollPosition = window.scrollY;
-      
-      if (scrollPosition > 50) {
-        setIsScrolled(true);
-      } else {
-        setIsScrolled(false);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const scrollPosition = window.scrollY;
+          
+          // Use hysteresis: different thresholds for scrolling down vs up to prevent flickering
+          // Scroll down threshold: 50px (activate scrolled state)
+          // Scroll up threshold: 30px (deactivate scrolled state)
+          // This creates a "dead zone" that prevents rapid toggling
+          if (scrollPosition > 50 && !currentScrolledState) {
+            setIsScrolled(true);
+            currentScrolledState = true;
+          } else if (scrollPosition < 30 && currentScrolledState) {
+            setIsScrolled(false);
+            currentScrolledState = false;
+          }
+          
+          lastScrollY = scrollPosition;
+          ticking = false;
+        });
+        ticking = true;
       }
     };
 

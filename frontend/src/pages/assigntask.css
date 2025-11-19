@@ -101,7 +101,7 @@
   --transition-bounce: 400ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
   font-family: var(--font-family);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
   min-height: 100vh;
   line-height: 1.5;
   
@@ -314,7 +314,7 @@
 /* in assigntask.css */
 .task-assignment-page .container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f0f2ff 0%, #e6f3ff 100%);
+  background: linear-gradient(135deg, #f0f2ff 0%, #e6f3ff 100%) !important;
   padding: var(--spacing-6);
   position: relative;
   z-index: 1;
@@ -328,15 +328,16 @@
 
 /* Enhanced header card */
 .task-assignment-page .header-card {
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
   border-radius: var(--radius-2xl);
   box-shadow: 
     0 20px 25px -5px rgba(0, 0, 0, 0.1),
     0 8px 10px -6px rgba(0, 0, 0, 0.1);
   padding: var(--spacing-8);
   margin-bottom: var(--spacing-8);
+  color: var(--gray-900) !important;
   position: relative;
   overflow: hidden;
   transition: all var(--transition-slow);
@@ -451,9 +452,9 @@
 
 /* Enhanced form card shadows and borders */
 .task-assignment-page .form-card {
-  background: rgba(255, 255, 255, 0.98);
+  background: rgba(255, 255, 255, 0.98) !important;
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
   border-radius: var(--radius-2xl);
   box-shadow: 
     0 10px 25px -5px rgba(0, 0, 0, 0.08),
@@ -468,6 +469,7 @@
   display: flex;
   flex-direction: column;
   transform: translateY(0);
+  color: var(--gray-900) !important;
 }
 
 .task-assignment-page .form-card::before {
@@ -539,11 +541,12 @@
 .task-assignment-page .form-select {
   width: 100%;
   padding: var(--spacing-4);
-  border: 2px solid var(--gray-200);
+  border: 2px solid var(--gray-200) !important;
   border-radius: var(--radius-lg);
   font-size: var(--font-size-base);
   transition: all var(--transition-slow);
-  background: white;
+  background: white !important;
+  color: var(--gray-900) !important;
   font-family: inherit;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
@@ -823,9 +826,9 @@
 
 
 .task-assignment-page .preview-card {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.95) !important;
   backdrop-filter: blur(20px);
-  border: 1px solid var(--primary-200);
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
   border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-xl);
   padding: var(--spacing-8);
@@ -834,6 +837,7 @@
   overflow: hidden;
   transition: all var(--transition-slow);
   cursor: pointer;
+  color: var(--gray-900) !important;
 }
 
 .task-assignment-page .preview-card::before {
@@ -1262,42 +1266,62 @@
 }
 
 
+/* Force light theme - override dark mode */
 @media (prefers-color-scheme: dark) {
   .task-assignment-page {
-    --gray-50: #111827;
-    --gray-100: #1f2937;
-    --gray-200: #374151;
-    --gray-300: #4b5563;
-    --gray-400: #6b7280;
-    --gray-500: #9ca3af;
-    --gray-600: #d1d5db;
-    --gray-700: #e5e7eb;
-    --gray-800: #f3f4f6;
-    --gray-900: #f9fafb;
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-    color: var(--gray-900);
+    /* Keep light theme colors */
+    --gray-50: #f9fafb !important;
+    --gray-100: #f3f4f6 !important;
+    --gray-200: #e5e7eb !important;
+    --gray-300: #d1d5db !important;
+    --gray-400: #9ca3af !important;
+    --gray-500: #6b7280 !important;
+    --gray-600: #4b5563 !important;
+    --gray-700: #374151 !important;
+    --gray-800: #1f2937 !important;
+    --gray-900: #111827 !important;
+    /* Force light background */
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: var(--gray-900) !important;
   }
   
-  .task-assignment-page .container { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
+  /* Force light container background */
+  .task-assignment-page .container { 
+    background: linear-gradient(135deg, #f0f2ff 0%, #e6f3ff 100%) !important; 
+  }
   
+  /* Force light card backgrounds */
   .task-assignment-page .header-card,
   .task-assignment-page .form-card,
   .task-assignment-page .preview-card {
-    background: rgba(30, 41, 59, 0.8);
-    border-color: rgba(71, 85, 105, 0.3);
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+    color: var(--gray-900) !important;
   }
   
+  /* Force light form inputs */
   .task-assignment-page .form-input,
   .task-assignment-page .form-textarea,
   .task-assignment-page .form-select {
-    background: rgba(30, 41, 59, 0.5);
-    color: var(--gray-900);
-    border-color: rgba(71, 85, 105, 0.3);
+    background: white !important;
+    color: var(--gray-900) !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
   }
   
+  /* Force light dropdown */
   .task-assignment-page .employee-dropdown {
-    background: rgba(30, 41, 59, 0.9);
-    border-color: rgba(71, 85, 105, 0.3);
+    background: white !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+  }
+  
+  /* Force light text colors */
+  .task-assignment-page h1,
+  .task-assignment-page h2,
+  .task-assignment-page h3,
+  .task-assignment-page p,
+  .task-assignment-page label,
+  .task-assignment-page span {
+    color: var(--gray-900) !important;
   }
 }
 

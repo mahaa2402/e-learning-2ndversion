@@ -19,8 +19,15 @@ router.get("/health", (req, res) => {
   });
 });
 
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log('✅ Created uploads directory:', uploadsDir);
+}
+
 // Multer temp storage
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ dest: uploadsDir });
 
 // AWS S3 Config
 const s3 = new AWS.S3({
@@ -81,11 +88,38 @@ router.post(
       console.log(`📤 Module Number: ${moduleNum}`);
       console.log(`📤 File Name: ${uniqueFileName}`);
 
-      // Check AWS credentials
-      if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_BUCKET_NAME) {
+      // Check AWS credentials first
+      if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_BUCKET_NAME || !process.env.AWS_REGION) {
         console.error('❌ AWS credentials not configured');
-        return res.status(500).json({ error: "AWS S3 not configured. Please check environment variables." });
+        console.error('❌ Missing:', {
+          AWS_ACCESS_KEY_ID: !process.env.AWS_ACCESS_KEY_ID,
+          AWS_SECRET_ACCESS_KEY: !process.env.AWS_SECRET_ACCESS_KEY,
+          AWS_BUCKET_NAME: !process.env.AWS_BUCKET_NAME,
+          AWS_REGION: !process.env.AWS_REGION
+        });
+        
+        // Clean up temp file if it exists
+        if (file && file.path && fs.existsSync(file.path)) {
+          try {
+            fs.unlinkSync(file.path);
+          } catch (unlinkError) {
+            console.error('❌ Error deleting temp file:', unlinkError);
+          }
+        }
+        
+        return res.status(500).json({ 
+          error: "AWS S3 not configured. Please check environment variables.",
+          details: "Missing AWS credentials or bucket configuration"
+        });
       }
+      
+      // Log AWS configuration (without exposing secrets)
+      console.log('✅ AWS Configuration:', {
+        AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID ? `${process.env.AWS_ACCESS_KEY_ID.substring(0, 4)}...` : 'NOT SET',
+        AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY ? 'SET' : 'NOT SET',
+        AWS_BUCKET_NAME: process.env.AWS_BUCKET_NAME,
+        AWS_REGION: process.env.AWS_REGION
+      });
 
       // Upload to S3
       console.log('📤 Reading file from temp location:', file.path);
@@ -153,9 +187,42 @@ router.post(
     } catch (error) {
       console.error("❌ Video upload error:", error);
       console.error("❌ Error stack:", error.stack);
+      console.error("❌ Error details:", {
+        name: error.name,
+        message: error.message,
+        code: error.code,
+        statusCode: error.statusCode
+      });
+      
+      // Clean up temporary file if it exists
+      if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+        try {
+          fs.unlinkSync(req.file.path);
+          console.log('✅ Cleaned up temporary file after error');
+        } catch (unlinkError) {
+          console.error('❌ Error deleting temp file:', unlinkError);
+        }
+      }
+      
+      // Provide more specific error messages
+      let errorMessage = error.message;
+      let errorCode = error.code || 'UNKNOWN_ERROR';
+      
+      if (error.code === 'InvalidAccessKeyId' || error.message.includes('Access Key Id')) {
+        errorMessage = 'The AWS Access Key ID is invalid or does not exist. Please check your AWS credentials.';
+        errorCode = 'INVALID_AWS_ACCESS_KEY';
+      } else if (error.code === 'SignatureDoesNotMatch') {
+        errorMessage = 'The AWS Secret Access Key is incorrect. Please verify your AWS credentials.';
+        errorCode = 'INVALID_AWS_SECRET_KEY';
+      } else if (error.code === 'NoSuchBucket') {
+        errorMessage = `The S3 bucket "${process.env.AWS_BUCKET_NAME}" does not exist. Please check your bucket name.`;
+        errorCode = 'BUCKET_NOT_FOUND';
+      }
+      
       res.status(500).json({ 
         error: "Video upload failed", 
-        details: error.message,
+        details: errorMessage,
+        code: errorCode,
         stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
     }

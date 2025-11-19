@@ -1704,6 +1704,13 @@ const Quiz = () => {
         <h2>{getCourseName()} QUIZ</h2>
       </div>
 
+      {/* ✅ Attempt indicator moved outside quiz-card */}
+      {attemptNumber > 1 && (
+        <div className="attempt-indicator" style={{ marginBottom: '1rem' }}>
+          Retake Attempt {attemptNumber} 
+        </div>
+      )}
+
       <div className="quiz-card">
         <div className="quiz-header">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '10px' }}>
@@ -1729,11 +1736,6 @@ const Quiz = () => {
               </div>
             )}
           </div>
-          {attemptNumber > 1 && (
-            <div className="attempt-indicator">
-              Retake Attempt {attemptNumber} 
-            </div>
-          )}
         </div>
 
         {/* Question image */}

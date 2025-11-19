@@ -165,7 +165,13 @@
   min-height: 50px;
   padding: 0.5rem 2rem;
   width: 100%;
+  position: sticky;
+  top: 0;
+  z-index: 100;
   transition: padding 0.3s ease, min-height 0.3s ease;
+  will-change: padding, min-height;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 /* Scrolled state - smaller navbar */
@@ -198,6 +204,9 @@
   height: clamp(50px, 6.67vw, 83px);
   object-fit: contain;
   transition: width 0.3s ease, height 0.3s ease;
+  will-change: width, height;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .logo-icon img.logo-small {
