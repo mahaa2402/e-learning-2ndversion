@@ -1,22 +1,147 @@
-.certificate-page {
+/* Certificate Detail Page - Using same layout as employee tracking */
+.employee-directory-container {
+  background: #f9fafb;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 2rem;
-  padding-top: 120px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  width: 100%; /* Takes remaining space in flex container */
+  overflow-x: hidden;
 }
 
+.employee-directory-max-width {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+  padding-top: 180px; /* Increased space for fixed header (~80px) + tabs (~70px) + margin (30px) */
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  margin-left: 0; /* Ensure it doesn't shift due to sidebar */
+}
+
+/* Page Header - Fixed at top, positioned to the right of sidebar */
 .page-header {
-  max-width: 1200px;
-  margin: 0 auto 2rem;
+  width: calc(100% - 300px); /* Full width minus sidebar width */
+  margin: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
   background: white;
   padding: 1.5rem 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 0;
+  position: fixed;
+  top: 0;
+  left: 300px; /* Start after sidebar */
+  right: 0;
+  z-index: 100;
+  border-bottom: 2px solid #e2e8f0;
+  margin-bottom: 0;
+}
+
+.page-header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+/* Certificate Tabs Container - Fixed below header, positioned to the right of sidebar */
+.certificate-tabs-container {
+  margin-bottom: 0;
+  background: white;
+  border-radius: 0;
+  padding: 0.75rem 0; /* Increased padding for better visibility */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: fixed;
+  top: 80px; /* Increased from 73px to show tabs fully */
+  left: 300px; /* Start after sidebar */
+  right: 0;
+  width: calc(100% - 300px); /* Full width minus sidebar width */
+  z-index: 99;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.certificate-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.25rem 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.certificate-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1.5rem;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #64748b;
+  position: relative;
+  visibility: visible;
+  opacity: 1;
+}
+
+.certificate-tab:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.certificate-tab.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.tab-icon {
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-text {
+  font-weight: 600;
+}
+
+/* Main Content Area */
+.certificate-main-content {
+  width: 100%;
+  min-height: 400px;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+/* Ensure progress section is visible */
+.course-progress-container {
+  background: white;
+  padding: 2rem;
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+  width: 100%;
+  display: block;
+  visibility: visible;
+  opacity: 1;
 }
+
+.course-progress-container h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 1.5rem 0;
+  display: block;
+}
+
+/* Duplicate removed - using the definition above */
 
 .page-header h1 {
   font-size: 2rem;
@@ -30,29 +155,185 @@
 
 .back-button {
   padding: 0.75rem 1.5rem;
-  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 1rem;
-  font-weight: 500;
+  font-size: 0.95rem;
+  font-weight: 600;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
 .back-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
 }
 
 .certificates-container {
-  max-width: 1200px;
-  margin: 0 auto 2rem;
+  background: transparent;
+  padding: 0;
+  margin-bottom: 2rem;
+  margin-top: 0;
+}
+
+.section-header {
+  margin-bottom: 1.5rem;
+}
+
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+/* Certificate Grid - Same as user dashboard */
+.certificates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.certificate-card {
   background: white;
-  padding: 2rem;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e2e8f0;
+}
+
+.certificate-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.certificate-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.certificate-badge {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  backdrop-filter: blur(10px);
+}
+
+.certificate-date {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  opacity: 0.95;
+}
+
+.date-icon-small {
+  width: 14px;
+  height: 14px;
+}
+
+.certificate-card-body {
+  padding: 1.5rem 1.25rem;
+  flex: 1;
+}
+
+.certificate-course-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 1rem;
+  line-height: 1.4;
+}
+
+.certificate-details-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.certificate-detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.certificate-detail-item:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-size: 0.85rem;
+  color: #718096;
+  font-weight: 500;
+}
+
+.detail-value {
+  font-size: 0.9rem;
+  color: #2d3748;
+  font-weight: 600;
+}
+
+.certificate-id-small {
+  font-size: 0.75rem;
+  color: #667eea;
+  font-family: 'Courier New', monospace;
+  word-break: break-all;
+}
+
+.certificate-card-footer {
+  padding: 1rem 1.25rem;
+  background: #f7fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.btn-view-certificate {
+  width: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-view-certificate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.empty-state-text {
+  font-size: 1rem;
+  color: #64748b;
+  margin: 0;
 }
 
 .certificates-container h2 {
@@ -385,5 +666,171 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
+  }
+}
+
+/* Course Progress Table Styles - Styles are defined above */
+
+.course-progress-table-container {
+  overflow-x: auto;
+}
+
+.course-progress-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.course-progress-table thead {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.course-progress-table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.course-progress-table tbody tr {
+  border-bottom: 1px solid #e2e8f0;
+  transition: background-color 0.2s ease;
+}
+
+.course-progress-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.course-progress-table td {
+  padding: 1rem;
+  vertical-align: middle;
+}
+
+.course-name-cell {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.modules-cell {
+  text-align: center;
+}
+
+.completed-count {
+  font-weight: 600;
+  color: #28a745;
+  font-size: 1.1rem;
+}
+
+.total-count {
+  font-weight: 500;
+  color: #64748b;
+}
+
+.progress-cell {
+  min-width: 200px;
+}
+
+.percentage-cell {
+  text-align: center;
+}
+
+.percentage-badge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.percentage-badge.completed {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.percentage-badge.in-progress {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.percentage-badge.not-started {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+@media (max-width: 1024px) {
+  .certificates-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.25rem;
+  }
+  
+  /* Adjust for smaller sidebar or collapsed sidebar */
+  .page-header,
+  .certificate-tabs-container,
+  .employee-directory-container {
+    left: 0;
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .employee-directory-max-width {
+    padding: 1rem;
+  }
+
+  .page-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+    padding: 1rem;
+  }
+
+  .page-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .certificate-tabs-container {
+    top: 120px;
+  }
+
+  .certificate-tabs {
+    flex-direction: column;
+  }
+
+  .certificate-tab {
+    width: 100%;
+  }
+
+  .course-progress-table {
+    font-size: 0.875rem;
+  }
+
+  .course-progress-table th,
+  .course-progress-table td {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .progress-cell {
+    min-width: 150px;
+  }
+
+  .certificates-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .certificate-card-header {
+    padding: 0.875rem 1rem;
+  }
+  
+  .certificate-card-body {
+    padding: 1.25rem 1rem;
+  }
+  
+  .certificate-card-footer {
+    padding: 0.875rem 1rem;
   }
 }

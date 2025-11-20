@@ -420,7 +420,7 @@ const TaskAssignment = () => {
                     <label className="form-label">
                       Priority
                     </label>
-                    <div className="flex items-center space-x-2">
+                    <div className="priority-wrapper flex items-center space-x-2">
                       <select
                         name="priority"
                         value={formData.priority}

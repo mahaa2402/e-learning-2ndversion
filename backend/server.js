@@ -35,9 +35,10 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
-// Body parsing
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Body parsing (for JSON/URL-encoded data, not file uploads)
+// File uploads are handled by multer with their own limits
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Debug middleware - MUST be after body parsing but before routes
 app.use((req, res, next) => {

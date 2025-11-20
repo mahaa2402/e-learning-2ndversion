@@ -591,16 +591,15 @@
 }
 
 .task-assignment-page .priority-indicator {
-  position: absolute;
-  right: 48px;
-  top: 50%;
-  transform: translateY(-50%);
+  position: relative;
   width: 16px;
   height: 16px;
   border-radius: 50%;
   border: 2px solid white;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all var(--transition-base);
+  flex-shrink: 0;
+  align-self: center;
 }
 
 

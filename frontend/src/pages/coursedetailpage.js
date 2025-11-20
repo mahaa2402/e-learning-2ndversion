@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Users, Award, BookOpen, Play, ChevronRight, User, Star, CheckCircle, ArrowRight, Download } from 'lucide-react';
+import { Users, Award, BookOpen, Play, ChevronRight, User, Star, CheckCircle, ArrowRight, Download, Lock } from 'lucide-react';
 import './coursedetailpage.css';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { API_ENDPOINTS } from '../config/api';
@@ -14,6 +14,8 @@ const CourseDetailPage = () => {
   const [showCoursesDropdown, setShowCoursesDropdown] = useState(false);
   const [commonCourses, setCommonCourses] = useState([]);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [unlockStatus, setUnlockStatus] = useState([]); // Track module unlock status
+  const [progressLoading, setProgressLoading] = useState(true);
   
   const navigate = useNavigate();
 
@@ -177,6 +179,113 @@ const CourseDetailPage = () => {
 
     fetchCourse();
   }, [title]);
+
+  // Fetch user progress to determine which modules are unlocked
+  const fetchUserProgress = async () => {
+    try {
+      setProgressLoading(true);
+      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const userEmail = localStorage.getItem('employeeEmail');
+
+      if (!token || !userEmail) {
+        console.log('No token or email found, using default unlock status');
+        setUnlockStatus([]);
+        setProgressLoading(false);
+        return;
+      }
+
+      // Use course title as courseName
+      const courseName = courseData?.title || title;
+      const courseId = courseData?._id || null;
+      
+      console.log('📊 Fetching progress for course:', courseName, 'courseId:', courseId);
+      
+      const progressUrl = courseId 
+        ? `${API_ENDPOINTS.PROGRESS.GET_PROGRESS}?userEmail=${encodeURIComponent(userEmail)}&courseName=${encodeURIComponent(courseName)}&courseId=${courseId}`
+        : `${API_ENDPOINTS.PROGRESS.GET_PROGRESS}?userEmail=${encodeURIComponent(userEmail)}&courseName=${encodeURIComponent(courseName)}`;
+      
+      const response = await fetch(progressUrl, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📊 Progress data received:', data);
+
+        if (Array.isArray(data.lessonUnlockStatus)) {
+          setUnlockStatus(data.lessonUnlockStatus);
+          console.log('✅ Unlock status set:', data.lessonUnlockStatus);
+        } else {
+          console.warn("Unexpected lessonUnlockStatus format:", data.lessonUnlockStatus);
+          setUnlockStatus([]);
+        }
+      } else {
+        console.log('Failed to fetch progress, using default unlock status');
+        setUnlockStatus([]);
+      }
+    } catch (error) {
+      console.error('Error fetching user progress:', error);
+      setUnlockStatus([]);
+    } finally {
+      setProgressLoading(false);
+    }
+  };
+
+  // Fetch progress when courseData is loaded
+  useEffect(() => {
+    if (courseData && isLoggedIn) {
+      fetchUserProgress();
+    }
+  }, [courseData, isLoggedIn, title]);
+
+  // Helper function to get module ID from module object
+  const getModuleId = (module) => {
+    return module.m_id || module.moduleId || module.id;
+  };
+
+  // Check if a module is unlocked
+  const isModuleUnlocked = (moduleIndex, module) => {
+    // First module is always unlocked
+    if (moduleIndex === 0) {
+      return true;
+    }
+
+    if (!Array.isArray(unlockStatus) || unlockStatus.length === 0) {
+      return moduleIndex === 0; // Only first module unlocked by default
+    }
+
+    const moduleId = getModuleId(module);
+    const moduleStatus = unlockStatus.find(status => status.lessonId === moduleId);
+    
+    // If we have status for this module, use it
+    if (moduleStatus) {
+      return moduleStatus.isUnlocked;
+    }
+
+    // If no status found, check if previous module is completed
+    // This handles sequential unlocking
+    if (moduleIndex > 0 && courseData?.modules) {
+      const previousModule = courseData.modules[moduleIndex - 1];
+      const previousModuleId = getModuleId(previousModule);
+      const previousStatus = unlockStatus.find(status => status.lessonId === previousModuleId);
+      
+      // Unlock if previous module is completed
+      return previousStatus ? previousStatus.isCompleted : false;
+    }
+
+    return false;
+  };
+
+  // Check if a module is completed
+  const isModuleCompleted = (module) => {
+    if (!Array.isArray(unlockStatus) || unlockStatus.length === 0) {
+      return false;
+    }
+
+    const moduleId = getModuleId(module);
+    const moduleStatus = unlockStatus.find(status => status.lessonId === moduleId);
+    return moduleStatus ? moduleStatus.isCompleted : false;
+  };
 
 
   // Handle logout
@@ -471,20 +580,46 @@ const CourseDetailPage = () => {
         <div className="course-detail-outline-container">
           <h2>Course outline</h2>
           <div className="course-detail-outline-list">
-            {courseData.modules && courseData.modules.map((mod, index) => (
-              <div key={mod.m_id} className="course-detail-outline-item">
+            {courseData.modules && courseData.modules.map((mod, index) => {
+              const isUnlocked = isModuleUnlocked(index, mod);
+              const isCompleted = isModuleCompleted(mod);
+              const moduleLocked = !isUnlocked;
+              
+              return (
+              <div 
+                key={mod.m_id} 
+                className={`course-detail-outline-item ${moduleLocked ? 'module-locked' : ''} ${isCompleted ? 'module-completed' : ''}`}
+              >
                 <div className="course-detail-outline-header">
-                  <div className="course-detail-outline-number">{String(index + 1).padStart(2, '0')}</div>
+                  <div className="course-detail-outline-number">
+                    {moduleLocked ? (
+                      <Lock className="lock-icon" size={20} />
+                    ) : (
+                      String(index + 1).padStart(2, '0')
+                    )}
+                  </div>
                   <div className="course-detail-outline-content">
-                    <h3 className="course-detail-outline-title">{mod.name}</h3>
+                    <h3 className="course-detail-outline-title">
+                      {mod.name}
+                      {isCompleted && <CheckCircle className="completed-icon" size={18} />}
+                    </h3>
                     <p className="course-detail-outline-description">
                       {getModuleDescription(mod.m_id, mod.name)}
                     </p>
+                    {moduleLocked && (
+                      <p className="module-locked-message">
+                        Complete previous modules to unlock this module
+                      </p>
+                    )}
                   </div>
                   <div className="course-detail-outline-actions">
                     <button 
-                      className="course-detail-btn course-detail-btn-start" 
+                      className={`course-detail-btn course-detail-btn-start ${moduleLocked ? 'btn-locked' : ''}`}
+                      disabled={moduleLocked}
                       onClick={() => {
+                        if (moduleLocked) {
+                          return; // Don't navigate if locked
+                        }
                         // Helper function to normalize strings for comparison
                         const normalizeString = (str) => {
                           if (!str) return '';
@@ -551,12 +686,20 @@ const CourseDetailPage = () => {
                         }
                       }}
                     >
-                      Start Module
+                      {moduleLocked ? (
+                        <>
+                          <Lock size={16} style={{ marginRight: '8px' }} />
+                          Locked
+                        </>
+                      ) : (
+                        'Start Module'
+                      )}
                     </button>
                   </div>
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
          
         </div>

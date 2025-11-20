@@ -1052,7 +1052,10 @@ const renderFormattedContent = (contentArray) => {
               borderRadius: '8px',
               marginTop: '20px',
               border: '1px solid #e0e0e0',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              maxHeight: 'none',
+              overflow: 'visible',
+              height: 'auto'
             }}>
               <h3 style={{ 
                 marginTop: 0,
@@ -1069,7 +1072,11 @@ const renderFormattedContent = (contentArray) => {
                 color: '#34495e',
                 lineHeight: '1.8',
                 whiteSpace: 'pre-wrap',
-                wordWrap: 'break-word'
+                wordWrap: 'break-word',
+                maxHeight: 'none',
+                overflow: 'visible',
+                height: 'auto',
+                display: 'block'
               }}>
                 {dbLesson?.notes || lesson?.notes || (dbCourse?.modules?.find(m => m.m_id === lessonId)?.lessonDetails?.notes)}
               </div>

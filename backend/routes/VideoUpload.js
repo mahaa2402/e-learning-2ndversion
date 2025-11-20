@@ -26,8 +26,14 @@ if (!fs.existsSync(uploadsDir)) {
   console.log('✅ Created uploads directory:', uploadsDir);
 }
 
-// Multer temp storage
-const upload = multer({ dest: uploadsDir });
+// Multer temp storage - NO FILE SIZE LIMIT (supports 1GB+ videos)
+const upload = multer({ 
+  dest: uploadsDir,
+  limits: {
+    fileSize: Infinity, // No limit - allows 1GB+ videos
+    fieldSize: 10 * 1024 * 1024, // 10MB for other fields
+  }
+});
 
 // AWS S3 Config
 const s3 = new AWS.S3({
@@ -36,10 +42,25 @@ const s3 = new AWS.S3({
   region: process.env.AWS_REGION,
 });
 
+// Error handler for multer errors (file size limit removed)
+const handleMulterError = (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    // File size limit errors should not occur since we set fileSize to Infinity
+    // But keep this for other multer errors
+    return res.status(400).json({ 
+      error: "File upload error", 
+      details: err.message,
+      code: err.code
+    });
+  }
+  next(err);
+};
+
 // 🎯 Simple video upload to S3 using course name and module number
 router.post(
   "/upload-video/:courseName/:moduleNumber",
   upload.single("video"),
+  handleMulterError,
   async (req, res) => {
     try {
       console.log('📥 Video upload request received');

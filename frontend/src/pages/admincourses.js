@@ -297,7 +297,7 @@ const handleSave = async () => {
 
     alert("Course and videos saved successfully! 🎉");
     closeModal();
-
+    
   } catch (err) {
     setError(err.message);
   } finally {
@@ -496,9 +496,10 @@ const handleSave = async () => {
     return;
   }
 
-  // Validate file size (500MB limit)
-  if (file.size > 500 * 1024 * 1024) {
-    alert("Video file size must be less than 500MB");
+  // Validate file size (1GB limit)
+  const maxSize = 1024 * 1024 * 1024; // 1GB
+  if (file.size >= maxSize) {
+    alert("Video file size must be less than 1GB");
     return;
   }
 

@@ -241,6 +241,16 @@ const generateCertificate = async (employeeEmail, courseName, employeeName, empl
       };
     }
     
+    // Format date as DD/MM/YYYY
+    const formatDate = (date) => {
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    };
+
+    const completionDate = new Date();
+    
     // Generate new certificate
     const newCertificate = new Certificate({
       employeeName: employeeName || employeeEmail.split('@')[0],
@@ -252,8 +262,8 @@ const generateCertificate = async (employeeEmail, courseName, employeeName, empl
         typeof mod === 'string' ? mod : (mod.m_id || mod.title)
       ),
       totalModules: completionStatus.totalModules,
-      completionDate: new Date(),
-      date: new Date().toLocaleDateString()
+      completionDate: completionDate,
+      date: formatDate(completionDate)
     });
     
     console.log(`💾 Saving certificate to database...`);

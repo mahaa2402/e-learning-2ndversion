@@ -1,11 +1,38 @@
 /* === Layout Fix for Sidebar Gap === */
-.employee-directory-container {
-  padding: 32px;              /* spacing inside main content */
+.employee-directory-container1 {
+  padding: 0 32px 32px 32px;  /* No top padding - content starts from top */
   padding-left: 48px;          /* extra gap from sidebar */
   background-color: #f9fafb;   /* subtle background for contrast */
   min-height: 100vh;
   width: 100%;
   box-sizing: border-box;
+}
+
+/* === Employee Directory Max Width Container === */
+.employee-directory-max-width {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+/* === Employee Directory Header === */
+.employee-directory-header {
+  margin-bottom: 24px;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.employee-directory-title {
+  margin-top :0 !important;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.employee-directory-subtitle {
+  margin: 0;
+  font-size: 1rem;
+  color: #6b7280;
 }
 
 /* === Employee Grid Layout === */

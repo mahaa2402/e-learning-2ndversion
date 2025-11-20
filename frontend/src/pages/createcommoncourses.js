@@ -502,6 +502,9 @@ const CreateCommonCourses = () => {
     console.log('📝 Retake questions count:', normalizedQuiz.retakeQuestions.length);
     
     // Populate currentModule with the module data
+    // Get notes from lessonDetails if available, otherwise from module.notes
+    const moduleNotes = moduleToEdit.lessonDetails?.notes || moduleToEdit.notes || '';
+    
     setCurrentModule({
       m_id: moduleToEdit.m_id || '',
       name: moduleToEdit.name || '',
@@ -509,7 +512,7 @@ const CreateCommonCourses = () => {
       description: moduleToEdit.description || '',
       lessons: moduleToEdit.lessons || 1,
       video: moduleToEdit.video || null,
-      notes: moduleToEdit.notes || '',
+      notes: moduleNotes,
       quiz: normalizedQuiz
     });
     
@@ -657,24 +660,26 @@ const CreateCommonCourses = () => {
       quiz: currentModule.quiz || { questions: [], passingScore: 70 }
     };
 
-    if (updatedModule.video?.url && !updatedModule.lessonDetails) {
+    // Ensure lessonDetails exists and includes notes
+    if (!updatedModule.lessonDetails) {
+      // Create new lessonDetails if it doesn't exist
       updatedModule.lessonDetails = {
         title: updatedModule.name,
-        videoUrl: updatedModule.video.url,
+        videoUrl: updatedModule.video?.url || null,
         content: [],
         duration: `${updatedModule.duration || 0}min`,
         notes: updatedModule.notes || ''
       };
-    } else if (updatedModule.notes && !updatedModule.lessonDetails) {
+    } else {
+      // Update existing lessonDetails, preserving all existing properties
       updatedModule.lessonDetails = {
-        title: updatedModule.name,
-        videoUrl: null,
-        content: [],
-        duration: `${updatedModule.duration || 0}min`,
-        notes: updatedModule.notes
+        ...updatedModule.lessonDetails,
+        title: updatedModule.lessonDetails.title || updatedModule.name,
+        videoUrl: updatedModule.video?.url || updatedModule.lessonDetails.videoUrl || null,
+        content: updatedModule.lessonDetails.content || [],
+        duration: updatedModule.lessonDetails.duration || `${updatedModule.duration || 0}min`,
+        notes: updatedModule.notes || updatedModule.lessonDetails.notes || ''
       };
-    } else if (updatedModule.lessonDetails) {
-      updatedModule.lessonDetails.notes = updatedModule.notes || '';
     }
 
     const updatedModules = [...formData.modules];
@@ -744,9 +749,11 @@ const CreateCommonCourses = () => {
       return;
     }
 
-    // Check file size (max 500MB)
-    if (file.size > 500 * 1024 * 1024) {
-      setError("Video file size must be less than 500MB");
+    // Check file size (max 1GB)
+    const maxSize = 1024 * 1024 * 1024; // 1GB
+    
+    if (file.size >= maxSize) {
+      setError("Video file size must be less than 1GB");
       return;
     }
 
@@ -1476,10 +1483,14 @@ const CreateCommonCourses = () => {
           if (module.lessonDetails && module.lessonDetails.videoUrl) {
             moduleData.lessonDetails = {
               ...module.lessonDetails,
+              title: module.lessonDetails.title || module.name,
               videoUrl: module.lessonDetails.videoUrl,
-              notes: module.lessonDetails.notes || module.notes || ''
+              content: module.lessonDetails.content || [],
+              duration: module.lessonDetails.duration || `${module.duration || 0}min`,
+              notes: module.notes || module.lessonDetails.notes || ''
             };
             console.log(`✅ Module "${module.name}" has lessonDetails with video URL: ${module.lessonDetails.videoUrl}`);
+            console.log(`📝 Module "${module.name}" notes:`, moduleData.lessonDetails.notes);
           } else if (videoUrl) {
             moduleData.lessonDetails = {
               title: module.name,
@@ -1491,13 +1502,16 @@ const CreateCommonCourses = () => {
             console.log(`✅ Module "${module.name}" has video URL: ${videoUrl}`);
           } else {
             console.log(`⚠️ Module "${module.name}" has no video URL`);
-            // Even if no video, include lessonDetails structure if it exists to preserve other data
+            // Even if no video, include lessonDetails structure if it exists or if notes exist
             if (module.lessonDetails || module.notes) {
               moduleData.lessonDetails = {
-                ...module.lessonDetails,
+                title: module.lessonDetails?.title || module.name,
                 videoUrl: null, // Explicitly set to null
-                notes: module.lessonDetails?.notes || module.notes || ''
+                content: module.lessonDetails?.content || [],
+                duration: module.lessonDetails?.duration || `${module.duration || 0}min`,
+                notes: module.notes || module.lessonDetails?.notes || ''
               };
+              console.log(`📝 Module "${module.name}" lessonDetails (no video) notes:`, moduleData.lessonDetails.notes);
             }
           }
           

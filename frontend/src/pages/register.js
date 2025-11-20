@@ -320,7 +320,7 @@ function Register() {
           <button 
             type="button" 
             onClick={() => navigate('/login')}
-            style={{ background: 'none', border: 'none', color: '#007bff', textDecoration: 'underline', cursor: 'pointer' }}
+            className="auth-link-button"
           >
             Login here
           </button>

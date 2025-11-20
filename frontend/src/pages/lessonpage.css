@@ -337,13 +337,13 @@
 
 .lesson-container {
   display: flex;
-  padding: 1rem 2rem 1rem 2rem;
+  padding: 1rem 2rem;
   gap: 2rem;
   background: #f9f9f9;
   width: 100%;
   box-sizing: border-box;
   margin-left: 40;
-  padding-right: 440px; /* Add padding to account for fixed sidebar (400px width + 20px gap + 20px slight gap) */
+  /* Removed padding-right since sidebar is no longer fixed */
 }
 
 .lesson-content {
@@ -499,21 +499,16 @@
 }
 
 .lesson-sidebar {
-  position: fixed;
-  right: 20px; /* Gap from right edge */
-  top: 150px; /* Position just below the whole navbar */
-  bottom: 20px; /* Gap from bottom edge */
+  position: relative;
   width: 400px;
   max-width: 400px;
   min-width: 350px;
   display: flex;
   flex-direction: column;
-  gap: 1rem; /* Reduced gap to prevent congestion */
-  overflow-y: auto;
-  overflow-x: hidden;
-  z-index: 50;
-  margin-left: auto;
-  padding-right: 5px; /* Space for scrollbar */
+  gap: 1rem;
+  overflow: visible; /* No separate scrollbar - scrolls with main content */
+  flex-shrink: 0; /* Prevent sidebar from shrinking */
+  align-self: flex-start; /* Align to top */
 }
 
 /* Custom scrollbar for sidebar */
@@ -924,4 +919,24 @@
   .video-container {
     max-width: 100%;
   }
+}
+
+/* Video Notes Section - Display fully without restrictions */
+.lesson-notes {
+  max-height: none !important;
+  overflow: visible !important;
+  height: auto !important;
+  display: block !important;
+}
+
+.lesson-notes > div {
+  max-height: none !important;
+  overflow: visible !important;
+  height: auto !important;
+  display: block !important;
+  -webkit-line-clamp: none !important;
+  line-clamp: none !important;
+  text-overflow: clip !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
 }

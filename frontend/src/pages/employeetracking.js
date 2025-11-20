@@ -177,7 +177,7 @@ const EmployeeDirectory = () => {
       <Sidebar />
 
       {/* Main content */}
-      <div className="flex-1 overflow-auto employee-directory-container">
+      <div className="flex-1 overflow-auto employee-directory-container1">
         <div className="employee-directory-max-width">
           {/* Loading */}
           {loading && (

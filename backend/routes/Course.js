@@ -224,17 +224,32 @@ router.put('/update/:courseId', async (req, res, next) => {
           title: module.lessonDetails.title || module.name,
           videoUrl: module.lessonDetails.videoUrl || null,
           content: module.lessonDetails.content || [],
-          duration: module.lessonDetails.duration || `${module.duration || 0}min`
+          duration: module.lessonDetails.duration || `${module.duration || 0}min`,
+          notes: module.lessonDetails.notes || module.notes || ''
         };
         console.log(`📋 Module ${module.m_id} lessonDetails:`, moduleData.lessonDetails);
       } else if (existingModule && existingModule.lessonDetails) {
         // Preserve existing lessonDetails if new module doesn't have it
         console.log(`📋 Preserving existing lessonDetails for module ${module.m_id}`);
-        moduleData.lessonDetails = existingModule.lessonDetails;
+        moduleData.lessonDetails = { ...existingModule.lessonDetails };
+        // Update notes if provided directly on module
+        if (module.notes !== undefined) {
+          moduleData.lessonDetails.notes = module.notes;
+        }
         // Log if videoUrl is missing
         if (!moduleData.lessonDetails.videoUrl) {
           console.warn(`⚠️ Module ${module.m_id} has lessonDetails but no videoUrl - video may not display`);
         }
+      } else if (module.notes) {
+        // If notes are provided but no lessonDetails, create lessonDetails with notes
+        moduleData.lessonDetails = {
+          title: module.name,
+          videoUrl: null,
+          content: [],
+          duration: `${module.duration || 0}min`,
+          notes: module.notes
+        };
+        console.log(`📋 Created lessonDetails for module ${module.m_id} with notes`);
       } else {
         // If no lessonDetails at all, check if we should create empty structure
         // This ensures the structure exists for future video uploads

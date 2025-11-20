@@ -136,6 +136,12 @@
   margin-bottom: 20px;
   font-size: 0.95rem;
   text-align: justify;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 4.8em; /* 3 lines * 1.6 line-height */
 }
 
 .course-btn {
