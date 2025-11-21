@@ -704,7 +704,7 @@ const courseData = {
     lessons: {
       "FACT01": {
         title: "Introduction to Factory Act",
-        videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/Module_2+Course_1.mp4",
+        videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/fact_mod1.mp4",
         content: [
           "Overview of the Factories Act:",
           "",
@@ -789,7 +789,7 @@ const courseData = {
       },
      "FACT02": {
   title: "Legal Compliance & Inspections",
-  videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/Module_2+Course_1.mp4",
+  videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/fact_mod2.mp4",
   content: [
     "Role of Factory Inspectors and Frequency of Inspections: Inspectors act as regulatory authorities ensuring compliance with the Factories Act and related laws. Their role covers examining working conditions, machinery safety, employee welfare, and environmental safeguards. Inspections may be routine (scheduled), surprise (without prior notice), or complaint-driven. High-risk industries such as chemical, heavy engineering, and mining units face stricter and more frequent inspections.",
     
@@ -807,7 +807,7 @@ const courseData = {
 ,
      "FACT03": {
   title: "Employee Rights & Grievance Redressal",
-  videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/Module_2+Course_2.mp4",
+  videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/fact_mod3.mp4",
   content: [
     "Fundamental Employee Rights: Every worker has the right to fair wages, safe working conditions, reasonable working hours, and weekly rest days. Additional rights include paid leave, overtime wages, and access to health and welfare facilities such as first aid, clean drinking water, and sanitation.",
     
@@ -834,7 +834,7 @@ const courseData = {
     lessons: {
       "WELD01": {
         title: "Basics of Industrial Work Skills",
-        videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/Module_2+Course_1.mp4",
+        videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/weilding_mod1.mp4",
         content: [
           "Introduction to Industrial Work Environment:",
           ,
@@ -870,7 +870,7 @@ const courseData = {
       },
       "WELD02": {
         title: "Welding & Safety Guidelines",
-        videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/Module_2+Course_1.mp4",
+        videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/weilding_mod2.mp4",
         content: [
            "Welding Process Overview:",
           "",
@@ -914,7 +914,7 @@ const courseData = {
       },
       "WELD03": {
         title: "CNC Operations Overview",
-        videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/Module_2+Course_1.mp4",
+        videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/weilding_mod3.mp4",
         content: [
           "Advanced Welding Joint Design:",
           "",

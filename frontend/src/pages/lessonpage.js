@@ -724,12 +724,55 @@ useEffect(() => {
     return moduleMapping[upperKey] || lessonKey;
   };
 
+  // Helper function to get all possible module ID formats for matching
+  // This handles the mismatch between FACT01/FACTORY01 and WELD01/WELDING01
+  const getModuleIdVariants = (lessonKey) => {
+    if (!lessonKey) return [lessonKey];
+    
+    const variants = [lessonKey];
+    const moduleId = getModuleIdFromLessonKey(lessonKey);
+    if (moduleId !== lessonKey) {
+      variants.push(moduleId);
+    }
+    
+    // For Factory Act, add both FACT01 and FACTORY01 formats
+    if (lessonKey.startsWith('FACT') && !lessonKey.startsWith('FACTORY')) {
+      const longFormat = lessonKey.replace(/^FACT/, 'FACTORY');
+      if (!variants.includes(longFormat)) {
+        variants.push(longFormat);
+      }
+    } else if (lessonKey.startsWith('FACTORY')) {
+      const shortFormat = lessonKey.replace(/^FACTORY/, 'FACT');
+      if (!variants.includes(shortFormat)) {
+        variants.push(shortFormat);
+      }
+    }
+    
+    // For Welding, add both WELD01 and WELDING01 formats
+    if (lessonKey.startsWith('WELD') && !lessonKey.startsWith('WELDING')) {
+      const longFormat = lessonKey.replace(/^WELD/, 'WELDING');
+      if (!variants.includes(longFormat)) {
+        variants.push(longFormat);
+      }
+    } else if (lessonKey.startsWith('WELDING')) {
+      const shortFormat = lessonKey.replace(/^WELDING/, 'WELD');
+      if (!variants.includes(shortFormat)) {
+        variants.push(shortFormat);
+      }
+    }
+    
+    const uniqueVariants = [...new Set(variants)];
+    console.log(`🔑 Module ID variants for ${lessonKey}:`, uniqueVariants);
+    return uniqueVariants;
+  };
+
   const isLessonUnlocked = (lessonKey) => {
     if (!Array.isArray(unlockStatus) || unlockStatus.length === 0) {
       return lessonKeys.indexOf(lessonKey) === 0; // default: first lesson unlocked
     }
-    const moduleId = getModuleIdFromLessonKey(lessonKey);
-    const lessonStatus = unlockStatus.find(status => status.lessonId === moduleId);
+    // Check all possible module ID formats to handle FACT01/FACTORY01 mismatch
+    const moduleIdVariants = getModuleIdVariants(lessonKey);
+    const lessonStatus = unlockStatus.find(status => moduleIdVariants.includes(status.lessonId));
     return lessonStatus ? lessonStatus.isUnlocked : false;
   };
 
@@ -738,19 +781,19 @@ useEffect(() => {
     if (!Array.isArray(unlockStatus) || unlockStatus.length === 0) {
       return lessonKeys.indexOf(lessonKey) === 0; // default: first quiz available
     }
-    const moduleId = getModuleIdFromLessonKey(lessonKey);
-    console.log('module id is ', moduleId)
-
-
-    const lessonStatus = unlockStatus.find(status => status.lessonId === moduleId);
+    // Check all possible module ID formats to handle FACT01/FACTORY01 mismatch
+    const moduleIdVariants = getModuleIdVariants(lessonKey);
+    console.log('module id variants are ', moduleIdVariants)
+    const lessonStatus = unlockStatus.find(status => moduleIdVariants.includes(status.lessonId));
     console.log("lesson status is ", lessonStatus)
     return lessonStatus ? lessonStatus.canTakeQuiz : false;
   };
 
   const isLessonCompleted = (lessonKey) => {
     if (!Array.isArray(unlockStatus)) return false;
-    const moduleId = getModuleIdFromLessonKey(lessonKey);
-    const lessonStatus = unlockStatus.find(status => status.lessonId === moduleId);
+    // Check all possible module ID formats to handle FACT01/FACTORY01 mismatch
+    const moduleIdVariants = getModuleIdVariants(lessonKey);
+    const lessonStatus = unlockStatus.find(status => moduleIdVariants.includes(status.lessonId));
     return lessonStatus ? lessonStatus.isCompleted : false;
   };
 
