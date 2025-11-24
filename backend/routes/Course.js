@@ -737,31 +737,47 @@ router.post('/update-quiz-timestamp', async (req, res) => {
 // GET /api/courses/course-access - Validate secure token and redirect to course
 router.get('/course-access', async (req, res) => {
   try {
-    const { token } = req.query;
+    let { token } = req.query;
+    
+    console.log('🔍 Course access request received');
+    console.log('📋 Raw token from query:', token ? token.substring(0, 50) + '...' : 'Missing');
     
     if (!token) {
+      console.log('❌ No token provided');
       return res.status(400).json({ 
         error: 'Token required', 
         message: 'Please provide a valid access token' 
       });
     }
     
+    // Decode URL-encoded token (in case it's double-encoded)
+    try {
+      token = decodeURIComponent(token);
+    } catch (e) {
+      // Token might already be decoded, continue
+      console.log('⚠️ Token decode attempt:', e.message);
+    }
+    
+    console.log('📋 Decoded token:', token ? token.substring(0, 50) + '...' : 'Still missing');
+    
     const { verifySecureToken } = require('../utils/secureLinkGenerator');
     const tokenData = verifySecureToken(token);
     
     if (!tokenData) {
+      console.log('❌ Token validation failed');
+      // Check backend logs for specific reason (expired, invalid signature, etc.)
       return res.status(400).json({ 
         error: 'Invalid or expired token', 
-        message: 'This link is invalid or has expired. Please contact your administrator for a new link.' 
+        message: 'This link is invalid or has expired. Please contact your administrator for a new link.',
+        details: 'Check backend logs for specific validation error'
       });
     }
     
     const { email, course, deadline } = tokenData;
     console.log(`✅ Valid token for ${email} - Course: ${course}`);
+    console.log(`📅 Deadline: ${new Date(deadline).toLocaleString()}`);
     
     // Token is valid - frontend will redirect to dashboard
-    // We don't need to find the course or generate redirect URL anymore
-    // Just validate and return success
     res.json({
       success: true,
       courseName: course,
@@ -771,6 +787,7 @@ router.get('/course-access', async (req, res) => {
     
   } catch (error) {
     console.error('❌ Error in course-access endpoint:', error);
+    console.error('❌ Error stack:', error.stack);
     res.status(500).json({ 
       error: 'Failed to process course access', 
       message: error.message 

@@ -19,13 +19,26 @@ const CourseAccess = () => {
       }
 
       try {
+        // Token is already URL-encoded from the URL, don't encode again
+        // But use encodeURIComponent to be safe (it won't double-encode if already encoded)
+        const apiUrl = `${API_ENDPOINTS.COURSES.GET_COURSE}/course-access?token=${encodeURIComponent(token)}`;
+        console.log('🔍 Calling API:', apiUrl.substring(0, 100) + '...');
+        
         // Call backend API to validate token and get redirect URL
-        const response = await fetch(`${API_ENDPOINTS.COURSES.GET_COURSE}/course-access?token=${encodeURIComponent(token)}`, {
+        const response = await fetch(apiUrl, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
         });
+        
+        console.log('📋 Response status:', response.status);
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('❌ API Error:', errorData);
+          throw new Error(errorData.message || `HTTP ${response.status}`);
+        }
 
         const data = await response.json();
 
