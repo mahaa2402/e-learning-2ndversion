@@ -43,17 +43,11 @@ const CourseAccess = () => {
         const data = await response.json();
 
         if (response.ok && data.success) {
+          // Redirect to user dashboard where assigned courses are listed
+          // Include the validated employee email so frontend can pre-filter
+          // or auto-open the correct user's dashboard view.
           const email = data.employeeEmail || '';
           const dashboardUrl = email ? `/userdashboard?email=${encodeURIComponent(email)}` : '/userdashboard';
-
-          const authToken = localStorage.getItem('token');
-          if (!authToken) {
-            sessionStorage.setItem('redirectAfterLogin', dashboardUrl);
-            sessionStorage.setItem('flashMessage', 'Please login to view your assigned courses.');
-            navigate('/login');
-            return;
-          }
-
           navigate(dashboardUrl);
         } else {
           setError(data.message || 'Invalid or expired access link');

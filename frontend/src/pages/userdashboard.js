@@ -181,6 +181,20 @@ const fetchAdminProfile = async () => {
   }
 };
 
+  const markAssignedCourseFlow = (identifier) => {
+    try {
+      if (!identifier) return;
+      const stored = JSON.parse(sessionStorage.getItem('assignedCourses') || '[]');
+      if (!stored.includes(identifier)) {
+        stored.push(identifier);
+        sessionStorage.setItem('assignedCourses', JSON.stringify(stored));
+      }
+    } catch (error) {
+      console.warn('Failed to mark assigned course flow:', error);
+      sessionStorage.setItem('assignedCourses', JSON.stringify([identifier]));
+    }
+  };
+
   const fetchCertificates = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -539,12 +553,15 @@ const fetchAdminProfile = async () => {
                                         // Get the first module/lesson ID
                                         if (course.modules && course.modules.length > 0) {
                                           const firstModuleId = course.modules[0].m_id || course.modules[0]._id || '1';
+                                          markAssignedCourseFlow(courseId || task.taskTitle);
                                           navigate(`/course/${courseId}/lesson/${firstModuleId}`);
                                         } else if (course.lessons && Object.keys(course.lessons).length > 0) {
                                           const firstLessonId = Object.keys(course.lessons)[0];
+                                          markAssignedCourseFlow(courseId || task.taskTitle);
                                           navigate(`/course/${courseId}/lesson/${firstLessonId}`);
                                         } else {
                                           // Fallback: navigate to course detail page
+                                          markAssignedCourseFlow(courseId || task.taskTitle);
                                           navigate(`/course/${courseId}`);
                                         }
                                       } else {

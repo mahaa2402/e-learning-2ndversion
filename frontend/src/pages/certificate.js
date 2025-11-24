@@ -46,33 +46,42 @@ const CertificatePage = () => {
   const getEmployeeData = () => {
     let employeeName = "Employee Name";
     let employeeId = "Unknown ID";
-    
-    // Check if admin is viewing an employee's certificate
-    const viewingEmployeeName = localStorage.getItem('viewingEmployeeName');
-    const viewingEmployeeId = localStorage.getItem('viewingEmployeeId');
-    
-    if (viewingEmployeeName) {
-      employeeName = viewingEmployeeName;
-    }
-    if (viewingEmployeeId) {
-      employeeId = viewingEmployeeId;
-    }
-    
-    // Try to get from user session if not viewing as admin
-    if (!viewingEmployeeName) {
-      const userSession = localStorage.getItem('userSession');
-      if (userSession) {
-        try {
-          const user = JSON.parse(userSession);
-          employeeName = user.name || user.email?.split('@')[0] || "Employee Name";
-          employeeId = user._id || user.id || "Unknown ID";
-        } catch (e) {
-          console.error('Error parsing user session:', e);
+
+    // Determine current user role from session (if available)
+    let isAdmin = false;
+    const userSessionRaw = localStorage.getItem('userSession');
+    if (userSessionRaw) {
+      try {
+        const user = JSON.parse(userSessionRaw);
+        isAdmin = user.role === 'admin';
+        // If not admin, prefer the logged-in user's info
+        if (!isAdmin) {
+          employeeName = user.name || user.email?.split('@')[0] || employeeName;
+          employeeId = user._id || user.id || employeeId;
         }
+      } catch (e) {
+        console.error('Error parsing user session:', e);
       }
     }
-    
-    // Fallback to individual localStorage items
+
+    // Only use viewingEmployee* keys when the current user is an admin
+    const viewingEmployeeName = localStorage.getItem('viewingEmployeeName');
+    const viewingEmployeeId = localStorage.getItem('viewingEmployeeId');
+    if (isAdmin && viewingEmployeeName) {
+      employeeName = viewingEmployeeName;
+    }
+    if (isAdmin && viewingEmployeeId) {
+      employeeId = viewingEmployeeId;
+    }
+
+    // If not admin, remove any stale viewingEmployee keys to avoid showing previous admin's selection
+    if (!isAdmin) {
+      localStorage.removeItem('viewingEmployeeName');
+      localStorage.removeItem('viewingEmployeeId');
+      localStorage.removeItem('viewingEmployeeEmail');
+    }
+
+    // Fallback to individual localStorage items if still missing
     if (employeeName === "Employee Name") {
       employeeName = localStorage.getItem('employeeName') || "Employee Name";
     }

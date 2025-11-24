@@ -3,7 +3,8 @@ const AssignedCourseUserProgress = require('./models/AssignedCourseUserProgress'
 const Employee = require('./models/Employee');
 const Admin = require('./models/Admin');
 const { generateCertificate } = require('./controllers/CertificateController');
-const Course = require('./models/Course');
+const { sendCourseCompletionEmail } = require('./services/emailService');
+const CommonCourse = require('./models/common_courses');
 require('dotenv').config();
 
 // ============================================================================
@@ -183,17 +184,22 @@ async function checkAndGenerateCertificate(employeeEmail, courseName, progress) 
     });
     
     // Get the course details to know total modules
-    const course = await Course.findOne({ name: courseName });
+    let course = await CommonCourse.findOne({ title: courseName });
     
     if (!course) {
-      console.log(`⚠️ Course "${courseName}" not found in admin courses`);
+      // Try alternative naming (some records may store `name` instead of `title`)
+      course = await CommonCourse.findOne({ name: courseName });
+    }
+    
+    if (!course) {
+      console.log(`⚠️ Course "${courseName}" not found in common courses`);
       return;
     }
     
-    console.log(`📚 Course found:`, {
-      name: course.name,
+    console.log(`📚 Course found in common courses:`, {
+      name: course.title || course.name,
       modulesCount: course.modules.length,
-      moduleTitles: course.modules.map(m => m.title)
+      moduleTitles: course.modules.map(m => m.title || m.name)
     });
     
     const totalModules = course.modules.length;
@@ -242,9 +248,6 @@ async function checkAndGenerateCertificate(employeeEmail, courseName, progress) 
           
           // Send email notification to admin who assigned the course
           try {
-            const { sendCourseCompletionEmail } = require('../services/emailService');
-            const Admin = require('../models/Admin');
-            
             // Get admin details
             const admin = await Admin.findById(courseAssignment.assignedBy.adminId);
             if (admin && admin.email) {

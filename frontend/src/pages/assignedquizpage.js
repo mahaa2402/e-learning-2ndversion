@@ -377,6 +377,15 @@ const AssignedQuizPage = () => {
     }
   };
 
+  // Precompute module/position flags to avoid complex inline JSX expressions
+  const currentModuleIndex = courseDetails?.modules?.findIndex(
+    module => module.title === selectedModule?.title
+  ) ?? -1;
+
+  const isLastModule = currentModuleIndex !== -1 && currentModuleIndex === ((courseDetails?.modules?.length || 0) - 1);
+
+  const isFinalModulePassed = isAllAnswersCorrect() && isLastModule;
+
   if (loading) {
     return (
       <div className="aqp-assigned-quiz-page">
@@ -607,15 +616,17 @@ const AssignedQuizPage = () => {
                     Retry Quiz
                   </button>
                 )}
-                <button 
-                  className="aqp-btn aqp-btn-back-to-module"
-                  onClick={handleBackToModule}
-                >
-                  {isAllAnswersCorrect() ? 
-                    (getNextModule() ? 'Continue to Next Module' : 'Back to Task') : 
-                    'Back to Task'
-                  }
-                </button>
+                {!isFinalModulePassed && (
+                  <button 
+                    className="aqp-btn aqp-btn-back-to-module"
+                    onClick={handleBackToModule}
+                  >
+                    {isAllAnswersCorrect() ? 
+                      (getNextModule() ? 'Continue to Next Module' : 'Back to Task') : 
+                      'Back to Task'
+                    }
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -664,12 +675,7 @@ const AssignedQuizPage = () => {
 
             <div className="aqp-options-container">
               {currentQuestion?.options?.map((option, optionIndex) => (
-                <label 
-                  key={optionIndex} 
-                  className={`aqp-option-label ${
-                    quizAnswers[currentQuestionIndex] === option ? 'aqp-selected' : ''
-                  }`}
-                >
+                <label key={optionIndex} className="aqp-option-label">
                   <input
                     type="radio"
                     name={`question-${currentQuestionIndex}`}

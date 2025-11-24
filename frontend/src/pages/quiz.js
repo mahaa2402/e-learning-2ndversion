@@ -160,6 +160,34 @@ const Quiz = () => {
     return 'ISP';
   };
 
+  const getAssignedCourseFlags = () => {
+    try {
+      const stored = JSON.parse(sessionStorage.getItem('assignedCourses') || '[]');
+      return Array.isArray(stored) ? stored : [];
+    } catch (error) {
+      console.warn('Failed to parse assigned course flags:', error);
+      return [];
+    }
+  };
+
+  const isAssignedCourseFlow = () => {
+    const flags = getAssignedCourseFlags();
+    const name = getCourseName();
+    return flags.includes(courseId) || (name && flags.includes(name));
+  };
+
+  const clearAssignedCourseFlag = () => {
+    try {
+      const flags = getAssignedCourseFlags();
+      const name = getCourseName();
+      const identifiersToRemove = [courseId, name].filter(Boolean);
+      const updated = flags.filter(flag => !identifiersToRemove.includes(flag));
+      sessionStorage.setItem('assignedCourses', JSON.stringify(updated));
+    } catch (error) {
+      console.warn('Failed to clear assigned course flag:', error);
+    }
+  };
+
   // Map lesson keys to module IDs for backend compatibility
   // For newly created common courses, mo_id is already the m_id, so return as-is
   // For static courses, use the mapping
@@ -1569,8 +1597,9 @@ const Quiz = () => {
                   };
                   
                   const nextCourse = getNextCourse();
+                  const assignedFlow = isAssignedCourseFlow();
                   
-                  if (nextCourse) {
+                  if (!assignedFlow && nextCourse) {
                     // There's a next course - show "Next Course" button
                     const nextCourseId = nextCourse.isStatic ? nextCourse.title : nextCourse._id;
                     
@@ -1642,10 +1671,13 @@ const Quiz = () => {
                     return (
                       <div className="certificate-section">
                         <div className="completion-message">
-                          Congratulations! You have completed the entire {getCourseName()} course!
+                          {assignedFlow
+                            ? `Great work! You finished the assigned course "${getCourseName()}".`
+                            : `Congratulations! You have completed the entire ${getCourseName()} course!`}
                         </div>
                         <button
                           onClick={() => {
+                            clearAssignedCourseFlag();
                             // Store courseId and lessonId for back navigation
                             localStorage.setItem('certificateCourseId', courseId);
                             localStorage.setItem('certificateLessonId', mo_id);

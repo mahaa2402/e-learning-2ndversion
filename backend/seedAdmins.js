@@ -10,7 +10,8 @@ mongoose.connect(mongoUri).then(async () => {
 
   const admins = [
     { name: 'admin1', email: 'admin1@gmail.com', password: await bcrypt.hash('admin1', 10) },
-    { name: 'admin2', email: 'admin2@gmail.com', password: await bcrypt.hash('admin2', 10) }
+    { name: 'admin2', email: 'admin2@gmail.com', password: await bcrypt.hash('admin2', 10) },
+    { name: 'mahaa', email: 'mahaashrichandran@gmail.com', password: await bcrypt.hash('mahaa123', 10) },
   ];
 
   await Admin.insertMany(admins);
