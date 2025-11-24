@@ -734,6 +734,50 @@ router.post('/update-quiz-timestamp', async (req, res) => {
 
 // GET /api/courses/:courseId - Get full course data with all modules
 // NOTE: This route MUST be last because it's a catch-all parameterized route
+// GET /api/courses/course-access - Validate secure token and redirect to course
+router.get('/course-access', async (req, res) => {
+  try {
+    const { token } = req.query;
+    
+    if (!token) {
+      return res.status(400).json({ 
+        error: 'Token required', 
+        message: 'Please provide a valid access token' 
+      });
+    }
+    
+    const { verifySecureToken } = require('../utils/secureLinkGenerator');
+    const tokenData = verifySecureToken(token);
+    
+    if (!tokenData) {
+      return res.status(400).json({ 
+        error: 'Invalid or expired token', 
+        message: 'This link is invalid or has expired. Please contact your administrator for a new link.' 
+      });
+    }
+    
+    const { email, course, deadline } = tokenData;
+    console.log(`✅ Valid token for ${email} - Course: ${course}`);
+    
+    // Token is valid - frontend will redirect to dashboard
+    // We don't need to find the course or generate redirect URL anymore
+    // Just validate and return success
+    res.json({
+      success: true,
+      courseName: course,
+      employeeEmail: email,
+      message: 'Token validated successfully'
+    });
+    
+  } catch (error) {
+    console.error('❌ Error in course-access endpoint:', error);
+    res.status(500).json({ 
+      error: 'Failed to process course access', 
+      message: error.message 
+    });
+  }
+});
+
 router.get('/:courseId', async (req, res) => {
   try {
     const { courseId } = req.params;

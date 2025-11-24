@@ -239,6 +239,38 @@ async function checkAndGenerateCertificate(employeeEmail, courseName, progress) 
           courseAssignment.status = 'completed';
           await progress.save();
           console.log(`✅ Course assignment status updated to completed`);
+          
+          // Send email notification to admin who assigned the course
+          try {
+            const { sendCourseCompletionEmail } = require('../services/emailService');
+            const Admin = require('../models/Admin');
+            
+            // Get admin details
+            const admin = await Admin.findById(courseAssignment.assignedBy.adminId);
+            if (admin && admin.email) {
+              console.log(`📧 Sending course completion email to admin: ${admin.email}`);
+              
+              const emailSent = await sendCourseCompletionEmail(
+                admin.email,
+                admin.name || courseAssignment.assignedBy.adminName,
+                employee.name,
+                employeeEmail,
+                courseName,
+                new Date()
+              );
+              
+              if (emailSent) {
+                console.log(`✅ Course completion email sent to admin: ${admin.email}`);
+              } else {
+                console.log(`⚠️ Failed to send completion email to admin, but course completion was recorded`);
+              }
+            } else {
+              console.log(`⚠️ Admin not found or no email for admin ID: ${courseAssignment.assignedBy.adminId}`);
+            }
+          } catch (emailError) {
+            console.error('❌ Error sending course completion email to admin:', emailError);
+            // Don't fail the process if email fails
+          }
         }
       } else {
         console.log(`⚠️ Failed to generate certificate: ${certificateResult.message}`);

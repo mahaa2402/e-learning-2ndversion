@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 
@@ -30,6 +30,7 @@ import CertificateDetails from '../pages/certificatedetail';
 import CreateCommonCourses from '../pages/createcommoncourses';
 
 import LessonPage from "../pages/lessonpage";
+import CourseAccess from "../pages/CourseAccess";
 
 
 
@@ -37,6 +38,26 @@ import LessonPage from "../pages/lessonpage";
 
 
 function AppRoutes() {
+  // Small URL sanitizer: some email clients or link generators may append
+  // an extra quote (`"`) or `%22` at the end of the href. When that
+  // happens React Router may not match the expected route (e.g. 
+  // `/course-access?token=..."`). We detect that and replace the URL
+  // with a cleaned version before the router mounts.
+  useEffect(() => {
+    try {
+      const href = window.location.href;
+      // If URL contains an unencoded double quote or %22 at the end
+      if (href.includes('"') || href.endsWith('%22')) {
+        const cleaned = href.replace(/\"/g, '').replace(/%22/g, '');
+        // Replace current history entry so back button behaves normally
+        window.history.replaceState(null, '', cleaned);
+        console.log('🔧 Cleaned stray quote from URL, new URL:', cleaned);
+      }
+    } catch (err) {
+      console.warn('⚠️ URL sanitizer failed:', err);
+    }
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>
@@ -44,6 +65,8 @@ function AppRoutes() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        {/* Course access route - placed early to ensure it's matched before other routes */}
+        <Route path="/course-access" element={<CourseAccess />} />
         <Route path="/admindashboard" element={<AdminDashboard />} />
         <Route path="/admincourses" element={<AdminCourses />} />
         <Route path="/createcommoncourses" element={<CreateCommonCourses />} />
@@ -65,7 +88,6 @@ function AppRoutes() {
      
          <Route path="/course/:courseId/module/:moduleId" element={<TaskModulePage />} />
         <Route path="/assignedquizpage" element={<AssignedQuizPage />} />
-
         <Route path="/certificatedetail/:id" element={<CertificateDetails />} />
          <Route path="/course/:courseId/lesson/:lessonId" element={<LessonPage />} />
         {/* Add more routes as needed */}

@@ -9,6 +9,8 @@ const {
   getEmployeeAssignedCourseProgress: getEmployeeAssignedCourseProgressManager, 
   getAllEmployeesAssignedCourseProgress: getAllEmployeesAssignedCourseProgressManager 
 } = require('../assignedCourseUserProgressManager');
+const { sendTaskAssignmentEmail } = require('../services/emailService');
+const { generateCourseLink } = require('../utils/secureLinkGenerator');
 const mongoose = require('mongoose');
 
 const getEmployees = async (req, res) => {
@@ -246,6 +248,54 @@ const createAssignedTask = async (req, res) => {
       console.error('❌ Error creating assigned course progress entries:', courseError);
       // Don't fail the entire request if course progress creation fails
       console.log('⚠️ Task assignment succeeded, but course progress creation failed');
+    }
+    
+    // ============================================================================
+    // SEND EMAIL NOTIFICATIONS TO ASSIGNED EMPLOYEES
+    // ============================================================================
+    console.log('=== SENDING EMAIL NOTIFICATIONS ===');
+    
+    try {
+      // Get base URL for link generation
+      const baseUrl = req.protocol + '://' + req.get('host');
+      
+      for (const employee of employees) {
+        console.log(`📧 Sending task assignment email to: ${employee.name} (${employee.email})`);
+        
+        // Generate secure course link
+        let courseLink = null;
+        try {
+          courseLink = generateCourseLink(employee.email, taskTitle, deadlineDate, baseUrl);
+          console.log(`🔗 Generated secure course link for ${employee.email}`);
+        } catch (linkError) {
+          console.error('❌ Error generating course link:', linkError);
+          // Continue without link if generation fails
+        }
+        
+        const emailSent = await sendTaskAssignmentEmail(
+          employee.email,
+          employee.name,
+          taskTitle,
+          description,
+          deadlineDate,
+          admin.name,
+          priority || 'medium',
+          courseLink
+        );
+        
+        if (emailSent) {
+          console.log(`✅ Task assignment email sent to ${employee.email}`);
+        } else {
+          console.log(`⚠️ Failed to send email to ${employee.email}, but task assignment succeeded`);
+        }
+      }
+      
+      console.log('✅ Email notification process completed');
+      
+    } catch (emailError) {
+      console.error('❌ Error sending task assignment emails:', emailError);
+      // Don't fail the entire request if email sending fails
+      console.log('⚠️ Task assignment succeeded, but email notifications failed');
     }
     
     res.status(201).json({ 
@@ -746,6 +796,48 @@ const assignTaskByEmail = async (req, res) => {
       console.error('❌ Error creating assigned course progress entry:', courseError);
       // Don't fail the entire request if course progress creation fails
       console.log('⚠️ Task assignment succeeded, but course progress creation failed');
+    }
+    
+    // ============================================================================
+    // SEND EMAIL NOTIFICATION TO ASSIGNED EMPLOYEE
+    // ============================================================================
+    console.log('=== SENDING EMAIL NOTIFICATION ===');
+    
+    try {
+      console.log(`📧 Sending task assignment email to: ${employee.name} (${employee.email})`);
+      
+      // Generate secure course link
+      const baseUrl = req.protocol + '://' + req.get('host');
+      let courseLink = null;
+      try {
+        courseLink = generateCourseLink(employee.email, taskTitle, deadlineDate, baseUrl);
+        console.log(`🔗 Generated secure course link for ${employee.email}`);
+      } catch (linkError) {
+        console.error('❌ Error generating course link:', linkError);
+        // Continue without link if generation fails
+      }
+      
+      const emailSent = await sendTaskAssignmentEmail(
+        employee.email,
+        employee.name,
+        taskTitle,
+        description,
+        deadlineDate,
+        admin.name,
+        priority || 'medium',
+        courseLink
+      );
+      
+      if (emailSent) {
+        console.log(`✅ Task assignment email sent to ${employee.email}`);
+      } else {
+        console.log(`⚠️ Failed to send email to ${employee.email}, but task assignment succeeded`);
+      }
+      
+    } catch (emailError) {
+      console.error('❌ Error sending task assignment email:', emailError);
+      // Don't fail the entire request if email sending fails
+      console.log('⚠️ Task assignment succeeded, but email notification failed');
     }
     
     res.status(201).json({ 
