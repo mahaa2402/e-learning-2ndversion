@@ -830,7 +830,7 @@ const courseData = {
     }
   },
   "68885c86d486bba2975cdca6": {
-    name: "Welding",
+    name: "Weilding",
     lessons: {
       "WELD01": {
         title: "Basics of Industrial Work Skills",

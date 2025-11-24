@@ -158,7 +158,7 @@ function LandingPage() {
   GDPR: "gdpr.jpg", 
   POSH: "posh.png",
   "Factory Act": "hsi.jpg",
-  Welding: "weilding.jpg",
+  Weilding: "weilding.jpg",
   CNC: "cnc.webp",
   Excel: "excel.png"
 };

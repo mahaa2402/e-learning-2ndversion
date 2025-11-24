@@ -124,8 +124,8 @@ const Quiz = () => {
         return 'POSH';
       } else if (moduleIdUpper.startsWith('FACT')) {
         return 'Factory Act';
-      } else if (moduleIdUpper.startsWith('WELD')) {
-        return 'Welding';
+      } else if (moduleIdUpper.startsWith('WELD') || moduleIdUpper.startsWith('WEILD')) {
+        return 'Weilding';
       } else if (moduleIdUpper.startsWith('CNC')) {
         return 'CNC';
       } else if (moduleIdUpper.startsWith('EXL')) {
@@ -147,8 +147,8 @@ const Quiz = () => {
         return 'POSH';
       } else if (courseIdUpper.includes('FACT') || courseIdUpper.includes('FACTORY')) {
         return 'Factory Act';
-      } else if (courseIdUpper.includes('WELD')) {
-        return 'Welding';
+      } else if (courseIdUpper.includes('WELD') || courseIdUpper.includes('WEILD')) {
+        return 'Weilding';
       } else if (courseIdUpper.includes('CNC')) {
         return 'CNC';
       } else if (courseIdUpper.includes('EXL') || courseIdUpper.includes('EXCEL')) {
@@ -242,7 +242,7 @@ const Quiz = () => {
       'POSH': 4,       // POSH04 is final
       'GDPR': 4,       // GDPR04 is final
       'Factory Act': 4, // FACTORY04 is final
-      'Welding': 4,    // WELDING04 is final
+      'Weilding': 4,    // WELDING04 is final
       'CNC': 4         // CNC04 is final
     };
     
@@ -1583,7 +1583,7 @@ const Quiz = () => {
                           'GDPR': 'GDPR01',
                           'POSH': 'POSH01',
                           'Factory Act': 'FACT01',
-                          'Welding': 'WELD01',
+                        'Weilding': 'WELD01',
                           'CNC': 'CNC01',
                           'Excel': 'EXL01',
                           'VRU': 'VRU01'

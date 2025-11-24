@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config/api';
@@ -11,7 +11,16 @@ const Login = () => {
     role: 'admin' 
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [flashMessage, setFlashMessage] = useState('');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const message = sessionStorage.getItem('flashMessage');
+    if (message) {
+      setFlashMessage(message);
+      sessionStorage.removeItem('flashMessage');
+    }
+  }, []);
 
   const handleChange = (e) => {
     setFormData((prev) => ({
@@ -47,6 +56,8 @@ const Login = () => {
 
         alert(res.data.message || 'Login successful!');
 
+        const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+
         // Fetch level progress for all users
         try {
           const progressRes = await fetch(`${API_ENDPOINTS.PROGRESS.GET_PROGRESS.replace('/get-with-unlocking', '')}/${userData.email}`, {
@@ -74,13 +85,16 @@ const Login = () => {
         // Handle navigation based on user role
         const userRole = userData.role || res.data.role;
         
-        if (userRole === 'admin') {
-          // Admin always goes to admin dashboard
+        if (redirectPath) {
+          sessionStorage.removeItem('redirectAfterLogin');
+          setTimeout(() => {
+            navigate(redirectPath);
+          }, 100);
+        } else if (userRole === 'admin') {
           setTimeout(() => {
             navigate('/admindashboard');
           }, 100);
         } else {
-          // For employees, always redirect to landing page
           setTimeout(() => {
             navigate('/');
           }, 100);
@@ -105,6 +119,11 @@ const Login = () => {
     <div className="auth-page">
       <div className="auth-container">
         <h2>Login</h2>
+        {flashMessage && (
+          <div className="auth-flash-message">
+            {flashMessage}
+          </div>
+        )}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="email">Email</label>
