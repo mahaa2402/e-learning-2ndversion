@@ -7,6 +7,29 @@ const { sendCourseCompletionEmail } = require('./services/emailService');
 const CommonCourse = require('./models/common_courses');
 require('dotenv').config();
 
+/**
+ * Returns additional course completion recipients configured via env.
+ * Accepts both comma-separated COURSE_COMPLETION_EXTRA_RECIPIENTS and the
+ * legacy single COMPLETION_NOTIFICATION_EMAIL variable.
+ */
+const getAdditionalCompletionRecipients = () => {
+  const recipients = new Set();
+
+  const extraList = process.env.COURSE_COMPLETION_EXTRA_RECIPIENTS;
+  if (extraList) {
+    extraList
+      .split(',')
+      .map(email => email.trim())
+      .filter(Boolean)
+      .forEach(email => recipients.add(email));
+  }
+
+  if (process.env.COMPLETION_NOTIFICATION_EMAIL) {
+    recipients.add(process.env.COMPLETION_NOTIFICATION_EMAIL.trim());
+  }
+
+  return Array.from(recipients);
+};
 // ============================================================================
 // CORE FUNCTIONS
 // ============================================================================
@@ -250,6 +273,7 @@ async function checkAndGenerateCertificate(employeeEmail, courseName, progress) 
           try {
             // Get admin details
             const admin = await Admin.findById(courseAssignment.assignedBy.adminId);
+            const completionDate = new Date();
             if (admin && admin.email) {
               console.log(`📧 Sending course completion email to admin: ${admin.email}`);
               
@@ -259,7 +283,7 @@ async function checkAndGenerateCertificate(employeeEmail, courseName, progress) 
                 employee.name,
                 employeeEmail,
                 courseName,
-                new Date()
+                completionDate
               );
               
               if (emailSent) {
@@ -269,6 +293,31 @@ async function checkAndGenerateCertificate(employeeEmail, courseName, progress) 
               }
             } else {
               console.log(`⚠️ Admin not found or no email for admin ID: ${courseAssignment.assignedBy.adminId}`);
+            }
+
+            const additionalRecipients = getAdditionalCompletionRecipients()
+              .filter(email => email && (!admin || email !== admin.email));
+
+            if (additionalRecipients.length) {
+              console.log(`📧 Sending course completion email to additional recipients: ${additionalRecipients.join(', ')}`);
+              const notificationsName = process.env.COMPLETION_NOTIFICATION_NAME || 'Training Coordinator';
+
+              for (const additionalEmail of additionalRecipients) {
+                const additionalEmailSent = await sendCourseCompletionEmail(
+                  additionalEmail,
+                  notificationsName,
+                  employee.name,
+                  employeeEmail,
+                  courseName,
+                  completionDate
+                );
+
+                if (additionalEmailSent) {
+                  console.log(`✅ Course completion email sent to additional recipient: ${additionalEmail}`);
+                } else {
+                  console.log(`⚠️ Failed to send completion email to additional recipient: ${additionalEmail}`);
+                }
+              }
             }
           } catch (emailError) {
             console.error('❌ Error sending course completion email to admin:', emailError);
