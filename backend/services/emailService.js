@@ -134,7 +134,68 @@ const getOTPContent = (otp, purpose) => {
   `;
 };
 
-const sendTaskAssignmentEmail = async (employeeEmail, employeeName, taskTitle, description, deadline, adminName, priority = 'medium', courseLink = null) => {
+const sendEmployeeWelcomeEmail = async ({
+  employeeEmail,
+  employeeName,
+  adminName,
+  loginUrl,
+  password,
+  isTemporary = true
+}) => {
+  try {
+    const emailConfigured = transporter !== null;
+    const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER || 'no-reply@elearning.com';
+    const subject = 'Welcome to the E-learning Platform';
+  const html = getEmployeeWelcomeContent({
+    employeeEmail,
+      employeeName,
+      adminName,
+      loginUrl,
+      password,
+      isTemporary
+    });
+
+    if (emailConfigured) {
+      const mailOptions = {
+        from: fromEmail,
+        to: employeeEmail,
+        subject,
+        html
+      };
+
+      console.log(`📧 Sending employee welcome email from: ${fromEmail} to: ${employeeEmail}`);
+      await transporter.sendMail(mailOptions);
+      console.log(`✅ Employee welcome email sent to ${employeeEmail}`);
+      return true;
+    }
+
+    console.log('\n========================================');
+    console.log(`📧 Employee Welcome Email - ${employeeEmail}`);
+    console.log(`👤 Employee: ${employeeName}`);
+    console.log(`🔑 Password: ${password}`);
+    console.log(`🔐 Temporary password: ${isTemporary ? 'Yes' : 'No'}`);
+    console.log(`🔗 Login URL: ${loginUrl}`);
+    console.log('========================================\n');
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send employee welcome email:', error.message);
+    return false;
+  }
+};
+
+const sendTaskAssignmentEmail = async ({
+  employeeEmail,
+  employeeName,
+  taskTitle,
+  description,
+  deadline,
+  adminName,
+  adminEmail,
+  priority = 'medium',
+  courseLink = null,
+  dashboardLink = null,
+  loginUrl = null
+}) => {
   try {
     const emailConfigured = transporter !== null;
 
@@ -162,8 +223,21 @@ const sendTaskAssignmentEmail = async (employeeEmail, employeeName, taskTitle, d
       const mailOptions = {
         from: fromEmail,
         to: employeeEmail,
+        replyTo: adminEmail || fromEmail,
         subject: `New Task Assigned: ${taskTitle} - E-learning Platform`,
-        html: getTaskAssignmentContent(employeeName, taskTitle, description, formattedDeadline, adminName, priority, priorityColor, courseLink)
+        html: getTaskAssignmentContent(
+          employeeName,
+          taskTitle,
+          description,
+          formattedDeadline,
+          adminName,
+          adminEmail,
+          priority,
+          priorityColor,
+          courseLink,
+          dashboardLink,
+          loginUrl
+        )
       };
 
       console.log(`📧 Sending task assignment email from: ${fromEmail} to: ${employeeEmail}`);
@@ -180,6 +254,8 @@ const sendTaskAssignmentEmail = async (employeeEmail, employeeName, taskTitle, d
       console.log(`⏰ Deadline: ${deadline}`);
       console.log(`👨‍💼 Assigned by: ${adminName}`);
       console.log(`⚡ Priority: ${priority}`);
+      if (dashboardLink) console.log(`📊 Dashboard Link: ${dashboardLink}`);
+      if (loginUrl) console.log(`🔐 Login Link: ${loginUrl}`);
       if (courseLink) console.log(`🔗 Course Link: ${courseLink}`);
       console.log('========================================\n');
       return true;
@@ -191,19 +267,44 @@ const sendTaskAssignmentEmail = async (employeeEmail, employeeName, taskTitle, d
   }
 };
 
-const getTaskAssignmentContent = (employeeName, taskTitle, description, deadline, adminName, priority, priorityColor, courseLink = null) => {
-  const linkSection = courseLink ? `
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${courseLink}" style="display: inline-block; padding: 14px 28px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
-        Start Course Now
+const getTaskAssignmentContent = (
+  employeeName,
+  taskTitle,
+  description,
+  deadline,
+  adminName,
+  adminEmail,
+  priority,
+  priorityColor,
+  courseLink = null,
+  dashboardLink = null,
+  loginUrl = null
+) => {
+  const loginSection = loginUrl
+    ? `
+    <div style="text-align: center; margin: 20px 0;">
+      <a href="${loginUrl}" style="display: inline-block; padding: 12px 24px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+        Go to Login Page
       </a>
-      <p style="margin-top: 15px; color: #666; font-size: 12px;">
-        ⚠️ This link will expire on ${deadline}
+      <p style="margin-top: 10px; color: #666; font-size: 12px;">
+        Use your platform credentials to access the learning portal.
       </p>
     </div>
-  ` : `
-    <p>Please log in to your account to view and start working on this task.</p>
-  `;
+  `
+    : '';
+
+  const dashboardSection = dashboardLink
+    ? `
+    <div style="text-align: center; margin: 20px 0;">
+      <a href="${dashboardLink}" style="display: inline-block; padding: 14px 28px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+        Start Course
+      </a>
+    </div>
+  `
+    : '';
+
+  // Remove the old 'Open Assignment (Secure Link)' button, and rely on the dashboard link instead
+  const courseSection = '';
 
   return `
     <!DOCTYPE html>
@@ -246,11 +347,13 @@ const getTaskAssignmentContent = (employeeName, taskTitle, description, deadline
               <span class="priority-badge">${priority}</span>
             </div>
             <div class="task-detail">
-              <span class="task-detail-label">Assigned by:</span> ${adminName}
+              <span class="task-detail-label">Assigned by:</span> ${adminName}${adminEmail ? ` (${adminEmail})` : ''}
             </div>
           </div>
           
-          ${linkSection}
+          ${dashboardSection}
+          ${courseSection}
+          ${loginSection}
           
           <p>If you have any questions, please contact your administrator.</p>
         </div>
@@ -280,14 +383,16 @@ const sendCourseCompletionEmail = async (adminEmail, adminName, employeeName, em
         minute: '2-digit'
       });
 
+      const subjectLine = `Training Certificate - ${courseName} - E-learning Platform - ${employeeName}`;
       const mailOptions = {
         from: fromEmail,
         to: adminEmail,
-        subject: `Course Completion Notification: ${courseName} - E-learning Platform`,
+        subject: subjectLine,
         html: getCourseCompletionContent(adminName, employeeName, employeeEmail, courseName, formattedDate)
       };
 
       console.log(`📧 Sending course completion email from: ${fromEmail} to: ${adminEmail}`);
+      console.log(`📧 Subject: ${subjectLine}`);
       const info = await transporter.sendMail(mailOptions);
       console.log(`✅ Course completion email sendMail result for ${adminEmail}:`, {
         accepted: info.accepted,
@@ -300,6 +405,7 @@ const sendCourseCompletionEmail = async (adminEmail, adminName, employeeName, em
       // Development mode: log to console
       console.log('\n========================================');
       console.log(`📧 Course Completion Email - ${adminEmail}`);
+      console.log(`📧 Subject: Training Certificate - ${courseName} - E-learning Platform - ${employeeName}`);
       console.log(`👨‍💼 Admin: ${adminName}`);
       console.log(`👤 Employee: ${employeeName} (${employeeEmail})`);
       console.log(`📚 Course: ${courseName}`);
@@ -334,7 +440,7 @@ const getCourseCompletionContent = (adminName, employeeName, employeeEmail, cour
     <body>
       <div class="container">
         <div class="header">
-          <h1>🎉 Course Completion Notification</h1>
+          <h1>🎉 Training Certificate</h1>
         </div>
         <div class="content">
           <p>Hello <strong>${adminName}</strong>,</p>
@@ -365,9 +471,55 @@ const getCourseCompletionContent = (adminName, employeeName, employeeEmail, cour
   `;
 };
 
+const getEmployeeWelcomeContent = ({ employeeEmail, employeeName, adminName, loginUrl, password, isTemporary }) => {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #28a745; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .content { padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd; }
+        .credential-box { background-color: #fff; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; }
+        .detail-label { font-weight: bold; color: #555; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; background-color: #f9f9f9; border-radius: 0 0 5px 5px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Welcome to E-learning</h1>
+        </div>
+        <div class="content">
+          <p>Hello <strong>${employeeName}</strong>,</p>
+          <p>${adminName} has created an account for you on the E-learning platform. Use the credentials below to access your dashboard and start learning.</p>
+          <div class="credential-box">
+            <p><span class="detail-label">Login Email:</span> ${employeeEmail}</p>
+            <p><span class="detail-label">Password:</span> <strong>${password}</strong></p>
+            <p style="font-size: 12px; color: #666;">${isTemporary ? 'This is a temporary password. You will be prompted to change it after your first login.' : 'Please keep this password safe.'}</p>
+          </div>
+          <div style="text-align: center; margin: 20px 0;">
+            <a href="${loginUrl}" style="display: inline-block; padding: 14px 28px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+              Go to Login Page
+            </a>
+          </div>
+          <p>If you have any questions, please reach out to your administrator.</p>
+        </div>
+        <div class="footer">
+          <p>E-learning Platform</p>
+          <p>This is an automated email, please do not reply.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+};
+
 module.exports = {
   initializeEmailService,
   sendOTPEmail,
+  sendEmployeeWelcomeEmail,
   sendTaskAssignmentEmail,
   sendCourseCompletionEmail
 };

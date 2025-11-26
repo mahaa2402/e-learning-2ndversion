@@ -1,4 +1,5 @@
 // backend/controllers/Admin.js
+const { URL } = require('url');
 const Admin = require('../models/Admin');
 const Employee = require('../models/Employee');
 const AssignedTask = require('../models/AssignedTask');
@@ -12,6 +13,16 @@ const {
 const { sendTaskAssignmentEmail } = require('../services/emailService');
 const { generateCourseLink } = require('../utils/secureLinkGenerator');
 const mongoose = require('mongoose');
+
+const resolveFrontendBase = (loginUrl) => {
+  if (!loginUrl) return null;
+  try {
+    const parsed = new URL(loginUrl);
+    return parsed.origin;
+  } catch (error) {
+    return loginUrl.replace(/\/login.*$/i, '').replace(/\/$/, '');
+  }
+};
 
 const getEmployees = async (req, res) => {
   try {
@@ -258,7 +269,14 @@ const createAssignedTask = async (req, res) => {
     try {
       // Get base URL for link generation
       const baseUrl = req.protocol + '://' + req.get('host');
+      const loginUrl =
+        process.env.PLATFORM_LOGIN_URL ||
+        (process.env.FRONTEND_BASE_URL
+          ? `${process.env.FRONTEND_BASE_URL.replace(/\/$/, '')}/login`
+          : 'http://localhost:3000/login');
       
+      const frontendBase = resolveFrontendBase(loginUrl);
+
       for (const employee of employees) {
         console.log(`📧 Sending task assignment email to: ${employee.name} (${employee.email})`);
         
@@ -271,17 +289,23 @@ const createAssignedTask = async (req, res) => {
           console.error('❌ Error generating course link:', linkError);
           // Continue without link if generation fails
         }
-        
-        const emailSent = await sendTaskAssignmentEmail(
-          employee.email,
-          employee.name,
+        const dashboardLink = frontendBase
+          ? `${frontendBase}/userdashboard?email=${encodeURIComponent(employee.email)}`
+          : null;
+
+        const emailSent = await sendTaskAssignmentEmail({
+          employeeEmail: employee.email,
+          employeeName: employee.name,
           taskTitle,
           description,
-          deadlineDate,
-          admin.name,
-          priority || 'medium',
-          courseLink
-        );
+          deadline: deadlineDate,
+          adminName: admin.name,
+          adminEmail: admin.email,
+          priority: priority || 'medium',
+          courseLink,
+          dashboardLink,
+          loginUrl
+        });
         
         if (emailSent) {
           console.log(`✅ Task assignment email sent to ${employee.email}`);
@@ -808,6 +832,11 @@ const assignTaskByEmail = async (req, res) => {
       
       // Generate secure course link
       const baseUrl = req.protocol + '://' + req.get('host');
+      const loginUrl =
+        process.env.PLATFORM_LOGIN_URL ||
+        (process.env.FRONTEND_BASE_URL
+          ? `${process.env.FRONTEND_BASE_URL.replace(/\/$/, '')}/login`
+          : 'http://localhost:3000/login');
       let courseLink = null;
       try {
         courseLink = generateCourseLink(employee.email, taskTitle, deadlineDate, baseUrl);
@@ -817,16 +846,24 @@ const assignTaskByEmail = async (req, res) => {
         // Continue without link if generation fails
       }
       
-      const emailSent = await sendTaskAssignmentEmail(
-        employee.email,
-        employee.name,
+      const frontendBase = resolveFrontendBase(loginUrl);
+      const dashboardLink = frontendBase
+        ? `${frontendBase}/userdashboard?email=${encodeURIComponent(employee.email)}`
+        : null;
+
+      const emailSent = await sendTaskAssignmentEmail({
+        employeeEmail: employee.email,
+        employeeName: employee.name,
         taskTitle,
         description,
-        deadlineDate,
-        admin.name,
-        priority || 'medium',
-        courseLink
-      );
+        deadline: deadlineDate,
+        adminName: admin.name,
+        adminEmail: admin.email,
+        priority: priority || 'medium',
+        courseLink,
+        dashboardLink,
+        loginUrl
+      });
       
       if (emailSent) {
         console.log(`✅ Task assignment email sent to ${employee.email}`);
@@ -938,7 +975,64 @@ const assignCourseToEmployeeController = async (req, res) => {
       });
     }
 
-    const progress = await assignCourseToEmployeeManager(employeeEmail, courseName, req.user.id, deadline);
+    const admin = await Admin.findById(req.user.id).select('name email');
+    if (!admin) {
+      return res.status(404).json({
+        error: 'Admin account not found',
+        details: 'Your admin account could not be verified'
+      });
+    }
+
+    const deadlineDate = deadline ? new Date(deadline) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    if (isNaN(deadlineDate.getTime())) {
+      return res.status(400).json({
+        error: 'Invalid deadline format',
+        details: 'Please provide a valid ISO date string'
+      });
+    }
+
+    const progress = await assignCourseToEmployeeManager(employeeEmail, courseName, req.user.id, deadlineDate);
+
+    try {
+      const baseUrl = req.protocol + '://' + req.get('host');
+      const loginUrl =
+        process.env.PLATFORM_LOGIN_URL ||
+        (process.env.FRONTEND_BASE_URL
+          ? `${process.env.FRONTEND_BASE_URL.replace(/\/$/, '')}/login`
+          : 'http://localhost:3000/login');
+      const frontendBase = resolveFrontendBase(loginUrl);
+
+      let courseLink = null;
+      try {
+        courseLink = generateCourseLink(employeeEmail, courseName, deadlineDate, baseUrl);
+      } catch (linkError) {
+        console.error('❌ Failed to generate course access link:', linkError);
+      }
+
+      const dashboardLink = frontendBase
+        ? `${frontendBase}/userdashboard?email=${encodeURIComponent(employeeEmail)}`
+        : null;
+
+      const emailSent = await sendTaskAssignmentEmail({
+        employeeEmail,
+        employeeName: employee.name,
+        taskTitle: courseName,
+        description: `You have been enrolled in "${courseName}". Click start to begin the training.`,
+        deadline: deadlineDate,
+        adminName: admin.name,
+        adminEmail: admin.email,
+        priority: 'medium',
+        courseLink,
+        dashboardLink,
+        loginUrl
+      });
+
+      if (!emailSent) {
+        console.warn(`⚠️ Course assignment email could not be sent to ${employeeEmail}`);
+      }
+    } catch (emailError) {
+      console.error('❌ Error sending course assignment email:', emailError);
+    }
     
     res.status(201).json({ 
       success: true, 

@@ -60,7 +60,13 @@ export const API_ENDPOINTS = {
   },
   CERTIFICATES: {
     GET_CERTIFICATES: `${API_BASE_URL}/certificates/employee-certificates`,
-    CHECK_COURSE_COMPLETION: `${API_BASE_URL}/certificate/check-course-completion`
+    CHECK_COURSE_COMPLETION: `${API_BASE_URL}/certificate/check-course-completion`,
+    GET_ALL: `${API_BASE_URL}/certificates/all`
+  },
+  EMPLOYEES: {
+    LIST: `${API_BASE_URL}/employee/employees`,
+    CREATE: `${API_BASE_URL}/employee/employees`,
+    DELETE: (employeeId) => `${API_BASE_URL}/employee/employees/${employeeId}`
   },
   TASKS: {
     GET_ASSIGNED_TASKS: `${API_BASE_URL}/assigned-tasks`

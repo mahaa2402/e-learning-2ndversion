@@ -1,21 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Building, Calendar, RefreshCw, AlertCircle } from 'lucide-react';
+import { User, Mail, Building, Calendar, RefreshCw, AlertCircle, Trash2, PlusCircle } from 'lucide-react';
 import './employeetracking.css'; // Import the CSS file
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';   // ✅ Sidebar import
+import { API_ENDPOINTS } from '../config/api';
+
+// Utility: Validate MongoDB ObjectId
+const isValidObjectId = (id) => typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id);
 
 // Employee Card component
-const EmployeeCard = ({ employee, onViewDetails }) => {
+const EmployeeCard = ({ employee, onViewDetails, onDelete, isDeleting }) => {
+  const showDelete = onDelete && isValidObjectId(employee._id || employee.id);
   return (
     <div className="employee-card">
       <div className="employee-card-header">
         <div className="employee-avatar">
           <User style={{ width: '24px', height: '24px', color: 'white' }} />
         </div>
-        <div>
+        <div className="employee-card-header-info">
           <h3 className="employee-name">{employee.name}</h3>
-        
+          {employee.department && (
+            <span className="employee-department-badge">
+              <Building className="employee-info-icon" />
+              {employee.department}
+            </span>
+          )}
         </div>
+        {showDelete && (
+          <button
+            className="employee-delete-button"
+            title="Delete employee"
+            onClick={() => onDelete(employee)}
+            disabled={isDeleting}
+          >
+            {isDeleting ? '...' : <Trash2 size={18} />}
+          </button>
+        )}
       </div>
 
       <div className="employee-info-list">
@@ -23,9 +43,12 @@ const EmployeeCard = ({ employee, onViewDetails }) => {
           <Mail className="employee-info-icon" />
           <span>{employee.email}</span>
         </div>
-        <div className="employee-info-item">
-      
-        </div>
+        {employee.department && (
+          <div className="employee-info-item">
+            <Building className="employee-info-icon" />
+            <span>{employee.department}</span>
+          </div>
+        )}
         <div className="employee-info-item">
           <Calendar className="employee-info-icon" />
           <span>
@@ -61,6 +84,11 @@ const EmployeeDirectory = () => {
   const [error, setError] = useState(null);
   const [selectedCertificate, setSelectedCertificate] = useState(null);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [newEmployee, setNewEmployee] = useState({ name: '', email: '', department: '', password: '' });
+  const [formStatus, setFormStatus] = useState({ type: null, message: '' });
+  const [isSubmittingEmployee, setIsSubmittingEmployee] = useState(false);
+  const [deletingEmployeeId, setDeletingEmployeeId] = useState(null);
+  const [lastTempPassword, setLastTempPassword] = useState('');
 
   const navigate = useNavigate();
 
@@ -80,6 +108,21 @@ const EmployeeDirectory = () => {
     );
   };
 
+  const formatEmployeeRecord = (employee = {}, overrides = {}) => {
+    const identifier = employee._id || employee.id || overrides.id || employee.email;
+    return {
+      _id: identifier,
+      id: identifier,
+      name: employee.name || employee.employeeName || employee.email?.split('@')[0] || 'Unnamed Employee',
+      email: employee.email || employee.employeeEmail || '',
+      department: employee.department || overrides.department || '',
+      createdAt: employee.createdAt || employee.completionDate || new Date().toISOString(),
+      hasCertificates: Boolean(employee.hasCertificates || employee.certificateCount),
+      certificateCount: employee.certificateCount || 0,
+      ...overrides,
+    };
+  };
+
   const fetchEmployees = async () => {
     try {
       setLoading(true);
@@ -92,7 +135,7 @@ const EmployeeDirectory = () => {
 
       // First, get all certificates to see which employees have certificates
       console.log('🔍 Fetching certificates to find employees with certificates...');
-      const certificatesResponse = await fetch('/api/certificates/all', {
+      const certificatesResponse = await fetch(API_ENDPOINTS.CERTIFICATES.GET_ALL, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -112,15 +155,14 @@ const EmployeeDirectory = () => {
           certificatesData.certificates.forEach(cert => {
             const key = cert.employeeEmail || cert.employeeId;
             if (key && !uniqueEmployees[key]) {
-              uniqueEmployees[key] = {
+              uniqueEmployees[key] = formatEmployeeRecord({
                 _id: cert.employeeId || cert.employeeEmail,
-                name: cert.employeeName || cert.employeeEmail.split('@')[0],
+                name: cert.employeeName,
                 email: cert.employeeEmail,
-               
                 createdAt: cert.createdAt || cert.completionDate,
+                certificateCount: 1,
                 hasCertificates: true,
-                certificateCount: 1
-              };
+              });
             } else if (uniqueEmployees[key]) {
               uniqueEmployees[key].certificateCount++;
             }
@@ -131,7 +173,7 @@ const EmployeeDirectory = () => {
       }
 
       // Also fetch regular employees for comparison
-      const response = await fetch('/api/employee/employees', {
+      const response = await fetch(API_ENDPOINTS.EMPLOYEES.LIST, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -143,7 +185,7 @@ const EmployeeDirectory = () => {
       let regularEmployees = [];
       if (response.ok) {
         const data = await response.json();
-        regularEmployees = Array.isArray(data) ? data : [];
+        regularEmployees = Array.isArray(data) ? data.map((emp) => formatEmployeeRecord(emp)) : [];
         console.log('👤 Regular employees:', regularEmployees);
       }
 
@@ -160,6 +202,126 @@ const EmployeeDirectory = () => {
       setEmployees([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleInputChange = (event) => {
+    const { name, value } = event.target;
+    setNewEmployee((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleAddEmployee = async (event) => {
+    event.preventDefault();
+    setFormStatus({ type: null, message: '' });
+
+    const trimmedName = newEmployee.name.trim();
+    const trimmedEmail = newEmployee.email.trim();
+    const trimmedDepartment = newEmployee.department.trim();
+    const trimmedPassword = newEmployee.password.trim();
+
+    if (!trimmedName || !trimmedEmail || !trimmedDepartment) {
+      setFormStatus({ type: 'error', message: 'Name, email, and department are required.' });
+      return;
+    }
+
+    const authToken = getAuthToken();
+    if (!authToken) {
+      setFormStatus({ type: 'error', message: 'Authentication required. Please login again.' });
+      return;
+    }
+
+    setIsSubmittingEmployee(true);
+
+    try {
+      const response = await fetch(API_ENDPOINTS.EMPLOYEES.CREATE, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: trimmedName,
+          email: trimmedEmail,
+          department: trimmedDepartment,
+          password: trimmedPassword || undefined,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.details || data.error || 'Failed to add employee');
+      }
+
+      const formattedEmployee = formatEmployeeRecord(data.employee, { hasCertificates: false, certificateCount: 0 });
+      setEmployees((prev) => [formattedEmployee, ...prev]);
+      setNewEmployee({ name: '', email: '', department: '', password: '' });
+      setLastTempPassword(data.tempPassword || '');
+      setFormStatus({
+        type: 'success',
+        message: data.passwordProvided
+          ? data.message
+          : `${data.message}${data.tempPassword ? ` • Temporary password: ${data.tempPassword}` : ''}`,
+      });
+    } catch (err) {
+      setFormStatus({ type: 'error', message: err.message || 'Failed to add employee' });
+    } finally {
+      setIsSubmittingEmployee(false);
+    }
+  };
+
+  const handleDeleteEmployee = async (employee) => {
+    const employeeId = employee._id || employee.id;
+    if (!employeeId) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete employee ${employee.name || employee.email}?`);
+    if (!confirmed) {
+      return;
+    }
+
+    const authToken = getAuthToken();
+    if (!authToken) {
+      alert('Authentication required. Please login again.');
+      return;
+    }
+
+    setDeletingEmployeeId(employeeId);
+
+    try {
+      let deleteUrl;
+      // If the id is not a valid ObjectId, assume it's an email and use delete-by-email query param
+      if (!isValidObjectId(employeeId) && employee.email && employee.email.includes('@')) {
+        deleteUrl = `${API_ENDPOINTS.EMPLOYEES.LIST}?email=${encodeURIComponent(employee.email)}`;
+      } else {
+        deleteUrl = API_ENDPOINTS.EMPLOYEES.DELETE(employeeId);
+      }
+
+      const response = await fetch(deleteUrl, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.details || data.error || 'Failed to delete employee');
+      }
+
+      setEmployees((prev) => prev.filter((emp) => (emp._id || emp.id) !== employeeId));
+      setFormStatus({ type: 'success', message: data.message || 'Employee deleted successfully' });
+    } catch (err) {
+      console.error('Error deleting employee:', err);
+      alert(err.message || 'Failed to delete employee');
+    } finally {
+      setDeletingEmployeeId(null);
     }
   };
 
@@ -235,9 +397,88 @@ const EmployeeDirectory = () => {
                     onClick={fetchEmployees}
                     disabled={loading}
                   >
-                   
-                  
+                    <RefreshCw size={16} style={{ marginRight: 6 }} />
+                    Refresh
                   </button>
+                </div>
+              </div>
+
+              <div className="employee-management-panel">
+                <div className="employee-add-card">
+                  <div className="employee-add-card-header">
+                    <div className="employee-add-card-title">
+                      <PlusCircle size={20} />
+                      <div>
+                        <h2>Add Employee</h2>
+                        <p>Quickly add a new employee record to the platform.</p>
+                      </div>
+                    </div>
+                  </div>
+                  <form className="employee-add-form" onSubmit={handleAddEmployee}>
+                    <div className="employee-add-form-group">
+                      <label htmlFor="name">Full Name</label>
+                      <input
+                        id="name"
+                        name="name"
+                        type="text"
+                        placeholder="Employee name"
+                        value={newEmployee.name}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    <div className="employee-add-form-group">
+                      <label htmlFor="email">Work Email</label>
+                      <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        placeholder="employee@company.com"
+                        value={newEmployee.email}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    <div className="employee-add-form-group">
+                      <label htmlFor="department">Department</label>
+                      <input
+                        id="department"
+                        name="department"
+                        type="text"
+                        placeholder="E.g. Operations"
+                        value={newEmployee.department}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    <div className="employee-add-form-group">
+                      <label htmlFor="password">
+                        Password <span className="optional-label">(optional)</span>
+                      </label>
+                      <input
+                        id="password"
+                        name="password"
+                        type="text"
+                        placeholder="Leave blank to auto-generate"
+                        value={newEmployee.password}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="employee-add-submit"
+                      disabled={isSubmittingEmployee}
+                    >
+                      {isSubmittingEmployee ? 'Adding...' : 'Add Employee'}
+                    </button>
+                  </form>
+                  {formStatus.message && (
+                    <div className={`employee-add-message ${formStatus.type}`}>
+                      {formStatus.message}
+                    </div>
+                  )}
+                  {lastTempPassword && (
+                    <div className="employee-add-temp-password">
+                      Temporary password: <strong>{lastTempPassword}</strong>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -272,6 +513,8 @@ const EmployeeDirectory = () => {
                       key={employee._id || employee.id || employee.email}
                       employee={employee}
                       onViewDetails={onViewDetails}
+                      onDelete={handleDeleteEmployee}
+                      isDeleting={deletingEmployeeId === (employee._id || employee.id)}
                     />
                   ))}
                 </div>

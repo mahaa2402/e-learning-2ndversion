@@ -1,8 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const Employee = require('../models/Employee');
+const AssignedCourseUserProgress = require('../models/AssignedCourseUserProgress');
+const AssignedCourseProgressTimestamp = require('../models/AssignedCourseProgressTimestamp');
+const EmployeeProgress = require('../models/EmployeeProgress');
+const UserProgress = require('../models/Userprogress');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const { Certificate } = require('../controllers/CertificateController'); // Import from CertificateController
+const { initializeEmployeeProgress, CommonUserProgress } = require('../commonUserProgressManager');
+const { initializeAssignedCourseProgress } = require('../assignedCourseUserProgressManager');
+const { sendEmployeeWelcomeEmail } = require('../services/emailService');
+
+const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
 
 
 // Authentication middleware
@@ -14,7 +25,7 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ error: 'Access token required' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+  jwt.verify(token, jwtSecret, (err, user) => {
     if (err) {
       return res.status(403).json({ error: 'Invalid or expired token' });
     }
@@ -23,6 +34,13 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// Simple admin guard based on JWT payload
+const requireAdmin = (req, res, next) => {
+  if (req.user && req.user.role === 'admin') {
+    return next();
+  }
+  return res.status(403).json({ error: 'Admin access required' });
+};
 // GET /api/profile - Get current user profile
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
@@ -166,7 +184,7 @@ router.get('/employees-for-assignment', async (req, res) => {
 });
 
 // GET /api/employees - Get all employees (no password)
-router.get('/employees', async (req, res) => {
+router.get('/employees', authenticateToken, requireAdmin, async (req, res) => {
   try {
     console.log('🔍 Fetching employees from database...');
     const employees = await Employee.find({}, '-password').sort({ name: 1 });
@@ -176,6 +194,114 @@ router.get('/employees', async (req, res) => {
   } catch (err) {
     console.error('❌ Error fetching employees:', err);
     res.status(500).json({ error: 'Failed to fetch employees', message: err.message });
+  }
+});
+
+// POST /api/employees - Add a new employee (admin only)
+router.post('/employees', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { name, email, department, password } = req.body || {};
+
+    if (!name || !email || !department) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        details: 'Name, email, and department are required'
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const cleanedName = name.trim();
+    const cleanedDepartment = department.trim();
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({
+        error: 'Invalid email address',
+        details: 'Please provide a valid employee email'
+      });
+    }
+
+    const existingEmployee = await Employee.findOne({ email: normalizedEmail });
+    if (existingEmployee) {
+      return res.status(409).json({
+        error: 'Employee already exists',
+        details: 'An employee with this email already exists'
+      });
+    }
+
+    const rawPassword = password?.trim() || crypto.randomBytes(5).toString('hex'); // 10 chars fallback
+
+    if (password && password.trim().length < 6) {
+      return res.status(400).json({
+        error: 'Invalid password',
+        details: 'Password must be at least 6 characters long'
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+    const employee = new Employee({
+      name: cleanedName,
+      email: normalizedEmail,
+      department: cleanedDepartment,
+      password: hashedPassword
+    });
+
+    const savedEmployee = await employee.save();
+    console.log('✅ Admin added employee:', savedEmployee.email);
+
+    // Initialize progress documents
+    try {
+      await initializeEmployeeProgress(savedEmployee.email);
+      console.log('✅ Initialized common progress for manually added employee:', savedEmployee.email);
+    } catch (progressError) {
+      console.warn('⚠️ Could not initialize common progress:', progressError.message);
+    }
+
+    try {
+      await initializeAssignedCourseProgress(savedEmployee.email);
+      console.log('✅ Initialized assigned course progress for manually added employee:', savedEmployee.email);
+    } catch (assignedError) {
+      console.warn('⚠️ Could not initialize assigned course progress:', assignedError.message);
+    }
+
+    const loginUrl =
+      process.env.PLATFORM_LOGIN_URL ||
+      (process.env.FRONTEND_BASE_URL ? `${process.env.FRONTEND_BASE_URL.replace(/\/$/, '')}/login` : 'http://localhost:3000/login');
+    const adminName = req.user?.name || req.user?.email || 'Administrator';
+
+    try {
+      await sendEmployeeWelcomeEmail({
+        employeeEmail: savedEmployee.email,
+        employeeName: savedEmployee.name,
+        adminName,
+        loginUrl,
+        password: rawPassword,
+        isTemporary: !password
+      });
+    } catch (welcomeError) {
+      console.warn('⚠️ Could not send employee welcome email:', welcomeError.message);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Employee added successfully',
+      employee: {
+        id: savedEmployee._id,
+        name: savedEmployee.name,
+        email: savedEmployee.email,
+        department: savedEmployee.department,
+        createdAt: savedEmployee.createdAt
+      },
+      tempPassword: password ? undefined : rawPassword,
+      passwordProvided: Boolean(password)
+    });
+
+  } catch (err) {
+    console.error('❌ Error adding employee:', err);
+    res.status(500).json({
+      error: 'Failed to add employee',
+      message: err.message
+    });
   }
 });
 
@@ -213,7 +339,7 @@ router.post('/update-progress', async (req, res) => {
 const { v4: uuidv4 } = require('uuid'); // for generating certificateId
 
 // DELETE /api/employees/:id - Delete an employee
-router.delete('/employees/:id', async (req, res) => {
+router.delete('/employees/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const employeeId = req.params.id;
     console.log(`🗑️ Attempting to delete employee with ID: ${employeeId}`);
@@ -228,6 +354,28 @@ router.delete('/employees/:id', async (req, res) => {
     
     // Delete the employee
     await Employee.findByIdAndDelete(employeeId);
+
+    // Cascade delete related records
+    try {
+      const cascades = await Promise.allSettled([
+        Certificate.deleteMany({ employeeEmail: employee.email }),
+        AssignedCourseUserProgress.deleteMany({ employeeEmail: employee.email }),
+        CommonUserProgress.deleteMany({ employeeEmail: employee.email }),
+        AssignedCourseProgressTimestamp.deleteMany({ employeeEmail: employee.email }),
+        EmployeeProgress.deleteMany({ employeeEmail: employee.email }),
+        UserProgress.deleteMany({ userEmail: employee.email })
+      ]);
+
+      cascades.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          console.log(`🗑️ Cascade delete #${index + 1} completed. Count:`, result.value?.deletedCount);
+        } else {
+          console.warn(`⚠️ Cascade delete #${index + 1} failed:`, result.reason?.message);
+        }
+      });
+    } catch (cascadeError) {
+      console.error('⚠️ Error deleting related records for employee:', cascadeError);
+    }
     
     console.log(`✅ Successfully deleted employee: ${employee.name}`);
     res.json({ 
@@ -246,8 +394,44 @@ router.delete('/employees/:id', async (req, res) => {
 });
 
 // DELETE /api/employees - Delete all employees (for testing)
-router.delete('/employees', async (req, res) => {
+router.delete('/employees', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    const emailQuery = req.query.email;
+    if (emailQuery) {
+      console.log(`🗑️ Attempting to delete employee by email: ${emailQuery}`);
+      const employee = await Employee.findOne({ email: emailQuery });
+      if (!employee) {
+        console.log(`❌ Employee not found with email: ${emailQuery}`);
+        return res.status(404).json({ error: 'Employee not found' });
+      }
+
+      // Delete employee and cascades similar to single-delete path
+      await Employee.findByIdAndDelete(employee._id);
+      try {
+        const cascades = await Promise.allSettled([
+          Certificate.deleteMany({ employeeEmail: employee.email }),
+          AssignedCourseUserProgress.deleteMany({ employeeEmail: employee.email }),
+          CommonUserProgress.deleteMany({ employeeEmail: employee.email }),
+          AssignedCourseProgressTimestamp.deleteMany({ employeeEmail: employee.email }),
+          EmployeeProgress.deleteMany({ employeeEmail: employee.email }),
+          UserProgress.deleteMany({ userEmail: employee.email })
+        ]);
+
+        cascades.forEach((result, index) => {
+          if (result.status === 'fulfilled') {
+            console.log(`🗑️ Cascade delete #${index + 1} completed. Count:`, result.value?.deletedCount);
+          } else {
+            console.warn(`⚠️ Cascade delete #${index + 1} failed:`, result.reason?.message);
+          }
+        });
+      } catch (cascadeError) {
+        console.error('⚠️ Error deleting related records for employee by email:', cascadeError);
+      }
+
+      console.log(`✅ Successfully deleted employee by email: ${employee.name} (${employee.email})`);
+      return res.json({ success: true, message: `Employee ${employee.name} deleted successfully`, deletedEmployee: { id: employee._id, name: employee.name, email: employee.email } });
+    }
+
     console.log('🗑️ Attempting to delete ALL employees...');
     
     const result = await Employee.deleteMany({});
