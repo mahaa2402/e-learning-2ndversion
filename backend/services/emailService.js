@@ -288,8 +288,13 @@ const sendCourseCompletionEmail = async (adminEmail, adminName, employeeName, em
       };
 
       console.log(`📧 Sending course completion email from: ${fromEmail} to: ${adminEmail}`);
-      await transporter.sendMail(mailOptions);
-      console.log(`✅ Course completion email sent to ${adminEmail} from ${fromEmail}`);
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`✅ Course completion email sendMail result for ${adminEmail}:`, {
+        accepted: info.accepted,
+        rejected: info.rejected,
+        pending: info.pending || [],
+        messageId: info.messageId
+      });
       return true;
     } else {
       // Development mode: log to console
