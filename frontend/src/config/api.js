@@ -79,7 +79,8 @@ export const API_ENDPOINTS = {
     DASHBOARD_STATS: `${API_BASE_URL}/admin/simple-dashboard-statistics`, // Using simple endpoint temporarily
     COURSES: `${API_BASE_URL}/admin/courses`, // Use deployed version
     EMPLOYEES: `${API_BASE_URL}/admin/employees`,
-    ASSIGNED_TASKS: `${API_BASE_URL}/admin/assigned-tasks`
+    ASSIGNED_TASKS: `${API_BASE_URL}/admin/assigned-tasks`,
+    ASSIGNED_COURSE_PROGRESS: `${API_BASE_URL}/admin/all-employees-assigned-course-progress`
   },
   VIDEOS: {
     UPLOAD: `${API_BASE_URL}/videos/upload-video`,

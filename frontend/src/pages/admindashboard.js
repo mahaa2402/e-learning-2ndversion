@@ -34,6 +34,13 @@ const AdminDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [activeCourses, setActiveCourses] = useState([]);
+  const [coursesLoading, setCoursesLoading] = useState(false);
+  const [coursesError, setCoursesError] = useState(null);
+  const [rawReportData, setRawReportData] = useState([]);
+  const [reportData, setReportData] = useState({ courses: [], rows: [] });
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState(null);
 
   // Fetch dashboard data from API
   useEffect(() => {
@@ -77,6 +84,153 @@ const AdminDashboard = () => {
 
     fetchDashboardData();
   }, [navigate]);
+
+  const buildReportData = (payload = [], allowedCourses = []) => {
+    const allowedSet = allowedCourses.length ? new Set(allowedCourses) : null;
+    const courseSet = new Set();
+    const rows = [];
+
+    payload.forEach(entry => {
+      const employeeName =
+        entry.employeeName ||
+        entry.employeeId?.name ||
+        entry.employeeEmail ||
+        'Unknown Employee';
+      const employeeEmail = entry.employeeEmail || entry.employeeId?.email || '';
+      const courseMap = {};
+
+      (entry.courseAssignments || []).forEach(assignment => {
+        const courseName = assignment.courseName;
+        if (!courseName) return;
+        if (allowedSet && !allowedSet.has(courseName)) {
+          return;
+        }
+        const status = (assignment.status || '').toLowerCase();
+        if (status !== 'completed') {
+          return;
+        }
+        courseSet.add(courseName);
+        courseMap[courseName] = 'Completed';
+      });
+
+      const hasCompleted = Object.values(courseMap).some(value => value === 'Completed');
+      if (hasCompleted) {
+        rows.push({ employeeName, employeeEmail, courses: courseMap });
+      }
+    });
+
+    const orderedCourses = allowedSet
+      ? allowedCourses.filter(course => courseSet.has(course))
+      : Array.from(courseSet).sort((a, b) => a.localeCompare(b));
+
+    const sortedRows = rows.sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+
+    return { courses: orderedCourses, rows: sortedRows };
+  };
+
+  useEffect(() => {
+    const fetchCommonCourses = async () => {
+      try {
+        setCoursesLoading(true);
+        setCoursesError(null);
+        const response = await fetch(API_ENDPOINTS.COURSES.GET_COURSES);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const result = await response.json();
+        const titles = (Array.isArray(result) ? result : [])
+          .map(course => course.title)
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b));
+        setActiveCourses(titles);
+      } catch (courseErr) {
+        console.error('Error fetching common courses:', courseErr);
+        setCoursesError(courseErr.message);
+        setActiveCourses([]);
+      } finally {
+        setCoursesLoading(false);
+      }
+    };
+
+    fetchCommonCourses();
+  }, []);
+
+  useEffect(() => {
+    const fetchReportData = async () => {
+      try {
+        setReportLoading(true);
+        setReportError(null);
+        const token = localStorage.getItem('token');
+        if (!token) {
+          navigate('/login');
+          return;
+        }
+
+        const response = await fetch(API_ENDPOINTS.ADMIN.ASSIGNED_COURSE_PROGRESS, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (result.success) {
+          setRawReportData(result.progress || []);
+        } else {
+          throw new Error(result.error || 'Failed to fetch course report data');
+        }
+      } catch (reportErr) {
+        console.error('Error fetching course report data:', reportErr);
+        setReportError(reportErr.message);
+        setRawReportData([]);
+      } finally {
+        setReportLoading(false);
+      }
+    };
+
+    fetchReportData();
+  }, [navigate]);
+
+  useEffect(() => {
+    setReportData(buildReportData(rawReportData, activeCourses));
+  }, [rawReportData, activeCourses]);
+
+  const escapeCsv = (value) => {
+    if (value === null || value === undefined) return '""';
+    const stringValue = String(value).replace(/"/g, '""');
+    return `"${stringValue}"`;
+  };
+
+  const handleDownloadReport = () => {
+    if (!reportData.courses.length || !reportData.rows.length) {
+      return;
+    }
+
+    const header = ['Employee Name', 'Employee Email', ...reportData.courses];
+    const rows = reportData.rows.map(row => {
+      const courseStatuses = reportData.courses.map(course => row.courses[course] || '');
+      return [row.employeeName, row.employeeEmail || '', ...courseStatuses];
+    });
+
+    const csvLines = [header, ...rows]
+      .map(line => line.map(escapeCsv).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvLines], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `course-report-${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   // Default data for fallback
   const defaultData = {
@@ -147,10 +301,34 @@ const AdminDashboard = () => {
         <div className="bg-white shadow-sm border-b border-gray-200 p-6">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold text-gray-900">Reports</h2>
-            {/* <button className="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-              <Download className="w-4 h-4 mr-2" />
-              Download
-            </button> */}
+            <div className="flex items-center gap-3">
+              {coursesError && (
+                <span className="text-sm text-red-600">{coursesError}</span>
+              )}
+              {reportError && (
+                <span className="text-sm text-red-600">{reportError}</span>
+              )}
+              <button
+                onClick={handleDownloadReport}
+                disabled={
+                  reportLoading ||
+                  coursesLoading ||
+                  !reportData.courses.length ||
+                  !reportData.rows.length
+                }
+                className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
+                  reportLoading ||
+                  coursesLoading ||
+                  !reportData.courses.length ||
+                  !reportData.rows.length
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                {reportLoading || coursesLoading ? 'Preparing...' : 'Download CSV'}
+              </button>
+            </div>
           </div>
           
           {/* Filters */}
