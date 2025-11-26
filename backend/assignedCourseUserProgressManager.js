@@ -16,19 +16,28 @@ const getAdditionalCompletionRecipients = () => {
   const recipients = new Set();
 
   const extraList = process.env.COURSE_COMPLETION_EXTRA_RECIPIENTS;
+  console.log('🔍 DEBUG: COURSE_COMPLETION_EXTRA_RECIPIENTS from env:', extraList ? `Found (${extraList.length} chars)` : 'NOT FOUND');
+  
   if (extraList) {
-    extraList
+    const emails = extraList
       .split(',')
       .map(email => email.trim())
-      .filter(Boolean)
-      .forEach(email => recipients.add(email));
+      .filter(Boolean);
+    
+    console.log(`📧 DEBUG: Parsed ${emails.length} email(s) from COURSE_COMPLETION_EXTRA_RECIPIENTS:`, emails);
+    emails.forEach(email => recipients.add(email));
+  } else {
+    console.log('⚠️ DEBUG: COURSE_COMPLETION_EXTRA_RECIPIENTS is not set in environment variables');
   }
 
   if (process.env.COMPLETION_NOTIFICATION_EMAIL) {
+    console.log('📧 DEBUG: Found COMPLETION_NOTIFICATION_EMAIL:', process.env.COMPLETION_NOTIFICATION_EMAIL);
     recipients.add(process.env.COMPLETION_NOTIFICATION_EMAIL.trim());
   }
 
-  return Array.from(recipients);
+  const finalRecipients = Array.from(recipients);
+  console.log(`✅ DEBUG: Total additional recipients: ${finalRecipients.length}`, finalRecipients);
+  return finalRecipients;
 };
 // ============================================================================
 // CORE FUNCTIONS
@@ -295,11 +304,25 @@ async function checkAndGenerateCertificate(employeeEmail, courseName, progress) 
               console.log(`⚠️ Admin not found or no email for admin ID: ${courseAssignment.assignedBy.adminId}`);
             }
 
-            const additionalRecipients = getAdditionalCompletionRecipients()
-              .filter(email => email && (!admin || email !== admin.email));
+            const allAdditionalRecipients = getAdditionalCompletionRecipients();
+            console.log(`🔍 DEBUG: All additional recipients before filtering: ${allAdditionalRecipients.length}`, allAdditionalRecipients);
+            
+            const additionalRecipients = allAdditionalRecipients
+              .filter(email => {
+                const isValid = email && email.trim().length > 0;
+                const isNotAdmin = !admin || email !== admin.email;
+                if (!isValid) {
+                  console.log(`⚠️ DEBUG: Filtered out invalid email: "${email}"`);
+                } else if (!isNotAdmin) {
+                  console.log(`⚠️ DEBUG: Filtered out admin email (already sent): "${email}"`);
+                }
+                return isValid && isNotAdmin;
+              });
+
+            console.log(`📧 DEBUG: Additional recipients after filtering: ${additionalRecipients.length}`, additionalRecipients);
 
             if (additionalRecipients.length) {
-              console.log(`📧 Sending course completion email to additional recipients: ${additionalRecipients.join(', ')}`);
+              console.log(`📧 Sending course completion email to ${additionalRecipients.length} additional recipient(s): ${additionalRecipients.join(', ')}`);
               const notificationsName = process.env.COMPLETION_NOTIFICATION_NAME || 'Training Coordinator';
 
               for (const additionalEmail of additionalRecipients) {

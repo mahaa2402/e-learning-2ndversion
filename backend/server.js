@@ -23,6 +23,12 @@ const app = express();
 
 console.log('🔧 Starting E-learning Server...');
 
+// Debug: Check course completion email configuration
+console.log('📧 Course Completion Email Configuration:');
+console.log('  COURSE_COMPLETION_EXTRA_RECIPIENTS:', process.env.COURSE_COMPLETION_EXTRA_RECIPIENTS ? `Set (${process.env.COURSE_COMPLETION_EXTRA_RECIPIENTS.length} chars)` : 'NOT SET');
+console.log('  COMPLETION_NOTIFICATION_EMAIL:', process.env.COMPLETION_NOTIFICATION_EMAIL || 'NOT SET');
+console.log('  COMPLETION_NOTIFICATION_NAME:', process.env.COMPLETION_NOTIFICATION_NAME || 'NOT SET (will use default)');
+
 // Initialize email service
 initializeEmailService();
 
