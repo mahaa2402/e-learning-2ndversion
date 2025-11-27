@@ -530,8 +530,15 @@ const fetchAdminProfile = async () => {
                             </td>
                             <td className="table-cell actions">
                               <button 
-                                className="btn btn-start-learning"
+                                className={`btn btn-start-learning ${overdue ? 'disabled' : ''}`}
+                                disabled={overdue}
+                                aria-disabled={overdue}
                                 onClick={async () => {
+                                  if (overdue) {
+                                    alert('This assignment is past the deadline and can no longer be started. Please contact your administrator for a new assignment.');
+                                    return;
+                                  }
+                                  
                                   try {
                                     // Fetch the common course by title to get course ID
                                     const token = localStorage.getItem('token');
@@ -581,7 +588,7 @@ const fetchAdminProfile = async () => {
                                   }
                                 }}
                               >
-                                {task.status === 'in-progress' ? 'Continue' : 'START'}
+                                {overdue ? 'EXPIRED' : task.status === 'in-progress' ? 'Continue' : 'START'}
                               </button>
                             </td>
                           </tr>

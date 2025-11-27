@@ -204,12 +204,15 @@ const sendTaskAssignmentEmail = async ({
       const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER;
       
       const deadlineDate = new Date(deadline);
-      const formattedDeadline = deadlineDate.toLocaleDateString('en-US', {
+      // Include timezone abbreviation for clarity
+      const formattedDeadline = deadlineDate.toLocaleString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
+        hour12: false,
+        timeZoneName: 'short'
       });
 
       const priorityColors = {
@@ -224,25 +227,143 @@ const sendTaskAssignmentEmail = async ({
       const now = new Date();
       const isDeadlineValid = !isNaN(deadlineDate.getTime());
       const isExpiredAtSend = isDeadlineValid && now.getTime() > deadlineDate.getTime();
+      const deadlineTimestamp = isDeadlineValid ? deadlineDate.getTime() : null;
 
       // Build the dashboard action section — clickable only if not expired
+      // Include JavaScript to check deadline on click and prevent navigation if expired
       let dashboardSectionHtml = '';
       if (dashboardLink) {
         if (!isExpiredAtSend) {
+          // Link is active, but add JavaScript to check deadline on click
           dashboardSectionHtml = `
             <div style="text-align: center; margin: 20px 0;">
-              <a href="${dashboardLink}" style="display: inline-block; padding: 14px 28px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+              <a href="${dashboardLink}" 
+                 id="startCourseBtn" 
+                 data-deadline="${deadlineTimestamp}"
+                 onclick="return checkDeadlineAndNavigate(event, ${deadlineTimestamp}, '${dashboardLink}');"
+                 style="display: inline-block; padding: 14px 28px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px; cursor: pointer;">
                 Start Course 
               </a>
-            
             </div>
+            <style>
+              #startCourseBtn.expired {
+                pointer-events: none !important;
+                touch-action: none !important;
+                cursor: not-allowed !important;
+                opacity: 0.7 !important;
+                background-color: #6c757d !important;
+                user-select: none !important;
+                -webkit-user-select: none !important;
+                -moz-user-select: none !important;
+                -ms-user-select: none !important;
+              }
+              #startCourseBtn.expired:hover {
+                background-color: #6c757d !important;
+                opacity: 0.7 !important;
+                cursor: not-allowed !important;
+              }
+              #startCourseBtn.expired:active {
+                background-color: #6c757d !important;
+                opacity: 0.7 !important;
+              }
+            </style>
+            <script>
+              (function() {
+                // Check deadline immediately on page load and disable button if expired
+                var deadlineTimestamp = ${deadlineTimestamp || 'null'};
+                if (deadlineTimestamp) {
+                  var now = Date.now();
+                  if (now > deadlineTimestamp) {
+                    var btn = document.getElementById('startCourseBtn');
+                    if (btn) {
+                      btn.classList.add('expired');
+                      btn.style.backgroundColor = '#6c757d';
+                      btn.style.cursor = 'not-allowed';
+                      btn.style.opacity = '0.7';
+                      btn.style.pointerEvents = 'none';
+                      btn.style.touchAction = 'none';
+                      btn.style.userSelect = 'none';
+                      btn.textContent = 'Start Course (Expired)';
+                      btn.href = 'javascript:void(0);';
+                      btn.removeAttribute('href');
+                      btn.onclick = function(e) { 
+                        e.preventDefault(); 
+                        e.stopPropagation(); 
+                        e.stopImmediatePropagation();
+                        return false; 
+                      };
+                      btn.ontouchstart = function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return false;
+                      };
+                      btn.ontouchend = function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return false;
+                      };
+                      btn.setAttribute('onclick', 'return false;');
+                      btn.setAttribute('ontouchstart', 'return false;');
+                      btn.setAttribute('ontouchend', 'return false;');
+                    }
+                  }
+                }
+              })();
+              
+              function checkDeadlineAndNavigate(event, deadlineTimestamp, originalLink) {
+                if (!deadlineTimestamp) {
+                  return true; // No deadline, allow navigation
+                }
+                const now = Date.now();
+                if (now > deadlineTimestamp) {
+                  // Deadline has passed - prevent navigation and disable button
+                  event.preventDefault();
+                  event.stopPropagation();
+                  event.stopImmediatePropagation();
+                  const btn = document.getElementById('startCourseBtn');
+                  if (btn) {
+                    btn.classList.add('expired');
+                    btn.style.backgroundColor = '#6c757d';
+                    btn.style.cursor = 'not-allowed';
+                    btn.style.opacity = '0.7';
+                    btn.style.pointerEvents = 'none';
+                    btn.style.touchAction = 'none';
+                    btn.style.userSelect = 'none';
+                    btn.textContent = 'Start Course (Expired)';
+                    btn.removeAttribute('href');
+                    btn.onclick = function(e) { 
+                      e.preventDefault(); 
+                      e.stopPropagation(); 
+                      e.stopImmediatePropagation();
+                      return false; 
+                    };
+                    btn.ontouchstart = function(e) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      return false;
+                    };
+                    btn.ontouchend = function(e) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      return false;
+                    };
+                    btn.setAttribute('onclick', 'return false;');
+                    btn.setAttribute('ontouchstart', 'return false;');
+                    btn.setAttribute('ontouchend', 'return false;');
+                  }
+                  return false;
+                }
+                return true; // Deadline not passed, allow navigation
+              }
+            </script>
           `;
         } else {
+          // Already expired at send time - show disabled button with no link and no href
           dashboardSectionHtml = `
             <div style="text-align: center; margin: 20px 0;">
-              <div style="display: inline-block; padding: 14px 28px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px; cursor: not-allowed; opacity: 0.7;">
+              <span style="display: inline-block; padding: 14px 28px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px; cursor: not-allowed; opacity: 0.7; pointer-events: none; touch-action: none; user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none;">
                 Start Course (Expired)
-              </div>
+              </span>
             </div>
           `;
         }
@@ -352,6 +473,19 @@ const getTaskAssignmentContent = (
         .priority-badge { display: inline-block; padding: 5px 10px; border-radius: 3px; color: white; background-color: ${priorityColor}; font-weight: bold; text-transform: uppercase; }
         .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; background-color: #f9f9f9; border-radius: 0 0 5px 5px; }
         .button { display: inline-block; padding: 12px 24px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+        #startCourseBtn.expired, #startCourseBtn.expired:hover, #startCourseBtn.expired:active, #startCourseBtn.expired:focus {
+          pointer-events: none !important;
+          touch-action: none !important;
+          cursor: not-allowed !important;
+          opacity: 0.7 !important;
+          background-color: #6c757d !important;
+          user-select: none !important;
+          -webkit-user-select: none !important;
+          -moz-user-select: none !important;
+          -ms-user-select: none !important;
+          -webkit-touch-callout: none !important;
+          -webkit-tap-highlight-color: transparent !important;
+        }
       </style>
     </head>
     <body>

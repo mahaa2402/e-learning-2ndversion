@@ -70,6 +70,7 @@ export const API_ENDPOINTS = {
   },
   TASKS: {
     GET_ASSIGNED_TASKS: `${API_BASE_URL}/assigned-tasks`
+    , VALIDATE_ASSIGNED_COURSE: `${API_BASE_URL}/assigned-course/validate`
   },
   QUIZ: {
     CHECK_AVAILABILITY: `${API_BASE_URL}/courses/check-quiz-availability`,

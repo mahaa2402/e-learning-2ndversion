@@ -4,12 +4,13 @@ const crypto = require('crypto');
  * Generate a secure token for course access link
  * Token includes: employeeEmail, courseName, deadline timestamp
  */
-function generateSecureToken(employeeEmail, courseName, deadline) {
+function generateSecureToken(employeeEmail, courseName, deadline, assignmentId = null) {
   const data = {
     email: employeeEmail,
     course: courseName,
     deadline: new Date(deadline).getTime(),
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    assignmentId: assignmentId || null
   };
   
   const payload = Buffer.from(JSON.stringify(data)).toString('base64');
@@ -92,7 +93,7 @@ function verifySecureToken(token) {
  * Generate a secure course access link
  */
 function generateCourseLink(employeeEmail, courseName, deadline, baseUrl) {
-  const token = generateSecureToken(employeeEmail, courseName, deadline);
+  const token = generateSecureToken(employeeEmail, courseName, deadline, null);
   
   // Determine frontend URL
   let frontendUrl;
@@ -136,13 +137,18 @@ function generateCourseLink(employeeEmail, courseName, deadline, baseUrl) {
 /**
  * Generate a secure dashboard link with expiration
  */
-function generateDashboardLink(employeeEmail, deadline, baseUrl) {
+function generateDashboardLink(employeeEmail, deadline, baseUrl, courseName = 'dashboard', assignmentId = null) {
   // Ensure deadline is a Date object
   const deadlineDate = deadline instanceof Date ? deadline : new Date(deadline);
   console.log(`🔗 Generating dashboard link for ${employeeEmail}`);
   console.log(`📅 Deadline: ${deadlineDate.toISOString()} (${deadlineDate.toLocaleString()})`);
   
-  const token = generateSecureToken(employeeEmail, 'dashboard', deadlineDate);
+  const token = generateSecureToken(employeeEmail, courseName || 'dashboard', deadlineDate, assignmentId);
+  if (assignmentId) {
+    console.log('🔗 Generating dashboard link with assignmentId:', assignmentId);
+  } else {
+    console.log('🔗 Generating dashboard link without assignmentId');
+  }
   
   // Determine frontend URL
   let frontendUrl;

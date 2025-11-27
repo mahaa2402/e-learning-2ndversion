@@ -14,7 +14,7 @@ const deadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from 
 console.log('🔧 Generating test course access token...\n');
 
 try {
-  const token = generateSecureToken(employeeEmail, courseName, deadline);
+  const token = generateSecureToken(employeeEmail, courseName, deadline, null);
   
   // For development testing, always use localhost:3000
   // Change this to production URL if testing on production server

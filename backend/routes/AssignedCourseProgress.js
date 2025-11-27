@@ -215,6 +215,45 @@ router.get('/assigned-courses', authenticateToken, async (req, res) => {
   }
 });
 
+// Validate an assigned course for the current employee (checks deadline and status)
+router.get('/validate/:courseName', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'employee') {
+      return res.status(403).json({ error: 'Employee access required' });
+    }
+
+    const { courseName } = req.params;
+    if (!courseName) {
+      return res.status(400).json({ error: 'Course name is required' });
+    }
+
+    const progress = await getEmployeeAssignedCourseProgress(req.user.email);
+    if (!progress) {
+      return res.status(404).json({ error: 'No assigned progress found for the user' });
+    }
+
+    const assignment = progress.courseAssignments.find(a => a.courseName === courseName);
+    if (!assignment) {
+      return res.status(404).json({ error: 'Course not assigned to this employee' });
+    }
+
+    // Check for expiration
+    if (assignment.deadline && Date.now() > new Date(assignment.deadline).getTime()) {
+      return res.status(400).json({ valid: false, message: 'Assignment deadline passed' });
+    }
+
+    // Check for statuses that should block access
+    if (assignment.status && (assignment.status === 'completed' || assignment.status === 'overdue')) {
+      return res.status(403).json({ valid: false, message: 'Assignment status does not allow access' });
+    }
+
+    res.json({ valid: true, assignment });
+  } catch (error) {
+    console.error('Error validating assigned course:', error);
+    res.status(500).json({ error: 'Failed to validate assigned course', message: error.message });
+  }
+});
+
 // Mark assigned course as completed
 router.patch('/mark-completed', authenticateToken, async (req, res) => {
   try {

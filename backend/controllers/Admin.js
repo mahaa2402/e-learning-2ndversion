@@ -12,6 +12,7 @@ const {
 } = require('../assignedCourseUserProgressManager');
 const { sendTaskAssignmentEmail } = require('../services/emailService');
 const { generateCourseLink, generateDashboardLink } = require('../utils/secureLinkGenerator');
+const AssignedCourseUserProgress = require('../models/AssignedCourseUserProgress');
 const mongoose = require('mongoose');
 
 const resolveFrontendBase = (loginUrl) => {
@@ -275,8 +276,19 @@ const createAssignedTask = async (req, res) => {
         
         // Generate secure dashboard link with expiration
         let dashboardLink = null;
+        // Try to read assignmentId for precise token generation
+        let assignmentId = null;
         try {
-          dashboardLink = generateDashboardLink(employee.email, deadlineDate, baseUrl);
+          const progressDoc = await AssignedCourseUserProgress.findOne({ employeeEmail: employee.email });
+          if (progressDoc) {
+            const assign = progressDoc.courseAssignments.find(a => a.courseName === taskTitle);
+            if (assign && assign._id) assignmentId = assign._id.toString();
+          }
+        } catch (err) {
+          console.warn('⚠️ Failed to lookup assignmentId for dashboard link:', err);
+        }
+        try {
+          dashboardLink = generateDashboardLink(employee.email, deadlineDate, baseUrl, taskTitle, assignmentId);
           console.log(`🔗 Generated secure dashboard link for ${employee.email}`);
         } catch (linkError) {
           console.error('❌ Error generating dashboard link:', linkError);
@@ -821,8 +833,18 @@ const assignTaskByEmail = async (req, res) => {
       // Generate secure dashboard link with expiration
       const baseUrl = req.protocol + '://' + req.get('host');
       let dashboardLink = null;
+      let assignmentId = null;
       try {
-        dashboardLink = generateDashboardLink(employee.email, deadlineDate, baseUrl);
+        const progressDoc = await AssignedCourseUserProgress.findOne({ employeeEmail: employee.email });
+        if (progressDoc) {
+          const assign = progressDoc.courseAssignments.find(a => a.courseName === taskTitle);
+          if (assign && assign._id) assignmentId = assign._id.toString();
+        }
+      } catch (err) {
+        console.warn('⚠️ Failed to lookup assignmentId for dashboard link:', err);
+      }
+      try {
+        dashboardLink = generateDashboardLink(employee.email, deadlineDate, baseUrl, taskTitle, assignmentId);
         console.log(`🔗 Generated secure dashboard link for ${employee.email}`);
       } catch (linkError) {
         console.error('❌ Error generating dashboard link:', linkError);
@@ -985,9 +1007,21 @@ const assignCourseToEmployeeController = async (req, res) => {
         console.error('❌ Failed to generate course access link:', linkError);
       }
 
-      const dashboardLink = frontendBase
-        ? `${frontendBase}/userdashboard?email=${encodeURIComponent(employeeEmail)}`
-        : null;
+      // Prefer secure dashboard link which validates the token via backend
+      let dashboardLink = null;
+      try {
+        // Find assignmentId created by assignCourseToEmployeeManager
+        const progressDoc = progress;
+        let assignmentId = null;
+        if (progressDoc && progressDoc.courseAssignments) {
+          const assignment = progressDoc.courseAssignments.find(a => a.courseName === courseName);
+          if (assignment && assignment._id) assignmentId = assignment._id.toString();
+        }
+        dashboardLink = generateDashboardLink(employeeEmail, deadlineDate, baseUrl, courseName, assignmentId);
+      } catch (err) {
+        console.error('❌ Failed to generate secure dashboard link (falling back to plain dashboard link):', err);
+        dashboardLink = frontendBase ? `${frontendBase}/userdashboard?email=${encodeURIComponent(employeeEmail)}` : null;
+      }
 
       const emailSent = await sendTaskAssignmentEmail({
         employeeEmail,

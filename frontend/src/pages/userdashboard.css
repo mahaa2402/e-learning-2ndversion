@@ -639,6 +639,16 @@ body {
   box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
 }
 
+.btn-start-learning.disabled,
+.btn-start-learning[disabled] {
+  background: #6b7280 !important;
+  color: #e2e8f0 !important;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+  opacity: 0.85;
+}
+
 .btn-certificate {
   background: linear-gradient(135deg, #48bb78, #38a169);
   color: white;

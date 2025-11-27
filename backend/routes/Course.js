@@ -761,6 +761,7 @@ router.get('/course-access', async (req, res) => {
     console.log('📋 Decoded token:', token ? token.substring(0, 50) + '...' : 'Still missing');
     
     const { verifySecureToken } = require('../utils/secureLinkGenerator');
+    const AssignedCourseUserProgress = require('../models/AssignedCourseUserProgress');
     const tokenData = verifySecureToken(token);
     
     if (!tokenData) {
@@ -773,17 +774,55 @@ router.get('/course-access', async (req, res) => {
       });
     }
     
-    const { email, course, deadline } = tokenData;
-    console.log(`✅ Valid token for ${email} - Course: ${course}`);
+    const { email, course, deadline, assignmentId } = tokenData;
+    console.log(`✅ Valid token for ${email} - Course: ${course} - assignmentId: ${assignmentId || 'none'}`);
     console.log(`📅 Deadline: ${new Date(deadline).toLocaleString()}`);
     
-    // Token is valid - frontend will redirect to dashboard
-    res.json({
-      success: true,
-      courseName: course,
-      employeeEmail: email,
-      message: 'Token validated successfully'
-    });
+    // Additional DB validation: ensure assignment exists and not expired
+    try {
+      const assignedProgress = await AssignedCourseUserProgress.findOne({ employeeEmail: email });
+      if (!assignedProgress) {
+        console.log('⚠️ No assigned progress record found for this employee; token accepted but no assignment');
+        return res.status(400).json({ success: false, message: 'Invalid or expired token - no assignment found' });
+      }
+
+      let matchedAssignment = null;
+      if (assignmentId) {
+        matchedAssignment = assignedProgress.courseAssignments.find(a => a._id && a._id.toString() === assignmentId.toString());
+      }
+      if (!matchedAssignment) {
+        matchedAssignment = assignedProgress.courseAssignments.find(a => a.courseName === course && a.deadline && Math.abs(new Date(a.deadline).getTime() - deadline) < 2000);
+      }
+      if (!matchedAssignment) {
+        console.log('⚠️ No matching assignment found for token - deny access');
+        return res.status(400).json({ success: false, message: 'Invalid or expired token - no assignment matched' });
+      }
+      if (matchedAssignment.deadline && Date.now() > new Date(matchedAssignment.deadline).getTime()) {
+        console.log('❌ Matched assignment deadline expired - deny access');
+        return res.status(400).json({ success: false, message: 'Token expired (assignment deadline)' });
+      }
+      if (matchedAssignment.status && matchedAssignment.status === 'completed') {
+        console.log('⚠️ Matched assignment already completed; denying course access');
+        return res.status(403).json({ success: false, message: 'Access denied: assignment already completed' });
+      }
+      if (matchedAssignment.status && matchedAssignment.status === 'overdue') {
+        console.log('⚠️ Matched assignment is overdue; denying course access');
+        return res.status(403).json({ success: false, message: 'Access denied: assignment overdue' });
+      }
+
+      // Valid token and assignment
+      console.log('✅ Token and DB assignment are valid - returning success');
+      res.json({
+        success: true,
+        courseName: course,
+        employeeEmail: email,
+        message: 'Token validated successfully'
+      });
+
+    } catch (dbError) {
+      console.error('❌ Error while performing DB validation on token:', dbError);
+      return res.status(500).json({ success: false, message: 'Server error during token validation' });
+    }
     
   } catch (error) {
     console.error('❌ Error in course-access endpoint:', error);
