@@ -220,6 +220,42 @@ const sendTaskAssignmentEmail = async ({
 
       const priorityColor = priorityColors[priority] || priorityColors.medium;
 
+      // Determine whether the link is already expired at time of email send
+      const now = new Date();
+      const isDeadlineValid = !isNaN(deadlineDate.getTime());
+      const isExpiredAtSend = isDeadlineValid && now.getTime() > deadlineDate.getTime();
+
+      // Build the dashboard action section — clickable only if not expired
+      let dashboardSectionHtml = '';
+      if (dashboardLink) {
+        if (!isExpiredAtSend) {
+          dashboardSectionHtml = `
+            <div style="text-align: center; margin: 20px 0;">
+              <a href="${dashboardLink}" style="display: inline-block; padding: 14px 28px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+                Start Course 
+              </a>
+            
+            </div>
+          `;
+        } else {
+          dashboardSectionHtml = `
+            <div style="text-align: center; margin: 20px 0;">
+              <div style="display: inline-block; padding: 14px 28px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px; cursor: not-allowed; opacity: 0.7;">
+                Start Course (Expired)
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      const expiryNoteHtml = isDeadlineValid
+        ? `
+          <p style="color: #666; font-size: 12px; margin-top: 8px; text-align:center;">
+            <strong>Note:</strong> This "Start Course" link will expire on <strong>${formattedDeadline}</strong> and will not be usable after this time.
+          </p>
+        `
+        : '';
+
       const mailOptions = {
         from: fromEmail,
         to: employeeEmail,
@@ -235,7 +271,8 @@ const sendTaskAssignmentEmail = async ({
           priority,
           priorityColor,
           courseLink,
-          dashboardLink,
+          dashboardSectionHtml,
+          expiryNoteHtml,
           loginUrl
         )
       };
@@ -277,7 +314,8 @@ const getTaskAssignmentContent = (
   priority,
   priorityColor,
   courseLink = null,
-  dashboardLink = null,
+  dashboardSectionHtml = null,
+  expiryNoteHtml = null,
   loginUrl = null
 ) => {
   const loginSection = loginUrl
@@ -293,15 +331,7 @@ const getTaskAssignmentContent = (
   `
     : '';
 
-  const dashboardSection = dashboardLink
-    ? `
-    <div style="text-align: center; margin: 20px 0;">
-      <a href="${dashboardLink}" style="display: inline-block; padding: 14px 28px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
-        Start Course
-      </a>
-    </div>
-  `
-    : '';
+  const dashboardSection = dashboardSectionHtml || '';
 
   // Remove the old 'Open Assignment (Secure Link)' button, and rely on the dashboard link instead
   const courseSection = '';
@@ -352,6 +382,7 @@ const getTaskAssignmentContent = (
           </div>
           
           ${dashboardSection}
+          ${expiryNoteHtml || ''}
           ${courseSection}
           ${loginSection}
           
@@ -367,7 +398,15 @@ const getTaskAssignmentContent = (
   `;
 };
 
-const sendCourseCompletionEmail = async (adminEmail, adminName, employeeName, employeeEmail, courseName, completedAt) => {
+const sendCourseCompletionEmail = async (
+  adminEmail,
+  adminName,
+  employeeName,
+  employeeEmail,
+  courseName,
+  completedAt,
+  certificateAttachment = null
+) => {
   try {
     const emailConfigured = transporter !== null;
 
@@ -391,6 +430,17 @@ const sendCourseCompletionEmail = async (adminEmail, adminName, employeeName, em
         html: getCourseCompletionContent(adminName, employeeName, employeeEmail, courseName, formattedDate)
       };
 
+      // Attach certificate PDF (if provided)
+      if (certificateAttachment && certificateAttachment.buffer) {
+        mailOptions.attachments = [
+          {
+            filename: certificateAttachment.filename || 'certificate.pdf',
+            content: certificateAttachment.buffer,
+            contentType: 'application/pdf'
+          }
+        ];
+        console.log(`📎 Attachment included in completion email: ${mailOptions.attachments[0].filename} (${mailOptions.attachments[0].content.length} bytes)`);
+      }
       console.log(`📧 Sending course completion email from: ${fromEmail} to: ${adminEmail}`);
       console.log(`📧 Subject: ${subjectLine}`);
       const info = await transporter.sendMail(mailOptions);
@@ -410,6 +460,10 @@ const sendCourseCompletionEmail = async (adminEmail, adminName, employeeName, em
       console.log(`👤 Employee: ${employeeName} (${employeeEmail})`);
       console.log(`📚 Course: ${courseName}`);
       console.log(`✅ Completed at: ${completedAt}`);
+      if (certificateAttachment && certificateAttachment.filename && certificateAttachment.buffer) {
+        console.log(`📎 Attachment (dev-mode) will be sent as: ${certificateAttachment.filename} (${certificateAttachment.buffer.length} bytes)`);
+      }
+
       console.log('========================================\n');
       return true;
     }
