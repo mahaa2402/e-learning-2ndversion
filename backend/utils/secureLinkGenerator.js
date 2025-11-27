@@ -133,9 +133,58 @@ function generateCourseLink(employeeEmail, courseName, deadline, baseUrl) {
   return accessLink;
 }
 
+/**
+ * Generate a secure dashboard link with expiration
+ */
+function generateDashboardLink(employeeEmail, deadline, baseUrl) {
+  // Ensure deadline is a Date object
+  const deadlineDate = deadline instanceof Date ? deadline : new Date(deadline);
+  console.log(`🔗 Generating dashboard link for ${employeeEmail}`);
+  console.log(`📅 Deadline: ${deadlineDate.toISOString()} (${deadlineDate.toLocaleString()})`);
+  
+  const token = generateSecureToken(employeeEmail, 'dashboard', deadlineDate);
+  
+  // Determine frontend URL
+  let frontendUrl;
+  
+  // Priority 1: Use baseUrl from request (most reliable)
+  if (baseUrl) {
+    if (baseUrl.includes(':5000')) {
+      frontendUrl = baseUrl.replace(':5000', '');
+    } else if (baseUrl.includes(':3000')) {
+      frontendUrl = baseUrl;
+    } else {
+      frontendUrl = baseUrl;
+    }
+    console.log('🔗 Using baseUrl for dashboard link:', frontendUrl);
+  }
+  // Priority 2: Use REACT_APP_API_URL from environment
+  else if (process.env.REACT_APP_API_URL) {
+    const apiUrl = process.env.REACT_APP_API_URL;
+    if (apiUrl.includes(':5000')) {
+      frontendUrl = apiUrl.replace(':5000', '').replace('/api', '');
+    } else {
+      frontendUrl = apiUrl.replace('/api', '');
+    }
+    console.log('🔗 Using REACT_APP_API_URL for dashboard link:', frontendUrl);
+  }
+  // Priority 3: Fallback to localhost (development only)
+  else {
+    frontendUrl = 'http://localhost:3000';
+    console.log('⚠️ No baseUrl or REACT_APP_API_URL, using localhost fallback for dashboard');
+  }
+  
+  // Point to backend route that will validate and redirect
+  const backendBase = baseUrl || process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
+  const dashboardLink = `${backendBase}/api/auth/validate-dashboard-link?token=${encodeURIComponent(token)}&email=${encodeURIComponent(employeeEmail)}`;
+  console.log('🔗 Generated secure dashboard link with expiration');
+  return dashboardLink;
+}
+
 module.exports = {
   generateSecureToken,
   verifySecureToken,
-  generateCourseLink
+  generateCourseLink,
+  generateDashboardLink
 };
 

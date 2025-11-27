@@ -38,12 +38,36 @@ const AdminDashboard = () => {
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [coursesError, setCoursesError] = useState(null);
   const [rawReportData, setRawReportData] = useState([]);
+  const [certificates, setCertificates] = useState([]);
   const [reportData, setReportData] = useState({ courses: [], rows: [] });
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState(null);
 
   // Fetch dashboard data from API
   useEffect(() => {
+    // Fetch certificates to map employee IDs for CSV export
+    const fetchCertificates = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(API_ENDPOINTS.CERTIFICATES.GET_ALL, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: token ? `Bearer ${token}` : ''
+          }
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const result = await response.json();
+        // result.certificates expected
+        setCertificates(Array.isArray(result.certificates) ? result.certificates : []);
+      } catch (err) {
+        console.warn('Could not fetch certificates for CSV mapping:', err.message);
+        setCertificates([]);
+      }
+    };
+    fetchCertificates();
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
@@ -85,7 +109,13 @@ const AdminDashboard = () => {
     fetchDashboardData();
   }, [navigate]);
 
-  const buildReportData = (payload = [], allowedCourses = []) => {
+  const buildReportData = (payload = [], allowedCourses = [], certificatesList = []) => {
+    const extractEmployeeId = (val) => {
+      if (!val) return '';
+      if (typeof val === 'string') return val;
+      if (typeof val === 'object') return val.employeeId || val._id || val.id || (val.toString ? val.toString() : '') || '';
+      return '';
+    };
     const allowedSet = allowedCourses.length ? new Set(allowedCourses) : null;
     const courseSet = new Set();
     const rows = [];
@@ -97,6 +127,16 @@ const AdminDashboard = () => {
         entry.employeeEmail ||
         'Unknown Employee';
       const employeeEmail = entry.employeeEmail || entry.employeeId?.email || '';
+      // Prefer the employeeId from assigned progress if present
+      let employeeId = extractEmployeeId(entry.employeeId);
+
+      // If employeeId missing, attempt to find it in the certificates collection using email
+      if (!employeeId && entry.employeeEmail) {
+        const certMatch = certificatesList.find(c => (c.employeeEmail || '').toLowerCase() === (entry.employeeEmail || '').toLowerCase());
+        if (certMatch) {
+          employeeId = certMatch.employeeId || certMatch.employeeIdString || '';
+        }
+      }
       const courseMap = {};
 
       (entry.courseAssignments || []).forEach(assignment => {
@@ -115,7 +155,7 @@ const AdminDashboard = () => {
 
       const hasCompleted = Object.values(courseMap).some(value => value === 'Completed');
       if (hasCompleted) {
-        rows.push({ employeeName, employeeEmail, courses: courseMap });
+        rows.push({ employeeName, employeeEmail, employeeId, courses: courseMap });
       }
     });
 
@@ -197,8 +237,8 @@ const AdminDashboard = () => {
   }, [navigate]);
 
   useEffect(() => {
-    setReportData(buildReportData(rawReportData, activeCourses));
-  }, [rawReportData, activeCourses]);
+    setReportData(buildReportData(rawReportData, activeCourses, certificates));
+  }, [rawReportData, activeCourses, certificates]);
 
   const escapeCsv = (value) => {
     if (value === null || value === undefined) return '""';
@@ -211,10 +251,10 @@ const AdminDashboard = () => {
       return;
     }
 
-    const header = ['Employee Name', 'Employee Email', ...reportData.courses];
+    const header = ['Employee Name', 'Employee Email', 'Employee ID', ...reportData.courses];
     const rows = reportData.rows.map(row => {
       const courseStatuses = reportData.courses.map(course => row.courses[course] || '');
-      return [row.employeeName, row.employeeEmail || '', ...courseStatuses];
+      return [row.employeeName, row.employeeEmail || '', row.employeeId || '', ...courseStatuses];
     });
 
     const csvLines = [header, ...rows]

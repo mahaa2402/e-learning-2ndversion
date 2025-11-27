@@ -4,6 +4,7 @@ const Employee = require('./models/Employee');
 const Admin = require('./models/Admin');
 const { generateCertificate } = require('./controllers/CertificateController');
 const { sendCourseCompletionEmail } = require('./services/emailService');
+const { generateCertificatePdf } = require('./utils/certificatePdfGenerator');
 const CommonCourse = require('./models/common_courses');
 require('dotenv').config();
 
@@ -278,11 +279,36 @@ async function checkAndGenerateCertificate(employeeEmail, courseName, progress) 
           await progress.save();
           console.log(`✅ Course assignment status updated to completed`);
           
+          const certificateDoc = certificateResult.certificate;
+          const completionDate = certificateDoc?.completionDate
+            ? new Date(certificateDoc.completionDate)
+            : new Date();
+
+          let certificateAttachment = null;
+          try {
+            const safeEmployeeName = (employee.name || 'Employee').replace(/[^\w.-]+/g, '_');
+            const safeCourseName = (courseName || 'Course').replace(/[^\w.-]+/g, '_');
+            const pdfBuffer = await generateCertificatePdf({
+              employeeName: employee.name,
+              employeeEmail,
+              courseName,
+              completionDate,
+              certificateId: certificateDoc?.certificateId
+            });
+
+            certificateAttachment = {
+              buffer: pdfBuffer,
+              filename: `Certificate-${safeEmployeeName}-${safeCourseName}.pdf`
+            };
+            console.log('📎 Generated certificate PDF for email attachment');
+          } catch (pdfError) {
+            console.error('❌ Failed to generate certificate PDF:', pdfError);
+          }
+
           // Send email notification to admin who assigned the course
           try {
             // Get admin details
             const admin = await Admin.findById(courseAssignment.assignedBy.adminId);
-            const completionDate = new Date();
             if (admin && admin.email) {
               console.log(`📧 Sending course completion email to admin: ${admin.email}`);
               
@@ -292,7 +318,8 @@ async function checkAndGenerateCertificate(employeeEmail, courseName, progress) 
                 employee.name,
                 employeeEmail,
                 courseName,
-                completionDate
+                completionDate,
+                certificateAttachment
               );
               
               if (emailSent) {
@@ -332,7 +359,8 @@ async function checkAndGenerateCertificate(employeeEmail, courseName, progress) 
                   employee.name,
                   employeeEmail,
                   courseName,
-                  completionDate
+                  completionDate,
+                  certificateAttachment
                 );
 
                 if (additionalEmailSent) {
@@ -380,7 +408,7 @@ async function getEmployeeAssignedCourseProgress(employeeEmail) {
 async function getAllEmployeesAssignedCourseProgress() {
   try {
     const allProgress = await AssignedCourseUserProgress.find({})
-      .populate('employeeId', 'name email department')
+      .populate('employeeId', 'name email department employeeId')
       .sort({ updatedAt: -1 });
     return allProgress;
   } catch (error) {

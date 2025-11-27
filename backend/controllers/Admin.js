@@ -11,7 +11,7 @@ const {
   getAllEmployeesAssignedCourseProgress: getAllEmployeesAssignedCourseProgressManager 
 } = require('../assignedCourseUserProgressManager');
 const { sendTaskAssignmentEmail } = require('../services/emailService');
-const { generateCourseLink } = require('../utils/secureLinkGenerator');
+const { generateCourseLink, generateDashboardLink } = require('../utils/secureLinkGenerator');
 const mongoose = require('mongoose');
 
 const resolveFrontendBase = (loginUrl) => {
@@ -269,29 +269,19 @@ const createAssignedTask = async (req, res) => {
     try {
       // Get base URL for link generation
       const baseUrl = req.protocol + '://' + req.get('host');
-      const loginUrl =
-        process.env.PLATFORM_LOGIN_URL ||
-        (process.env.FRONTEND_BASE_URL
-          ? `${process.env.FRONTEND_BASE_URL.replace(/\/$/, '')}/login`
-          : 'http://localhost:3000/login');
-      
-      const frontendBase = resolveFrontendBase(loginUrl);
 
       for (const employee of employees) {
         console.log(`📧 Sending task assignment email to: ${employee.name} (${employee.email})`);
         
-        // Generate secure course link
-        let courseLink = null;
+        // Generate secure dashboard link with expiration
+        let dashboardLink = null;
         try {
-          courseLink = generateCourseLink(employee.email, taskTitle, deadlineDate, baseUrl);
-          console.log(`🔗 Generated secure course link for ${employee.email}`);
+          dashboardLink = generateDashboardLink(employee.email, deadlineDate, baseUrl);
+          console.log(`🔗 Generated secure dashboard link for ${employee.email}`);
         } catch (linkError) {
-          console.error('❌ Error generating course link:', linkError);
+          console.error('❌ Error generating dashboard link:', linkError);
           // Continue without link if generation fails
         }
-        const dashboardLink = frontendBase
-          ? `${frontendBase}/userdashboard?email=${encodeURIComponent(employee.email)}`
-          : null;
 
         const emailSent = await sendTaskAssignmentEmail({
           employeeEmail: employee.email,
@@ -302,9 +292,7 @@ const createAssignedTask = async (req, res) => {
           adminName: admin.name,
           adminEmail: admin.email,
           priority: priority || 'medium',
-          courseLink,
-          dashboardLink,
-          loginUrl
+          dashboardLink
         });
         
         if (emailSent) {
@@ -830,26 +818,16 @@ const assignTaskByEmail = async (req, res) => {
     try {
       console.log(`📧 Sending task assignment email to: ${employee.name} (${employee.email})`);
       
-      // Generate secure course link
+      // Generate secure dashboard link with expiration
       const baseUrl = req.protocol + '://' + req.get('host');
-      const loginUrl =
-        process.env.PLATFORM_LOGIN_URL ||
-        (process.env.FRONTEND_BASE_URL
-          ? `${process.env.FRONTEND_BASE_URL.replace(/\/$/, '')}/login`
-          : 'http://localhost:3000/login');
-      let courseLink = null;
+      let dashboardLink = null;
       try {
-        courseLink = generateCourseLink(employee.email, taskTitle, deadlineDate, baseUrl);
-        console.log(`🔗 Generated secure course link for ${employee.email}`);
+        dashboardLink = generateDashboardLink(employee.email, deadlineDate, baseUrl);
+        console.log(`🔗 Generated secure dashboard link for ${employee.email}`);
       } catch (linkError) {
-        console.error('❌ Error generating course link:', linkError);
+        console.error('❌ Error generating dashboard link:', linkError);
         // Continue without link if generation fails
       }
-      
-      const frontendBase = resolveFrontendBase(loginUrl);
-      const dashboardLink = frontendBase
-        ? `${frontendBase}/userdashboard?email=${encodeURIComponent(employee.email)}`
-        : null;
 
       const emailSent = await sendTaskAssignmentEmail({
         employeeEmail: employee.email,
@@ -860,9 +838,7 @@ const assignTaskByEmail = async (req, res) => {
         adminName: admin.name,
         adminEmail: admin.email,
         priority: priority || 'medium',
-        courseLink,
-        dashboardLink,
-        loginUrl
+        dashboardLink
       });
       
       if (emailSent) {

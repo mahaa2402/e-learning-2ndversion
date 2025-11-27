@@ -200,7 +200,7 @@ router.get('/employees', authenticateToken, requireAdmin, async (req, res) => {
 // POST /api/employees - Add a new employee (admin only)
 router.post('/employees', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { name, email, department, password } = req.body || {};
+    const { name, email, department, password, employeeId } = req.body || {};
 
     if (!name || !email || !department) {
       return res.status(400).json({
@@ -239,9 +239,12 @@ router.post('/employees', authenticateToken, requireAdmin, async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
+    const cleanedEmployeeId = employeeId ? String(employeeId).trim() : undefined;
+
     const employee = new Employee({
       name: cleanedName,
       email: normalizedEmail,
+      employeeId: cleanedEmployeeId,
       department: cleanedDepartment,
       password: hashedPassword
     });
@@ -289,6 +292,7 @@ router.post('/employees', authenticateToken, requireAdmin, async (req, res) => {
         id: savedEmployee._id,
         name: savedEmployee.name,
         email: savedEmployee.email,
+        employeeId: savedEmployee.employeeId || undefined,
         department: savedEmployee.department,
         createdAt: savedEmployee.createdAt
       },

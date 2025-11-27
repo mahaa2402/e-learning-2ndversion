@@ -65,7 +65,7 @@ const EmployeeCard = ({ employee, onViewDetails, onDelete, isDeleting }) => {
       <div className="employee-card-footer">
         <span className="employee-footer-label">Employee ID</span>
         <span className="employee-footer-value">
-          {employee._id?.slice(-8) || employee.id?.slice(-8) || 'N/A'}
+          {employee.employeeId || employee._id?.slice(-8) || employee.id?.slice(-8) || 'N/A'}
         </span>
         {employee.hasCertificates && (
           <div style={{ marginTop: '8px', padding: '4px 8px', backgroundColor: '#e8f5e8', borderRadius: '4px', fontSize: '12px' }}>
@@ -115,6 +115,7 @@ const EmployeeDirectory = () => {
       id: identifier,
       name: employee.name || employee.employeeName || employee.email?.split('@')[0] || 'Unnamed Employee',
       email: employee.email || employee.employeeEmail || '',
+      employeeId: employee.employeeId || overrides.employeeId || '',
       department: employee.department || overrides.department || '',
       createdAt: employee.createdAt || employee.completionDate || new Date().toISOString(),
       hasCertificates: Boolean(employee.hasCertificates || employee.certificateCount),
@@ -246,6 +247,7 @@ const EmployeeDirectory = () => {
         body: JSON.stringify({
           name: trimmedName,
           email: trimmedEmail,
+          employeeId: newEmployee.employeeId?.trim() || undefined,
           department: trimmedDepartment,
           password: trimmedPassword || undefined,
         }),
@@ -445,6 +447,17 @@ const EmployeeDirectory = () => {
                         type="text"
                         placeholder="E.g. Operations"
                         value={newEmployee.department}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    <div className="employee-add-form-group">
+                      <label htmlFor="employeeId">Employee ID</label>
+                      <input
+                        id="employeeId"
+                        name="employeeId"
+                        type="text"
+                        placeholder="Employee ID (e.g., EMP-12345)"
+                        value={newEmployee.employeeId || ''}
                         onChange={handleInputChange}
                       />
                     </div>
