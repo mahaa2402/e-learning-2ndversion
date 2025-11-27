@@ -70,13 +70,12 @@ function verifySecureToken(token) {
     
     // Check if token has expired (past deadline)
     const now = Date.now();
-    console.log('📅 Current time:', new Date(now).toLocaleString());
-    console.log('📅 Deadline time:', new Date(data.deadline).toLocaleString());
-    console.log('📅 Time remaining:', Math.max(0, data.deadline - now), 'ms');
-    
+    console.log('📅 [DEBUG] Current time (ms):', now, '|', new Date(now).toISOString());
+    console.log('📅 [DEBUG] Deadline (ms):', data.deadline, '|', new Date(data.deadline).toISOString());
+    console.log('📅 [DEBUG] Time remaining (ms):', data.deadline - now);
     if (data.deadline && now > data.deadline) {
       console.log('❌ Token expired - deadline passed');
-      console.log('📅 Expired by:', (now - data.deadline) / (1000 * 60 * 60), 'hours');
+      console.log('📅 [DEBUG] Expired by (ms):', now - data.deadline);
       return null;
     }
     

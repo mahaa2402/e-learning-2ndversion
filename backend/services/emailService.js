@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const moment = require('moment-timezone');
 
 let transporter = null;
 
@@ -203,17 +204,14 @@ const sendTaskAssignmentEmail = async ({
       // Read FROM_EMAIL fresh from process.env each time (in case .env was updated)
       const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER;
       
+
+      // Convert deadline (UTC) to IST for email display
       const deadlineDate = new Date(deadline);
-      // Include timezone abbreviation for clarity
-      const formattedDeadline = deadlineDate.toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-        timeZoneName: 'short'
-      });
+      let formattedDeadline = '';
+      if (!isNaN(deadlineDate.getTime())) {
+        const deadlineIST = moment(deadlineDate).tz('Asia/Kolkata');
+        formattedDeadline = deadlineIST.format('MMMM D, YYYY [at] HH:mm [IST]');
+      }
 
       const priorityColors = {
         high: '#dc3545',
@@ -372,7 +370,8 @@ const sendTaskAssignmentEmail = async ({
       const expiryNoteHtml = isDeadlineValid
         ? `
           <p style="color: #666; font-size: 12px; margin-top: 8px; text-align:center;">
-            <strong>Note:</strong> This "Start Course" link will expire on <strong>${formattedDeadline}</strong> and will not be usable after this time.
+            <strong>Note:</strong> This "Start Course" link will expire on <strong>${formattedDeadline}</strong> and will not be usable after this time.<br>
+            <span style="font-size:11px;">(Time shown in IST - Indian Standard Time)</span>
           </p>
         `
         : '';
