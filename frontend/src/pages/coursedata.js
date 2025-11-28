@@ -4,7 +4,7 @@ const courseData = {
     lessons: {
       "ISP01": {
         title: "Introduction to Information Security & Data Protection",
-        videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/videos/isp/mod1/1763966172588_6ba267b0-f416-4996-b54d-19dc838da7a1.mp4",
+        videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/isp_mod1.mp4",
         content: [
           "What is Information Security?",
           "",
@@ -38,7 +38,7 @@ const courseData = {
       "ISP02": {
         title: "Legal Frameworks & Data Subject Rights",
         duration:"30min",
-        videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/videos/isp/mod2/1763966282005_4e1b3200-0ee8-4598-9faa-8a8d869abdd5.mp4",
+        videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/isp_mod2.mp4",
         content: [
           "Legal Framework Overview:",
           "",
@@ -78,7 +78,7 @@ const courseData = {
       },
       "ISP03": {
         title: "Risk Assessment & Threat Management",
-        videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/videos/isp/mod3/1763975632777_5de30ace-82f0-4e28-95f3-3ce022ba003a.mp4",
+        videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/isp_mod3.mp4",
         content: [
           "Understanding Information Security Risks:",
           "",
@@ -116,7 +116,7 @@ const courseData = {
       },
       "ISP04": {
         title: "Security Controls & Best Practices",
-        videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/videos/isp/mod4/1763966340630_4b526467-91e8-4ea9-b384-19836569a7ce.mp4",
+        videoUrl: "https://intern-vista-work-space.s3.eu-north-1.amazonaws.com/e-learning/isp_mod4.mp4",
         content: [
           "Types of Security Controls:",
           "",
