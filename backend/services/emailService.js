@@ -602,6 +602,13 @@ const sendCourseCompletionEmail = async (
     }
   } catch (error) {
     console.error('❌ Failed to send course completion email:', error.message);
+    console.error('❌ Email error details:', {
+      to: adminEmail,
+      errorName: error.name,
+      errorCode: error.code,
+      errorMessage: error.message,
+      stack: error.stack
+    });
     // Don't throw error - we don't want email failure to break the process
     return false;
   }

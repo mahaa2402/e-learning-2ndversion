@@ -42,7 +42,10 @@ export const API_ENDPOINTS = {
     REGISTER: `${API_BASE_URL}/auth/register`,
     SEND_OTP: `${API_BASE_URL}/auth/send-otp`,
     VERIFY_OTP: `${API_BASE_URL}/auth/verify-otp`,
-    RESEND_OTP: `${API_BASE_URL}/auth/resend-otp`
+    RESEND_OTP: `${API_BASE_URL}/auth/resend-otp`,
+    FORGOT_PASSWORD_REQUEST: `${API_BASE_URL}/auth/forgot-password`,
+    FORGOT_PASSWORD_VERIFY: `${API_BASE_URL}/auth/forgot-password/verify`,
+    FORGOT_PASSWORD_RESET: `${API_BASE_URL}/auth/forgot-password/reset`
   },
   COURSES: {
     GET_COURSES: `${API_BASE_URL}/courses/getcourse`,

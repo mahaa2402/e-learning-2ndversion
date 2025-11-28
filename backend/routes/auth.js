@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { login, register } = require('../controllers/Login');
 const { sendSignupOTP, verifyOTP, resendOTP } = require('../controllers/OTPController');
+const { requestPasswordReset, verifyPasswordResetOTP, resetPassword } = require('../controllers/ForgotPasswordController');
 const { verifySecureToken } = require('../utils/secureLinkGenerator');
 const AssignedCourseUserProgress = require('../models/AssignedCourseUserProgress');
 
@@ -28,6 +29,22 @@ router.post('/resend-otp', resendOTP);
 
 // Register route (requires OTP verification)
 router.post('/register', register);
+
+// Forgot password routes
+console.log('📋 Registering forgot password routes...');
+router.post('/forgot-password', (req, res, next) => {
+  console.log('🔐 POST /api/auth/forgot-password - Route hit');
+  requestPasswordReset(req, res, next);
+});
+router.post('/forgot-password/verify', (req, res, next) => {
+  console.log('🔐 POST /api/auth/forgot-password/verify - Route hit');
+  verifyPasswordResetOTP(req, res, next);
+});
+router.post('/forgot-password/reset', (req, res, next) => {
+  console.log('🔐 POST /api/auth/forgot-password/reset - Route hit');
+  resetPassword(req, res, next);
+});
+console.log('✅ Forgot password routes registered');
 
 // Validate dashboard link and redirect
 router.get('/validate-dashboard-link', async (req, res) => {
