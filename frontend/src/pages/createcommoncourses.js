@@ -29,7 +29,12 @@ const CreateCommonCourses = () => {
     modules: [],
     backgroundImage: null, // For storing the image file
     backgroundImageUrl: null, // For storing the uploaded image URL
-    retakeQuizCooldownHours: 24 // Default 24 hours (1 day) for retake quiz cooldown
+    retakeQuizCooldownHours: 24, // Default 24 hours (1 day) for retake quiz cooldown
+    preTest: {                 // Optional course-level pre-test
+      enabled: false,
+      passingScore: 0,
+      questions: []
+    }
   });
 
   const [currentModule, setCurrentModule] = useState({
@@ -118,7 +123,12 @@ const CreateCommonCourses = () => {
       modules: [],
       backgroundImage: null,
       backgroundImageUrl: null,
-      retakeQuizCooldownHours: 24
+      retakeQuizCooldownHours: 24,
+      preTest: {
+        enabled: false,
+        passingScore: 0,
+        questions: []
+      }
     });
     setCurrentModule({
       m_id: '',
@@ -184,7 +194,12 @@ const CreateCommonCourses = () => {
         })),
         backgroundImage: null,
         backgroundImageUrl: course.backgroundImageUrl || null,
-        retakeQuizCooldownHours: course.retakeQuizCooldownHours || 24
+        retakeQuizCooldownHours: course.retakeQuizCooldownHours || 24,
+        preTest: {
+          enabled: !!course.preTest?.enabled,
+          passingScore: course.preTest?.passingScore || 0,
+          questions: Array.isArray(course.preTest?.questions) ? course.preTest.questions : []
+        }
       });
     } else {
       setEditingCourse(null);
@@ -1457,6 +1472,13 @@ const CreateCommonCourses = () => {
         description: formData.description || '',
         backgroundImageUrl: finalBackgroundImageUrl,
         retakeQuizCooldownHours: formData.retakeQuizCooldownHours || 24,
+        preTest: formData.preTest && formData.preTest.enabled
+          ? {
+              enabled: true,
+              passingScore: formData.preTest.passingScore || 0,
+              questions: Array.isArray(formData.preTest.questions) ? formData.preTest.questions : []
+            }
+          : { enabled: false, passingScore: 0, questions: [] },
         modules: updatedModules.map((module, index) => {
           const moduleData = {
           m_id: module.m_id,
@@ -1820,6 +1842,12 @@ const CreateCommonCourses = () => {
                   >
                     Modules ({formData.modules.length})
                   </button>
+                  <button
+                    onClick={() => setActiveTab('pretest')}
+                    className={`tab-button ${activeTab === 'pretest' ? 'active' : ''}`}
+                  >
+                    Pre-Test (Optional)
+                  </button>
                 </div>
 
               <div className="modal-body">
@@ -1987,6 +2015,162 @@ const CreateCommonCourses = () => {
                         Time (in hours) users must wait after failing the retake quiz before attempting again. Default: 24 hours (1 day)
                       </p>
                     </div>
+                  </div>
+                )}
+
+                {/* Pre-Test Tab */}
+                {activeTab === 'pretest' && (
+                  <div className="pretest-tab">
+                    <div className="form-group">
+                      <label className="form-label">
+                        <input
+                          type="checkbox"
+                          checked={formData.preTest.enabled}
+                          onChange={(e) =>
+                            setFormData(prev => ({
+                              ...prev,
+                              preTest: { ...prev.preTest, enabled: e.target.checked }
+                            }))
+                          }
+                          style={{ marginRight: '8px' }}
+                        />
+                        Enable Pre-Test assessment for this course
+                      </label>
+                    </div>
+
+                    {formData.preTest.enabled && (
+                      <>
+                        <div className="form-group">
+                          <label className="form-label">
+                            Passing Score (optional, for reference only)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            className="form-input"
+                            value={formData.preTest.passingScore}
+                            onChange={(e) =>
+                              setFormData(prev => ({
+                                ...prev,
+                                preTest: {
+                                  ...prev.preTest,
+                                  passingScore: Number(e.target.value) || 0
+                                }
+                              }))
+                            }
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label">
+                            Pre-Test Questions ({formData.preTest.questions.length})
+                          </label>
+
+                          <button
+                            type="button"
+                            className="create-btn"
+                            style={{ marginBottom: '12px' }}
+                            onClick={() => {
+                              const newQuestion = {
+                                question: '',
+                                type: 'multiple-choice',
+                                options: ['', '', '', ''],
+                                correctAnswer: '',
+                                points: 1,
+                                imageUrl: null
+                              };
+                              setFormData(prev => ({
+                                ...prev,
+                                preTest: {
+                                  ...prev.preTest,
+                                  questions: [...prev.preTest.questions, newQuestion]
+                                }
+                              }));
+                            }}
+                          >
+                            <Plus className="w-4 h-4" style={{ marginRight: 4 }} />
+                            Add Question
+                          </button>
+
+                          {formData.preTest.questions.map((q, idx) => (
+                            <div key={idx} className="question-card">
+                              <div className="question-header">
+                                <span>Question {idx + 1}</span>
+                                <button
+                                  type="button"
+                                  className="icon-button text-red-500"
+                                  onClick={() => {
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      preTest: {
+                                        ...prev.preTest,
+                                        questions: prev.preTest.questions.filter((_, i) => i !== idx)
+                                      }
+                                    }));
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+
+                              <input
+                                type="text"
+                                className="form-input"
+                                placeholder="Enter question text"
+                                value={q.question}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setFormData(prev => {
+                                    const questions = [...prev.preTest.questions];
+                                    questions[idx] = { ...questions[idx], question: value };
+                                    return { ...prev, preTest: { ...prev.preTest, questions } };
+                                  });
+                                }}
+                              />
+
+                              <div className="options-grid">
+                                {q.options.map((opt, optIdx) => (
+                                  <div key={optIdx} className="option-row">
+                                    <input
+                                      type="radio"
+                                      name={`pretest-correct-${idx}`}
+                                      checked={q.correctAnswer === opt}
+                                      onChange={() => {
+                                        setFormData(prev => {
+                                          const questions = [...prev.preTest.questions];
+                                          questions[idx] = { ...questions[idx], correctAnswer: opt };
+                                          return { ...prev, preTest: { ...prev.preTest, questions } };
+                                        });
+                                      }}
+                                    />
+                                    <input
+                                      type="text"
+                                      className="form-input"
+                                      placeholder={`Option ${optIdx + 1}`}
+                                      value={opt}
+                                      onChange={(e) => {
+                                        const value = e.target.value;
+                                        setFormData(prev => {
+                                          const questions = [...prev.preTest.questions];
+                                          const options = [...questions[idx].options];
+                                          options[optIdx] = value;
+                                          // If this option was the correct answer, keep it in sync
+                                          const correctAnswer =
+                                            questions[idx].correctAnswer === opt ? value : questions[idx].correctAnswer;
+                                          questions[idx] = { ...questions[idx], options, correctAnswer };
+                                          return { ...prev, preTest: { ...prev.preTest, questions } };
+                                        });
+                                      }}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 

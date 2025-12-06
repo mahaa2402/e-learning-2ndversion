@@ -79,6 +79,9 @@ export const API_ENDPOINTS = {
     CHECK_AVAILABILITY: `${API_BASE_URL}/courses/check-quiz-availability`,
     GET_QUESTIONS: `${API_BASE_URL}/courses/questions`
   },
+  PRETEST: {
+    SUBMIT: `${API_BASE_URL}/courses/pretest-submit`
+  },
   ADMIN: {
     DASHBOARD_STATS: `${API_BASE_URL}/admin/simple-dashboard-statistics`, // Using simple endpoint temporarily
     COURSES: `${API_BASE_URL}/admin/courses`, // Use deployed version

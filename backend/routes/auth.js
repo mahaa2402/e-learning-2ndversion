@@ -231,7 +231,8 @@ router.get('/validate-dashboard-link', async (req, res) => {
       console.error('❌ Error during DB assignment validation for dashboard link:', dbCheckError);
       return res.status(500).send(`<h1>Error</h1><p>An error occurred while validating the link.</p>`);
     }
-    // Token is valid and not expired, redirect to user dashboard
+    // Token is valid and not expired, redirect to login page first
+    // This ensures user is authenticated before accessing dashboard
     console.log(`✅ Dashboard link is valid and not expired`);
     console.log(`📅 Deadline: ${new Date(tokenData.deadline).toLocaleString()}`);
     console.log(`📅 Current time: ${new Date().toLocaleString()}`);
@@ -248,32 +249,54 @@ router.get('/validate-dashboard-link', async (req, res) => {
       frontendBase = extractOrigin(process.env.PLATFORM_LOGIN_URL);
     }
     
-    // Fallback: construct from request
+    // Fallback: construct from request (avoid localhost in production)
     if (!frontendBase) {
       const protocol = req.protocol || 'http';
-      const host = req.get('host') || 'localhost:3000';
-      // If host includes port 5000, change to 3000 for frontend
-      if (host.includes(':5000')) {
-        frontendBase = `${protocol}://${host.replace(':5000', ':3000')}`;
-      } else {
-        frontendBase = `${protocol}://${host}`;
+      // Check X-Forwarded-Host header first (for reverse proxies)
+      let host = req.get('x-forwarded-host') || req.get('host') || null;
+      
+      // If host is localhost, try to use X-Forwarded-For or other headers
+      if (host && (host.includes('localhost') || host.includes('127.0.0.1'))) {
+        // Try to get the original host from forwarded headers
+        const forwardedHost = req.get('x-forwarded-host');
+        const forwardedProto = req.get('x-forwarded-proto') || protocol;
+        if (forwardedHost && !forwardedHost.includes('localhost')) {
+          host = forwardedHost;
+          frontendBase = `${forwardedProto}://${host}`;
+        } else {
+          // Only use localhost if we're truly in development
+          host = 'localhost:3000';
+          frontendBase = `${protocol}://${host}`;
+        }
+      } else if (host) {
+        // If host includes port 5000, change to 3000 for frontend
+        if (host.includes(':5000')) {
+          frontendBase = `${protocol}://${host.replace(':5000', ':3000')}`;
+        } else {
+          frontendBase = `${protocol}://${host}`;
+        }
       }
     }
     
-    // Final fallback
+    // Final fallback - only use localhost if no environment variables are set
     if (!frontendBase) {
+      console.warn('⚠️ No frontend URL determined, using localhost fallback');
       frontendBase = 'http://localhost:3000';
     }
     
     // Ensure frontendBase is clean (no paths, just origin)
     frontendBase = extractOrigin(frontendBase) || frontendBase;
     
-    // Construct the dashboard URL - ensure it's just /userdashboard (no /login prefix)
-    const dashboardUrl = `${frontendBase}/userdashboard?email=${encodeURIComponent(email)}`;
+    // Remove any trailing slashes and ensure no paths
+    frontendBase = frontendBase.replace(/\/+$/, '').replace(/\/.*$/, '');
     
-    console.log(`✅ Valid dashboard link, redirecting ${email} to dashboard: ${dashboardUrl}`);
+    // Redirect to login page with token and email preserved
+    // Login page will handle authentication and then redirect to dashboard
+    const loginUrl = `${frontendBase}/login?redirectToken=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}&redirectTo=dashboard`;
+    
+    console.log(`✅ Valid dashboard link, redirecting ${email} to login first: ${loginUrl}`);
     console.log(`🔗 Frontend base URL: ${frontendBase}`);
-    res.redirect(dashboardUrl);
+    res.redirect(loginUrl);
     
   } catch (error) {
     console.error('❌ Error validating dashboard link:', error);

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config/api';
 import './Auth.css';
 
 const Login = () => {
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({ 
     email: '', 
     password: '', 
@@ -30,7 +31,22 @@ const Login = () => {
       setFlashMessage(message);
       sessionStorage.removeItem('flashMessage');
     }
-  }, []);
+
+    // Check for redirect token and email from "Start Course" button
+    const redirectToken = searchParams.get('redirectToken');
+    const email = searchParams.get('email');
+    const redirectTo = searchParams.get('redirectTo');
+
+    if (redirectToken && email && redirectTo === 'dashboard') {
+      // Store the redirect information for after login
+      sessionStorage.setItem('dashboardRedirectToken', redirectToken);
+      sessionStorage.setItem('dashboardRedirectEmail', email);
+      // Pre-fill email if provided
+      if (email) {
+        setFormData(prev => ({ ...prev, email }));
+      }
+    }
+  }, [searchParams]);
 
   const handleChange = (e) => {
     setFormData((prev) => ({
@@ -95,7 +111,24 @@ const Login = () => {
         // Handle navigation based on user role
         const userRole = userData.role || res.data.role;
         
-        if (redirectPath) {
+        // Check if we have a dashboard redirect token (from "Start Course" button)
+        const dashboardRedirectToken = sessionStorage.getItem('dashboardRedirectToken');
+        const dashboardRedirectEmail = sessionStorage.getItem('dashboardRedirectEmail');
+        
+        if (dashboardRedirectToken && dashboardRedirectEmail) {
+          // Clear the stored redirect info
+          sessionStorage.removeItem('dashboardRedirectToken');
+          sessionStorage.removeItem('dashboardRedirectEmail');
+          
+          // Redirect to the validate-dashboard-link route which will then redirect to dashboard
+          const backendBase = process.env.REACT_APP_API_URL?.replace('/api', '') || window.location.origin.replace(':3000', ':5000');
+          const validateUrl = `${backendBase}/api/auth/validate-dashboard-link?token=${encodeURIComponent(dashboardRedirectToken)}&email=${encodeURIComponent(dashboardRedirectEmail)}`;
+          
+          console.log('🔄 Redirecting to dashboard validation after login');
+          setTimeout(() => {
+            window.location.href = validateUrl;
+          }, 100);
+        } else if (redirectPath) {
           sessionStorage.removeItem('redirectAfterLogin');
           setTimeout(() => {
             navigate(redirectPath);

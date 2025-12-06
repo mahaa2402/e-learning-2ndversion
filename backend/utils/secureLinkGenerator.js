@@ -149,40 +149,63 @@ function generateDashboardLink(employeeEmail, deadline, baseUrl, courseName = 'd
     console.log('🔗 Generating dashboard link without assignmentId');
   }
   
-  // Determine frontend URL
+  // Helper function to extract clean origin (protocol + host, no path)
+  const extractOrigin = (url) => {
+    if (!url) return null;
+    try {
+      const parsed = new URL(url);
+      return `${parsed.protocol}//${parsed.host}`;
+    } catch (error) {
+      // If URL parsing fails, try to extract origin manually
+      const match = url.match(/^(https?:\/\/[^\/]+)/);
+      return match ? match[1] : url.replace(/\/.*$/, '');
+    }
+  };
+
+  // Determine frontend URL - always extract just the origin (no paths)
   let frontendUrl;
   
-  // Priority 1: Use baseUrl from request (most reliable)
-  if (baseUrl) {
-    if (baseUrl.includes(':5000')) {
-      frontendUrl = baseUrl.replace(':5000', '');
-    } else if (baseUrl.includes(':3000')) {
-      frontendUrl = baseUrl;
-    } else {
-      frontendUrl = baseUrl;
+  // Priority 1: Use FRONTEND_BASE_URL from environment (most reliable for production)
+  if (process.env.FRONTEND_BASE_URL) {
+    frontendUrl = extractOrigin(process.env.FRONTEND_BASE_URL);
+    console.log('🔗 Using FRONTEND_BASE_URL for dashboard link:', frontendUrl);
+  }
+  // Priority 2: Use PLATFORM_LOGIN_URL from environment (extract origin, remove /login if present)
+  else if (process.env.PLATFORM_LOGIN_URL) {
+    frontendUrl = extractOrigin(process.env.PLATFORM_LOGIN_URL);
+    console.log('🔗 Using PLATFORM_LOGIN_URL for dashboard link:', frontendUrl);
+  }
+  // Priority 3: Use baseUrl from request (if it's not localhost)
+  else if (baseUrl && !baseUrl.includes('localhost') && !baseUrl.includes('127.0.0.1')) {
+    frontendUrl = extractOrigin(baseUrl);
+    if (frontendUrl.includes(':5000')) {
+      frontendUrl = frontendUrl.replace(':5000', '');
     }
     console.log('🔗 Using baseUrl for dashboard link:', frontendUrl);
   }
-  // Priority 2: Use REACT_APP_API_URL from environment
+  // Priority 4: Use REACT_APP_API_URL from environment
   else if (process.env.REACT_APP_API_URL) {
     const apiUrl = process.env.REACT_APP_API_URL;
-    if (apiUrl.includes(':5000')) {
-      frontendUrl = apiUrl.replace(':5000', '').replace('/api', '');
-    } else {
-      frontendUrl = apiUrl.replace('/api', '');
+    frontendUrl = extractOrigin(apiUrl);
+    if (frontendUrl.includes(':5000')) {
+      frontendUrl = frontendUrl.replace(':5000', '');
     }
+    frontendUrl = frontendUrl.replace('/api', '');
     console.log('🔗 Using REACT_APP_API_URL for dashboard link:', frontendUrl);
   }
-  // Priority 3: Fallback to localhost (development only)
+  // Priority 5: Fallback to localhost (development only)
   else {
     frontendUrl = 'http://localhost:3000';
-    console.log('⚠️ No baseUrl or REACT_APP_API_URL, using localhost fallback for dashboard');
+    console.log('⚠️ No environment variables or valid baseUrl, using localhost fallback for dashboard');
   }
   
-  // Point to backend route that will validate and redirect
-  const backendBase = baseUrl || process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
-  const dashboardLink = `${backendBase}/api/auth/validate-dashboard-link?token=${encodeURIComponent(token)}&email=${encodeURIComponent(employeeEmail)}`;
-  console.log('🔗 Generated secure dashboard link with expiration');
+  // Ensure frontendUrl is clean (no trailing slashes, no paths)
+  frontendUrl = frontendUrl.replace(/\/+$/, ''); // Remove trailing slashes
+  
+  // Point to login page first, then redirect to dashboard after login
+  // This ensures user is authenticated before accessing dashboard
+  const dashboardLink = `${frontendUrl}/login?redirectToken=${encodeURIComponent(token)}&email=${encodeURIComponent(employeeEmail)}&redirectTo=dashboard`;
+  console.log('🔗 Generated secure dashboard link - will redirect to login first:', dashboardLink);
   return dashboardLink;
 }
 

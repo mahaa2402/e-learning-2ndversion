@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Users, Award, BookOpen, Play, ChevronRight, User, Star, CheckCircle, ArrowRight, Download, Lock } from 'lucide-react';
+import PreTestQuiz from '../components/PreTestQuiz';
 import './coursedetailpage.css';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { API_ENDPOINTS } from '../config/api';
@@ -16,6 +17,10 @@ const CourseDetailPage = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [unlockStatus, setUnlockStatus] = useState([]); // Track module unlock status
   const [progressLoading, setProgressLoading] = useState(true);
+  // Pre-test hooks
+  const [preTestDone, setPreTestDone] = useState(false);
+  const [preTestStorageKey, setPreTestStorageKey] = useState(null);
+  const [showPreTest, setShowPreTest] = useState(false);
   
   const navigate = useNavigate();
 
@@ -172,6 +177,11 @@ const CourseDetailPage = () => {
 
         const data = await response.json();
         setCourseData(data);
+        // Setup pretest storage key
+        const employeeEmail = typeof window !== 'undefined' ? localStorage.getItem('employeeEmail') : null;
+        const key = employeeEmail && data?._id ? `pretest_done_${employeeEmail}_${data._id}` : null;
+        setPreTestStorageKey(key);
+        setPreTestDone(key ? localStorage.getItem(key) === 'true' : false);
       } catch (err) {
         console.error('Error loading course:', err);
       }
@@ -439,78 +449,7 @@ const CourseDetailPage = () => {
       <header className="navbar-container">
         {/* Top Navigation Bar - Blue */}
         <div className="top-navbar">
-          <div className="top-nav-left">
-            <div className="contact-info">
-              <span className="phone-info">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
-                </svg>
-                 +1(866) 898-9971
-              </span>
-              <span className="email-info">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
-                </svg>
-                 info@vistaes.com
-              </span>
-            </div>
-          </div>
-          <div className="top-nav-right">
-            <nav className="top-nav-links">
-              <Link to="/">Home</Link>
-              <div className="dropdown">
-                <a href="#" onClick={(e) => {
-                  e.preventDefault();
-                  handleCoursesDropdownToggle();
-                }}>
-                  Courses
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M7 10l5 5 5-5z"/>
-                  </svg>
-                </a>
-                {showCoursesDropdown && (
-                  <div className="dropdown-menu">
-                    {commonCourses.length > 0 ? (
-                      commonCourses.map((course, index) => (
-                        <div
-                          key={course._id || index}
-                          className="dropdown-item"
-                          onClick={() => handleCourseSelect(course.title)}
-                        >
-                          {course.title}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="dropdown-item">No courses available</div>
-                    )}
-                  </div>
-                )}
-              </div>
-              {isLoggedIn && <Link to="/userdashboard">Dashboard</Link>}
-              <a href="/#aboutus" onClick={(e) => {
-                e.preventDefault();
-                navigate('/');
-                setTimeout(() => {
-                  document.getElementById('aboutus')?.scrollIntoView({ behavior: 'smooth' });
-                }, 100);
-              }}>
-                About
-              </a>
-              <div className="nav-auth">
-                {!isLoggedIn ? (
-                  <>
-                    <Link to="/login" className="auth-link">Login</Link>
-                    <span className="separator">/</span>
-                    <Link to="/register" className="auth-link">Register</Link>
-                  </>
-                ) : (
-                  <button className="auth-link logout-btn" onClick={handleLogout}>
-                    Logout
-                  </button>
-                )}
-              </div>
-            </nav>
-          </div>
+         
         </div>
 
         {/* Bottom Navigation Bar - White */}
@@ -714,13 +653,81 @@ const CourseDetailPage = () => {
               <p>Join us to enhance your skills</p>
             </div>
             <div className="course-detail-actions-buttons">
-              <button 
-                className="course-detail-btn course-detail-btn-primary course-detail-btn-large"
-                onClick={handleStartLesson}
-              >
-                <Play className="course-detail-btn-icon" />
-                Start Learning For Free
-              </button>
+              {!preTestDone && courseData?.preTest?.enabled ? (
+                <>
+                  {!showPreTest ? (
+                    <button
+                      className="course-detail-btn course-detail-btn-primary course-detail-btn-large"
+                      onClick={() => setShowPreTest(true)}
+                    >
+                      ▶ Take Pre-test
+                    </button>
+                  ) : (
+                    <PreTestQuiz
+                      courseTitle={courseData.title}
+                      questions={courseData.preTest.questions}
+                      onCompleted={async ({ score, total, answers }) => {
+                        // Submit to server
+                        try {
+                          const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+                          const payload = {
+                            courseId: courseData._id || title,
+                            courseName: courseData.title || title,
+                            score,
+                            total,
+                            answers,
+                            passingScore: courseData.preTest?.passingScore
+                          };
+                          if (token) {
+                            const res = await fetch(API_ENDPOINTS.PRETEST.SUBMIT, {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                              },
+                              body: JSON.stringify(payload)
+                            });
+                            if (!res.ok) {
+                              // Log and continue - still mark as done locally
+                              console.warn('Pretest submission failed', res.status);
+                            }
+                          }
+                        } catch (err) {
+                          console.error('Error submitting pretest:', err);
+                        } finally {
+                          if (preTestStorageKey) {
+                            localStorage.setItem(preTestStorageKey, 'true');
+                          }
+                          setPreTestDone(true);
+                          // Store course and first module for back navigation and certificate page
+                          const certCourseId = courseData._id || title;
+                          const certLessonId = courseData.modules && courseData.modules.length > 0 ? courseData.modules[0].m_id : null;
+                          if (certCourseId) localStorage.setItem('certificateCourseId', certCourseId);
+                          if (certLessonId) localStorage.setItem('certificateLessonId', certLessonId);
+                          // Navigate to certificate page with override
+                          navigate('/certificate', {
+                            state: {
+                              fromPreTest: true,
+                              certificateDataOverride: {
+                                courseTitle: courseData.title,
+                                completionDate: new Date().toISOString()
+                              }
+                            }
+                          });
+                        }
+                      }}
+                    />
+                  )}
+                </>
+              ) : (
+                <button 
+                  className="course-detail-btn course-detail-btn-primary course-detail-btn-large"
+                  onClick={handleStartLesson}
+                >
+                  <Play className="course-detail-btn-icon" />
+                  Start Learning For Free
+                </button>
+              )}
             </div>
           </div>
         </div>

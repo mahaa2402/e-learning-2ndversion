@@ -28,6 +28,7 @@ import AssignedQuizPage from '../pages/assignedquizpage';
 import CertificatePage from '../pages/certificate';
 import CertificateDetails from '../pages/certificatedetail';
 import CreateCommonCourses from '../pages/createcommoncourses';
+import PreTestPage from '../pages/pretestpage';
 
 import LessonPage from "../pages/lessonpage";
 import CourseAccess from "../pages/CourseAccess";
@@ -90,6 +91,7 @@ function AppRoutes() {
         <Route path="/assignedquizpage" element={<AssignedQuizPage />} />
         <Route path="/certificatedetail/:id" element={<CertificateDetails />} />
          <Route path="/course/:courseId/lesson/:lessonId" element={<LessonPage />} />
+        <Route path="/course/:courseId/pretest" element={<PreTestPage />} />
         {/* Add more routes as needed */}
           
 

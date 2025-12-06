@@ -17,41 +17,23 @@ const getAdditionalCompletionRecipients = () => {
   const recipients = new Set();
 
   const extraList = process.env.COURSE_COMPLETION_EXTRA_RECIPIENTS;
-  console.log('🔍 DEBUG: COURSE_COMPLETION_EXTRA_RECIPIENTS from env:', extraList ? `Found (${extraList.length} chars): "${extraList}"` : 'NOT FOUND');
+  console.log('🔍 DEBUG: COURSE_COMPLETION_EXTRA_RECIPIENTS from env:', extraList ? `Found (${extraList.length} chars)` : 'NOT FOUND');
   
   if (extraList) {
-    // Split by comma and clean up
     const emails = extraList
       .split(',')
       .map(email => email.trim())
-      .filter(email => {
-        // Validate email format (basic check)
-        const isValid = email && email.length > 0 && email.includes('@') && email.includes('.');
-        if (!isValid && email.length > 0) {
-          console.log(`⚠️ DEBUG: Invalid email format filtered out: "${email}"`);
-        }
-        return isValid;
-      });
+      .filter(Boolean);
     
-    console.log(`📧 DEBUG: Parsed ${emails.length} valid email(s) from COURSE_COMPLETION_EXTRA_RECIPIENTS:`, emails);
-    emails.forEach(email => {
-      const normalizedEmail = email.toLowerCase().trim();
-      recipients.add(normalizedEmail);
-      console.log(`📧 DEBUG: Added recipient: ${normalizedEmail}`);
-    });
+    console.log(`📧 DEBUG: Parsed ${emails.length} email(s) from COURSE_COMPLETION_EXTRA_RECIPIENTS:`, emails);
+    emails.forEach(email => recipients.add(email));
   } else {
     console.log('⚠️ DEBUG: COURSE_COMPLETION_EXTRA_RECIPIENTS is not set in environment variables');
   }
 
   if (process.env.COMPLETION_NOTIFICATION_EMAIL) {
-    const legacyEmail = process.env.COMPLETION_NOTIFICATION_EMAIL.trim();
-    console.log('📧 DEBUG: Found COMPLETION_NOTIFICATION_EMAIL:', legacyEmail);
-    if (legacyEmail && legacyEmail.includes('@') && legacyEmail.includes('.')) {
-      recipients.add(legacyEmail.toLowerCase());
-      console.log(`📧 DEBUG: Added legacy recipient: ${legacyEmail.toLowerCase()}`);
-    } else {
-      console.log(`⚠️ DEBUG: Invalid COMPLETION_NOTIFICATION_EMAIL format: "${legacyEmail}"`);
-    }
+    console.log('📧 DEBUG: Found COMPLETION_NOTIFICATION_EMAIL:', process.env.COMPLETION_NOTIFICATION_EMAIL);
+    recipients.add(process.env.COMPLETION_NOTIFICATION_EMAIL.trim());
   }
 
   const finalRecipients = Array.from(recipients);
@@ -182,11 +164,8 @@ async function assignCourseToEmployee(employeeEmail, courseName, adminId, deadli
  */
 async function updateAssignedCourseProgress(employeeEmail, courseName) {
   try {
-    console.log(`📊 updateAssignedCourseProgress called for: ${employeeEmail} - Course: "${courseName}"`);
-    
     const progress = await AssignedCourseUserProgress.findOne({ employeeEmail });
     if (!progress) {
-      console.error(`❌ No progress found for employee: ${employeeEmail}`);
       throw new Error(`No progress found for employee: ${employeeEmail}`);
     }
 
@@ -197,7 +176,6 @@ async function updateAssignedCourseProgress(employeeEmail, courseName) {
 
     if (!courseAssignment) {
       console.log(`⚠️ Course "${courseName}" is not assigned to ${employeeEmail}`);
-      console.log(`📋 Available assigned courses:`, progress.courseAssignments.map(a => a.courseName));
       return null;
     }
 
@@ -205,8 +183,6 @@ async function updateAssignedCourseProgress(employeeEmail, courseName) {
     const currentProgress = progress.assignedCourseProgress.get(courseName) || 0;
     const newProgress = currentProgress + 1;
     progress.assignedCourseProgress.set(courseName, newProgress);
-
-    console.log(`📈 Progress update: ${courseName} - ${currentProgress} → ${newProgress}`);
 
     // Update assignment status based on progress
     if (newProgress > 0) {
@@ -217,14 +193,12 @@ async function updateAssignedCourseProgress(employeeEmail, courseName) {
     console.log(`✅ Updated assigned course progress for ${employeeEmail} - ${courseName}: ${newProgress}`);
 
     // Check if all modules are completed and generate certificate
-    console.log(`🔍 Calling checkAndGenerateCertificate for ${employeeEmail} - ${courseName}`);
     await checkAndGenerateCertificate(employeeEmail, courseName, progress);
 
     return progress;
 
   } catch (error) {
     console.error('❌ Error updating assigned course progress:', error);
-    console.error('❌ Error stack:', error.stack);
     throw error;
   }
 }
@@ -234,9 +208,7 @@ async function updateAssignedCourseProgress(employeeEmail, courseName) {
  */
 async function checkAndGenerateCertificate(employeeEmail, courseName, progress) {
   try {
-    console.log(`\n🔍 ========== CHECKING COURSE COMPLETION ==========`);
-    console.log(`🔍 Employee: ${employeeEmail}`);
-    console.log(`🔍 Course: "${courseName}"`);
+    console.log(`🔍 Checking if course "${courseName}" is completed for ${employeeEmail}`);
     console.log(`📊 Progress data:`, {
       employeeEmail,
       courseName,
@@ -245,39 +217,31 @@ async function checkAndGenerateCertificate(employeeEmail, courseName, progress) 
     });
     
     // Get the course details to know total modules
-    console.log(`🔍 Looking up course in database...`);
     let course = await CommonCourse.findOne({ title: courseName });
     
     if (!course) {
-      console.log(`⚠️ Course not found by title "${courseName}", trying name field...`);
       // Try alternative naming (some records may store `name` instead of `title`)
       course = await CommonCourse.findOne({ name: courseName });
     }
     
     if (!course) {
-      console.error(`❌ Course "${courseName}" not found in common courses database`);
-      console.error(`❌ Searched by: title="${courseName}" and name="${courseName}"`);
-      console.error(`❌ Cannot determine completion status without course data`);
-      console.log(`🔍 ========== END COURSE COMPLETION CHECK ==========\n`);
+      console.log(`⚠️ Course "${courseName}" not found in common courses`);
       return;
     }
     
-    console.log(`✅ Course found in database:`, {
-      _id: course._id,
-      title: course.title,
-      name: course.name,
-      modulesCount: course.modules?.length || 0,
-      moduleTitles: course.modules?.map(m => m.title || m.name || m.m_id) || []
+    console.log(`📚 Course found in common courses:`, {
+      name: course.title || course.name,
+      modulesCount: course.modules.length,
+      moduleTitles: course.modules.map(m => m.title || m.name)
     });
     
-    const totalModules = course.modules?.length || 0;
+    const totalModules = course.modules.length;
     const completedModules = progress.assignedCourseProgress.get(courseName) || 0;
     
-    console.log(`📊 Completion Status: ${completedModules}/${totalModules} modules completed`);
-    console.log(`📊 Completion Check: ${completedModules} >= ${totalModules} ? ${completedModules >= totalModules}`);
+    console.log(`📊 Course: ${courseName}, Completed: ${completedModules}/${totalModules}`);
     
     // Check if all modules are completed
-    if (completedModules >= totalModules && totalModules > 0) {
+    if (completedModules >= totalModules) {
       console.log(`🎉 Course "${courseName}" is completed! Generating certificate...`);
       
       // Get employee details
@@ -345,48 +309,35 @@ async function checkAndGenerateCertificate(employeeEmail, courseName, progress) 
           try {
             // Get admin details
             const admin = await Admin.findById(courseAssignment.assignedBy.adminId);
-            console.log(`🔍 DEBUG: Looking for admin with ID: ${courseAssignment.assignedBy.adminId}`);
-            console.log(`🔍 DEBUG: Admin found:`, admin ? { id: admin._id, name: admin.name, email: admin.email } : 'NOT FOUND');
-            
             if (admin && admin.email) {
-              console.log(`📧 Sending course completion email to admin: ${admin.email} (${admin.name || 'Unknown'})`);
+              console.log(`📧 Sending course completion email to admin: ${admin.email}`);
               
-              try {
-                const emailSent = await sendCourseCompletionEmail(
-                  admin.email,
-                  admin.name || courseAssignment.assignedBy.adminName,
-                  employee.name,
-                  employeeEmail,
-                  courseName,
-                  completionDate,
-                  certificateAttachment
-                );
-                
-                if (emailSent) {
-                  console.log(`✅ Course completion email sent successfully to admin: ${admin.email}`);
-                } else {
-                  console.error(`❌ Failed to send completion email to admin: ${admin.email} (email service returned false)`);
-                }
-              } catch (adminEmailError) {
-                console.error(`❌ Exception while sending email to admin ${admin.email}:`, adminEmailError);
-                console.error(`❌ Admin email error stack:`, adminEmailError.stack);
+              const emailSent = await sendCourseCompletionEmail(
+                admin.email,
+                admin.name || courseAssignment.assignedBy.adminName,
+                employee.name,
+                employeeEmail,
+                courseName,
+                completionDate,
+                certificateAttachment
+              );
+              
+              if (emailSent) {
+                console.log(`✅ Course completion email sent to admin: ${admin.email}`);
+              } else {
+                console.log(`⚠️ Failed to send completion email to admin, but course completion was recorded`);
               }
             } else {
-              console.error(`❌ Admin not found or no email for admin ID: ${courseAssignment.assignedBy.adminId}`);
-              console.error(`❌ Admin object:`, admin ? { hasEmail: !!admin.email, email: admin.email } : 'null');
+              console.log(`⚠️ Admin not found or no email for admin ID: ${courseAssignment.assignedBy.adminId}`);
             }
 
-            // Get and send to additional recipients
-            console.log(`🔍 DEBUG: Getting additional completion recipients...`);
             const allAdditionalRecipients = getAdditionalCompletionRecipients();
             console.log(`🔍 DEBUG: All additional recipients before filtering: ${allAdditionalRecipients.length}`, allAdditionalRecipients);
             
             const additionalRecipients = allAdditionalRecipients
               .filter(email => {
-                const trimmedEmail = email ? email.trim() : '';
-                const isValid = trimmedEmail.length > 0 && trimmedEmail.includes('@');
-                const isNotAdmin = !admin || trimmedEmail.toLowerCase() !== (admin.email || '').toLowerCase();
-                
+                const isValid = email && email.trim().length > 0;
+                const isNotAdmin = !admin || email !== admin.email;
                 if (!isValid) {
                   console.log(`⚠️ DEBUG: Filtered out invalid email: "${email}"`);
                 } else if (!isNotAdmin) {
@@ -397,40 +348,30 @@ async function checkAndGenerateCertificate(employeeEmail, courseName, progress) 
 
             console.log(`📧 DEBUG: Additional recipients after filtering: ${additionalRecipients.length}`, additionalRecipients);
 
-            if (additionalRecipients.length > 0) {
+            if (additionalRecipients.length) {
               console.log(`📧 Sending course completion email to ${additionalRecipients.length} additional recipient(s): ${additionalRecipients.join(', ')}`);
               const notificationsName = process.env.COMPLETION_NOTIFICATION_NAME || 'Training Coordinator';
 
               for (const additionalEmail of additionalRecipients) {
-                try {
-                  console.log(`📧 Attempting to send email to: ${additionalEmail}`);
-                  const additionalEmailSent = await sendCourseCompletionEmail(
-                    additionalEmail,
-                    notificationsName,
-                    employee.name,
-                    employeeEmail,
-                    courseName,
-                    completionDate,
-                    certificateAttachment
-                  );
+                const additionalEmailSent = await sendCourseCompletionEmail(
+                  additionalEmail,
+                  notificationsName,
+                  employee.name,
+                  employeeEmail,
+                  courseName,
+                  completionDate,
+                  certificateAttachment
+                );
 
-                  if (additionalEmailSent) {
-                    console.log(`✅ Course completion email sent successfully to additional recipient: ${additionalEmail}`);
-                  } else {
-                    console.error(`❌ Failed to send completion email to additional recipient: ${additionalEmail} (email service returned false)`);
-                  }
-                } catch (additionalEmailError) {
-                  console.error(`❌ Exception while sending email to additional recipient ${additionalEmail}:`, additionalEmailError);
-                  console.error(`❌ Additional email error stack:`, additionalEmailError.stack);
+                if (additionalEmailSent) {
+                  console.log(`✅ Course completion email sent to additional recipient: ${additionalEmail}`);
+                } else {
+                  console.log(`⚠️ Failed to send completion email to additional recipient: ${additionalEmail}`);
                 }
               }
-            } else {
-              console.log(`⚠️ No additional recipients to send emails to (after filtering)`);
             }
           } catch (emailError) {
-            console.error('❌ CRITICAL ERROR sending course completion emails:', emailError);
-            console.error('❌ Email error message:', emailError.message);
-            console.error('❌ Email error stack:', emailError.stack);
+            console.error('❌ Error sending course completion email to admin:', emailError);
             // Don't fail the process if email fails
           }
         }
@@ -439,19 +380,11 @@ async function checkAndGenerateCertificate(employeeEmail, courseName, progress) 
         console.log(`📋 Certificate error details:`, certificateResult);
       }
     } else {
-      if (totalModules === 0) {
-        console.log(`⚠️ Course "${courseName}" has 0 modules - cannot determine completion`);
-      } else {
-        console.log(`📚 Course "${courseName}" is still in progress: ${completedModules}/${totalModules} modules completed`);
-        console.log(`📚 Remaining: ${totalModules - completedModules} module(s) to complete`);
-      }
+      console.log(`📚 Course "${courseName}" is still in progress: ${completedModules}/${totalModules} modules completed`);
     }
     
-    console.log(`🔍 ========== END COURSE COMPLETION CHECK ==========\n`);
-    
   } catch (error) {
-    console.error('❌ CRITICAL ERROR in checkAndGenerateCertificate:', error);
-    console.error('❌ Error message:', error.message);
+    console.error('❌ Error checking and generating certificate:', error);
     console.error('❌ Error stack:', error.stack);
   }
 }

@@ -5,6 +5,8 @@ import courseData from './coursedata';
 import { API_ENDPOINTS } from '../config/api';
 import './lessonpage.css';
 
+// PreTestInline removed; use dedicated pretest page + `PreTestQuiz` component.
+
 function LessonPage() {
   const { courseId, lessonId } = useParams();
   const navigate = useNavigate();
@@ -31,6 +33,38 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
   const [dbCourse, setDbCourse] = useState(null);
   const [dbLesson, setDbLesson] = useState(null);
   const [fetchingFromDb, setFetchingFromDb] = useState(false);
+
+  // ===== PRE-TEST HANDLING (moved to top-level to avoid conditional hooks) =====
+  const employeeEmail = typeof window !== 'undefined' ? localStorage.getItem('employeeEmail') : null;
+  // We'll compute preTestStorageKey once dbCourse (with _id) is available; initialize false and set later
+  const [preTestDone, setPreTestDone] = useState(false);
+
+  // Derived values for preTest - computed from dbCourse where available
+  const hasPreTest = !!dbCourse?.preTest?.enabled && Array.isArray(dbCourse?.preTest?.questions) && dbCourse.preTest.questions.length > 0;
+  const preTestStorageKey = employeeEmail && dbCourse?._id ? `pretest_done_${employeeEmail}_${dbCourse._id}` : null;
+
+  // Initialize preTestDone from localStorage when dbCourse becomes available and a storage key can be computed
+  useEffect(() => {
+    if (!preTestStorageKey) return;
+    const stored = localStorage.getItem(preTestStorageKey) === 'true';
+    if (stored !== preTestDone) {
+      console.log('📌 Initializing preTestDone from localStorage:', stored, preTestStorageKey);
+      setPreTestDone(stored);
+    }
+  }, [preTestStorageKey]);
+
+  // If pre-test is required and not completed, redirect to dedicated PreTest page
+  useEffect(() => {
+    if (hasPreTest && !preTestDone) {
+      const pretestCourseId = dbCourse?._id || courseId;
+      navigate(`/course/${pretestCourseId}/pretest`, { replace: true });
+    }
+  }, [hasPreTest, preTestDone, dbCourse, courseId, navigate]);
+
+  // Debug render info to help trace hook invocation / navigation flow
+  useEffect(() => {
+    console.log('🔁 LessonPage render:', { courseId, lessonId, hasPreTest, preTestDone, dbCourseLoaded: !!dbCourse, loading, fetchingFromDb });
+  });
 
   // Try to get course from static data first (for backward compatibility)
   const staticCourse = courseData[courseId];
@@ -982,6 +1016,29 @@ useEffect(() => {
       </div>
     );
   }
+
+  // hasPreTest and preTestStorageKey are computed at the top near the other hooks to avoid conditional hooks
+
+  const handlePreTestCompleted = ({ score, total }) => {
+    console.log('✅ Pre-test completed:', { score, total });
+    if (preTestStorageKey) {
+      localStorage.setItem(preTestStorageKey, 'true');
+    }
+    setPreTestDone(true);
+
+    navigate('/certificate', {
+      state: {
+        fromPreTest: true,
+        certificateDataOverride: {
+          courseTitle: dbCourse?.title || course?.name,
+          completionDate: new Date().toISOString()
+        }
+      }
+    });
+  };
+
+  // (Moved) Pre-test redirect and initialization will be handled by effects declared earlier, so no duplicates here.
+
 const renderFormattedContent = (contentArray) => {
   return contentArray.map((line, i) => {
     // Skip empty lines

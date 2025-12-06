@@ -14,8 +14,28 @@ const courseSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     description: { type: String },                     // Course description
-    backgroundImageUrl: { type: String },            // Background image URL for the course
+    backgroundImageUrl: { type: String },              // Background image URL for the course
     retakeQuizCooldownHours: { type: Number, default: 24 }, // Cooldown time in hours after failing retake quiz (default 24 hours = 1 day)
+
+    // Optional course-level pre-test (taken before any modules)
+    preTest: {
+      enabled: { type: Boolean, default: false },
+      passingScore: { type: Number, default: 0 },
+      questions: [
+        {
+          question: { type: String, required: true },
+          type: {
+            type: String,
+            enum: ['multiple-choice', 'true-false', 'fill-in-blank'],
+            default: 'multiple-choice'
+          },
+          options: [String],
+          correctAnswer: { type: String, required: true },
+          points: { type: Number, default: 1 },
+          imageUrl: { type: String, default: null }
+        }
+      ]
+    },
 
     modules: [
       {
