@@ -111,28 +111,17 @@ const Login = () => {
         // Handle navigation based on user role
         const userRole = userData.role || res.data.role;
         
-        // Check if we have a dashboard redirect token (from "Start Course" button)
+        // Clear any stored redirect info from "Start Course" button (but don't redirect to dashboard)
+        // User will follow normal login flow to landing page
         const dashboardRedirectToken = sessionStorage.getItem('dashboardRedirectToken');
         const dashboardRedirectEmail = sessionStorage.getItem('dashboardRedirectEmail');
-        
-        if (dashboardRedirectToken && dashboardRedirectEmail) {
-          // Clear the stored redirect info
+        if (dashboardRedirectToken || dashboardRedirectEmail) {
           sessionStorage.removeItem('dashboardRedirectToken');
           sessionStorage.removeItem('dashboardRedirectEmail');
-          
-          // Redirect to the validate-dashboard-link route which will then redirect to dashboard
-          // Use API_BASE_URL from config and remove /api to get backend base
-          const backendBase = API_BASE_URL.replace('/api', '').replace(/\/$/, '');
-          const validateUrl = `${backendBase}/api/auth/validate-dashboard-link?token=${encodeURIComponent(dashboardRedirectToken)}&email=${encodeURIComponent(dashboardRedirectEmail)}`;
-          
-          console.log('🔄 Redirecting to dashboard validation after login');
-          console.log('🔗 API_BASE_URL:', API_BASE_URL);
-          console.log('🔗 Backend base:', backendBase);
-          console.log('🔗 Validate URL:', validateUrl);
-          setTimeout(() => {
-            window.location.href = validateUrl;
-          }, 100);
-        } else if (redirectPath) {
+          console.log('🧹 Cleared dashboard redirect info - following normal login flow');
+        }
+        
+        if (redirectPath) {
           sessionStorage.removeItem('redirectAfterLogin');
           setTimeout(() => {
             navigate(redirectPath);

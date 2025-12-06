@@ -11,11 +11,24 @@ function extractOrigin(urlString) {
   if (!urlString) return null;
   try {
     const url = new URL(urlString);
-    return url.origin;
+    let origin = url.origin;
+    // Remove port 5000 (backend port) - frontend should never use this
+    if (origin.includes(':5000')) {
+      origin = origin.replace(':5000', '');
+    }
+    return origin;
   } catch (e) {
     // If URL parsing fails, try regex
     const match = urlString.match(/^(https?:\/\/[^\/]+)/);
-    return match ? match[1] : null;
+    if (match) {
+      let origin = match[1];
+      // Remove port 5000 (backend port)
+      if (origin.includes(':5000')) {
+        origin = origin.replace(':5000', '');
+      }
+      return origin;
+    }
+    return null;
   }
 }
 
@@ -240,14 +253,28 @@ router.get('/validate-dashboard-link', async (req, res) => {
     // Get frontend base URL - ensure it's just the origin without any path
     let frontendBase = null;
     
-    // Try to extract origin from environment variables
+    // Try to extract origin from environment variables (highest priority)
     if (process.env.FRONTEND_BASE_URL) {
       frontendBase = extractOrigin(process.env.FRONTEND_BASE_URL);
+      console.log(`🔗 Using FRONTEND_BASE_URL from env: ${frontendBase}`);
     }
     
     if (!frontendBase && process.env.PLATFORM_LOGIN_URL) {
       frontendBase = extractOrigin(process.env.PLATFORM_LOGIN_URL);
+      console.log(`🔗 Using PLATFORM_LOGIN_URL from env: ${frontendBase}`);
     }
+    
+    // Production hardcoded fallback for 16.16.205.98
+    if (!frontendBase) {
+      const requestHost = req.get('x-forwarded-host') || req.get('host') || '';
+      if (requestHost.includes('16.16.205.98') || requestHost.includes('16.16.205.98:5000')) {
+        frontendBase = 'http://16.16.205.98';
+        console.log(`🔗 Using hardcoded production frontend URL: ${frontendBase}`);
+      }
+    }
+    
+    // Log what we have so far
+    console.log(`🔍 Frontend base after env check: ${frontendBase || 'null'}`);
     
     // Fallback: construct from request (avoid localhost in production)
     if (!frontendBase) {
@@ -255,26 +282,29 @@ router.get('/validate-dashboard-link', async (req, res) => {
       // Check X-Forwarded-Host header first (for reverse proxies)
       let host = req.get('x-forwarded-host') || req.get('host') || null;
       
-      // If host is localhost, try to use X-Forwarded-For or other headers
-      if (host && (host.includes('localhost') || host.includes('127.0.0.1'))) {
-        // Try to get the original host from forwarded headers
-        const forwardedHost = req.get('x-forwarded-host');
-        const forwardedProto = req.get('x-forwarded-proto') || protocol;
-        if (forwardedHost && !forwardedHost.includes('localhost')) {
-          host = forwardedHost;
-          frontendBase = `${forwardedProto}://${host}`;
-        } else {
-          // Only use localhost if we're truly in development
-          host = 'localhost:3000';
-          frontendBase = `${protocol}://${host}`;
-        }
-      } else if (host) {
-        // If host includes port 5000, change to 3000 for frontend
+      console.log(`🔍 Request host: ${host}`);
+      console.log(`🔍 X-Forwarded-Host: ${req.get('x-forwarded-host')}`);
+      
+      if (host) {
+        // ALWAYS remove port 5000 (backend port) - frontend never uses this
         if (host.includes(':5000')) {
-          frontendBase = `${protocol}://${host.replace(':5000', ':3000')}`;
+          host = host.replace(':5000', '');
+          console.log(`🔧 Removed port 5000, new host: ${host}`);
+        }
+        
+        // Determine frontend URL based on host
+        if (host.includes('localhost') || host.includes('127.0.0.1')) {
+          // For localhost, use port 3000 (development)
+          frontendBase = `${protocol}://localhost:3000`;
+        } else if (host.includes(':3000')) {
+          // Keep port 3000 if present (development)
+          frontendBase = `${protocol}://${host}`;
         } else {
+          // For production, use the host without any port (defaults to port 80/443)
           frontendBase = `${protocol}://${host}`;
         }
+        
+        console.log(`🔧 Constructed frontend base from request: ${frontendBase}`);
       }
     }
     
@@ -290,12 +320,72 @@ router.get('/validate-dashboard-link', async (req, res) => {
     // Remove any trailing slashes and ensure no paths
     frontendBase = frontendBase.replace(/\/+$/, '').replace(/\/.*$/, '');
     
+    // CRITICAL: Final safety check - ensure we're NEVER using backend port (5000) for frontend
+    // Frontend should be on port 80/443 (default) or 3000 (dev), never 5000
+    if (frontendBase && frontendBase.includes(':5000')) {
+      console.warn('⚠️ Frontend URL contains port 5000 (backend port), removing it');
+      frontendBase = frontendBase.replace(':5000', '');
+    }
+    
+    // Additional safety: if frontendBase is still null or invalid, use a safe default
+    if (!frontendBase || frontendBase.includes(':5000')) {
+      // Extract host from request and remove port 5000
+      const protocol = req.protocol || 'http';
+      let safeHost = req.get('x-forwarded-host') || req.get('host') || '16.16.205.98';
+      
+      // Always remove port 5000 (backend port)
+      if (safeHost.includes(':5000')) {
+        safeHost = safeHost.replace(':5000', '');
+      }
+      
+      // For production IP addresses, use without port (defaults to port 80)
+      // For localhost, use port 3000
+      if (safeHost.includes('localhost') || safeHost.includes('127.0.0.1')) {
+        frontendBase = `${protocol}://localhost:3000`;
+      } else {
+        // Production: use host without port (defaults to port 80/443)
+        frontendBase = `${protocol}://${safeHost}`;
+      }
+      
+      console.warn(`⚠️ Using fallback frontend URL: ${frontendBase}`);
+    }
+    
+    // FINAL CHECK: One more time, ensure no port 5000
+    if (frontendBase && frontendBase.includes(':5000')) {
+      console.error('❌ CRITICAL: Frontend URL still contains port 5000 after all checks!');
+      frontendBase = frontendBase.replace(':5000', '');
+      console.warn(`🔧 Force-removed port 5000, final URL: ${frontendBase}`);
+    }
+    
+    // FINAL VALIDATION: Ensure frontendBase is absolutely correct
+    // Must NOT contain port 5000, must be a valid frontend URL
+    if (!frontendBase || frontendBase.includes(':5000')) {
+      console.error('❌ CRITICAL ERROR: Frontend URL is invalid or contains port 5000!');
+      console.error(`❌ Invalid frontendBase: ${frontendBase}`);
+      // Force use production URL
+      frontendBase = 'http://16.16.205.98';
+      console.warn(`🔧 Forced to production URL: ${frontendBase}`);
+    }
+    
     // Redirect directly to dashboard (user should already be authenticated if coming from login page)
     // If user is not authenticated, they'll be redirected to login by the frontend
     const dashboardUrl = `${frontendBase}/userdashboard?email=${encodeURIComponent(email)}`;
     
+    // Final validation of the complete URL
+    if (dashboardUrl.includes(':5000')) {
+      console.error('❌ CRITICAL ERROR: Dashboard URL contains port 5000!');
+      console.error(`❌ Invalid dashboardUrl: ${dashboardUrl}`);
+      // Force correct URL
+      const correctedUrl = dashboardUrl.replace(':5000', '');
+      console.warn(`🔧 Corrected URL: ${correctedUrl}`);
+      return res.redirect(correctedUrl);
+    }
+    
     console.log(`✅ Valid dashboard link, redirecting ${email} to dashboard: ${dashboardUrl}`);
-    console.log(`🔗 Frontend base URL: ${frontendBase}`);
+    console.log(`🔗 Final frontend base URL: ${frontendBase}`);
+    console.log(`🔗 Request host: ${req.get('host')}`);
+    console.log(`🔗 Request protocol: ${req.protocol}`);
+    console.log(`🔗 X-Forwarded-Host: ${req.get('x-forwarded-host')}`);
     res.redirect(dashboardUrl);
     
   } catch (error) {
