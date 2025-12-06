@@ -290,13 +290,13 @@ router.get('/validate-dashboard-link', async (req, res) => {
     // Remove any trailing slashes and ensure no paths
     frontendBase = frontendBase.replace(/\/+$/, '').replace(/\/.*$/, '');
     
-    // Redirect to login page with token and email preserved
-    // Login page will handle authentication and then redirect to dashboard
-    const loginUrl = `${frontendBase}/login?redirectToken=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}&redirectTo=dashboard`;
+    // Redirect directly to dashboard (user should already be authenticated if coming from login page)
+    // If user is not authenticated, they'll be redirected to login by the frontend
+    const dashboardUrl = `${frontendBase}/userdashboard?email=${encodeURIComponent(email)}`;
     
-    console.log(`✅ Valid dashboard link, redirecting ${email} to login first: ${loginUrl}`);
+    console.log(`✅ Valid dashboard link, redirecting ${email} to dashboard: ${dashboardUrl}`);
     console.log(`🔗 Frontend base URL: ${frontendBase}`);
-    res.redirect(loginUrl);
+    res.redirect(dashboardUrl);
     
   } catch (error) {
     console.error('❌ Error validating dashboard link:', error);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { API_ENDPOINTS } from '../config/api';
+import { API_ENDPOINTS, API_BASE_URL } from '../config/api';
 import './Auth.css';
 
 const Login = () => {
@@ -121,10 +121,14 @@ const Login = () => {
           sessionStorage.removeItem('dashboardRedirectEmail');
           
           // Redirect to the validate-dashboard-link route which will then redirect to dashboard
-          const backendBase = process.env.REACT_APP_API_URL?.replace('/api', '') || window.location.origin.replace(':3000', ':5000');
+          // Use API_BASE_URL from config and remove /api to get backend base
+          const backendBase = API_BASE_URL.replace('/api', '').replace(/\/$/, '');
           const validateUrl = `${backendBase}/api/auth/validate-dashboard-link?token=${encodeURIComponent(dashboardRedirectToken)}&email=${encodeURIComponent(dashboardRedirectEmail)}`;
           
           console.log('🔄 Redirecting to dashboard validation after login');
+          console.log('🔗 API_BASE_URL:', API_BASE_URL);
+          console.log('🔗 Backend base:', backendBase);
+          console.log('🔗 Validate URL:', validateUrl);
           setTimeout(() => {
             window.location.href = validateUrl;
           }, 100);
