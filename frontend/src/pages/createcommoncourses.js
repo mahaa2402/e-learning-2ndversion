@@ -231,120 +231,29 @@ const CreateCommonCourses = () => {
       return handleUpdateModule(editingModuleIndex);
     }
 
-    // If there's a video file that hasn't been uploaded yet, upload it first
+    // OPTIMIZATION: Don't wait for video upload - add module immediately and upload video when saving course
+    // This makes adding modules much faster, especially in production with slower network
     let videoUrl = null;
     let videoData = null;
     
     if (currentModule.video?.file && !currentModule.video.url) {
-      try {
-        setIsLoading(true);
-        const courseTitle = formData.title || editingCourse?.title;
-        if (!courseTitle) {
-          // If course title isn't set, keep the file reference for later upload
-          console.log('⚠️ Course title not set, keeping video file reference for later upload');
-          videoData = {
-            file: currentModule.video.file,
-            name: currentModule.video.file.name,
-            size: `${(currentModule.video.file.size / 1024 / 1024).toFixed(2)} MB`,
-            type: currentModule.video.file.type,
-            pendingUpload: true
-          };
-        } else {
-          // Course title is set, upload the video now
-          // Calculate module number: existing modules count + 1 (for the new module being added)
-          // If editing an existing course, we need to account for existing modules in the database
-          let moduleNumber = formData.modules.length + 1;
-          
-          // If editing an existing course, check if there are existing modules in the database
-          // that aren't in formData yet (this shouldn't happen, but be safe)
-          if (editingCourse && editingCourse.modules) {
-            // Use the maximum of: existing DB modules count or current formData modules count
-            moduleNumber = Math.max(editingCourse.modules.length, formData.modules.length) + 1;
-            console.log('📤 Editing existing course - existing modules:', editingCourse.modules.length, 'formData modules:', formData.modules.length, 'new module number:', moduleNumber);
-          }
-          
-          const formDataToSend = new FormData();
-          formDataToSend.append("video", currentModule.video.file);
-
-          // Sanitize course name like admincourses does (match backend sanitization)
-          // Backend uses: replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
-          const courseName = courseTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-          const uploadUrl = `${API_ENDPOINTS.VIDEOS.UPLOAD}/${encodeURIComponent(courseName)}/${moduleNumber}`;
-          console.log('📤 Uploading video to:', uploadUrl);
-          console.log('📤 Course title:', courseTitle);
-          console.log('📤 Course name (sanitized):', courseName);
-          console.log('📤 Module number:', moduleNumber);
-          console.log('📤 File:', currentModule.video.file.name, currentModule.video.file.size, 'bytes');
-
-          const token = localStorage.getItem('token') || localStorage.getItem('authToken');
-          const uploadResponse = await fetch(uploadUrl, {
-            method: 'POST',
-            body: formDataToSend,
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-
-          console.log('📤 Upload response status:', uploadResponse.status);
-          console.log('📤 Upload response headers:', Object.fromEntries(uploadResponse.headers.entries()));
-
-          if (!uploadResponse.ok) {
-            let errorData;
-            try {
-              errorData = await uploadResponse.json();
-            } catch (e) {
-              errorData = { error: `HTTP ${uploadResponse.status}: ${uploadResponse.statusText}` };
-            }
-            console.error('❌ Upload failed:', errorData);
-            throw new Error(errorData.error || `Failed to upload video: ${uploadResponse.statusText}`);
-          }
-
-          const uploadResult = await uploadResponse.json();
-          console.log('✅ Upload result:', uploadResult);
-          
-          // Validate upload result
-          if (!uploadResult.video?.url && !uploadResult.videoUrl) {
-            console.error('❌ Upload result missing video URL:', uploadResult);
-            throw new Error('Upload succeeded but no video URL returned');
-          }
-          
-          videoUrl = uploadResult.video?.url || uploadResult.videoUrl;
-          console.log('✅ Video URL:', videoUrl);
-          
-          // Store video data with URL
-          videoData = {
-            url: videoUrl,
-            name: currentModule.video.file.name,
-            size: `${(currentModule.video.file.size / 1024 / 1024).toFixed(2)} MB`,
-            type: currentModule.video.file.type,
-            s3Key: uploadResult.video?.s3Key,
-            uploadedAt: uploadResult.video?.uploadedAt || new Date().toISOString(),
-            pendingUpload: false
-          };
-          
-          console.log('✅ Video uploaded successfully before adding module');
-        }
-      } catch (err) {
-        console.error('❌ Video upload failed:', err);
-        // If upload fails but file exists, keep the file reference for later
-        if (currentModule.video?.file) {
-          console.log('⚠️ Keeping video file reference for later upload');
-          videoData = {
-            file: currentModule.video.file,
-            name: currentModule.video.file.name,
-            size: `${(currentModule.video.file.size / 1024 / 1024).toFixed(2)} MB`,
-            type: currentModule.video.file.type,
-            pendingUpload: true
-          };
-          setError(`Video upload failed: ${err.message}. The video file will be uploaded when you save the course.`);
-        } else {
-          setError(err.message || "Failed to upload video");
-          setIsLoading(false);
-          return;
-        }
-      } finally {
-        setIsLoading(false);
-      }
+      // Store file reference - video will be uploaded when course is saved (faster UX)
+      console.log('📤 Video file will be uploaded when course is saved (non-blocking)');
+      console.log('📤 Video file details:', {
+        name: currentModule.video.file.name,
+        size: currentModule.video.file.size,
+        type: currentModule.video.file.type,
+        isFile: currentModule.video.file instanceof File
+      });
+      
+      // IMPORTANT: Store the File object directly - it will be used during save
+      videoData = {
+        file: currentModule.video.file, // Keep the File object
+        name: currentModule.video.file.name,
+        size: `${(currentModule.video.file.size / 1024 / 1024).toFixed(2)} MB`,
+        type: currentModule.video.file.type,
+        pendingUpload: true
+      };
     } else if (currentModule.video?.url) {
       // Video already has URL
       videoUrl = currentModule.video.url;
@@ -1233,8 +1142,9 @@ const CreateCommonCourses = () => {
       const token = localStorage.getItem('token') || localStorage.getItem('authToken');
       const courseTitle = formData.title;
 
-      // Step 1: Upload any pending videos that haven't been uploaded yet (like admincourses.js)
-      console.log('📤 Checking for pending video uploads...');
+      // Step 1: Upload ALL videos FIRST (in parallel) before saving course
+      // This ensures video URLs are available when saving to database
+      console.log('📤 Step 1: Checking for videos to upload...');
       const updatedModules = [...formData.modules];
       
       // Sanitize course name like admincourses does (match backend sanitization)
@@ -1243,230 +1153,77 @@ const CreateCommonCourses = () => {
       console.log('📤 Course title:', courseTitle);
       console.log('📤 Course name (sanitized):', courseName);
       
-      let videosUploaded = 0;
+      // Collect videos that need uploading
+      const videosToUpload = [];
       
       for (let i = 0; i < updatedModules.length; i++) {
         const module = updatedModules[i];
-        
-        // Debug: Log module video status
-        console.log(`🔍 Module ${i + 1} "${module.name}" video status:`, {
-          hasVideo: !!module.video,
-          hasFile: !!module.video?.file,
-          hasUrl: !!module.video?.url,
-          pendingUpload: module.video?.pendingUpload,
-          videoObject: module.video
-        });
-        
-        // If module has a video file but no URL, upload it now (like admincourses.js checks for pendingUpload)
-        // Also handle case where video is stored directly as File (backward compatibility)
         const hasVideoFile = module.video?.file instanceof File || (module.video instanceof File);
         const needsUpload = (hasVideoFile && !module.video?.url) || module.video?.pendingUpload;
         
+        console.log(`🔍 Module ${i + 1} "${module.name}":`, {
+          hasVideoFile,
+          hasUrl: !!module.video?.url,
+          pendingUpload: module.video?.pendingUpload,
+          needsUpload
+        });
+        
         if (needsUpload) {
-          // Get the file object (either from module.video.file or module.video itself)
           const videoFile = module.video?.file instanceof File 
             ? module.video.file 
             : (module.video instanceof File ? module.video : null);
           
-          if (!videoFile) {
-            console.error(`❌ Module ${i + 1} has invalid file object:`, module.video);
-            throw new Error(`Module "${module.name}" has an invalid video file. Please re-upload the video.`);
-          }
-          
-          console.log(`📤 Uploading video for module ${i + 1}: ${module.name}`);
-          console.log(`📤 Module video file:`, {
-            name: videoFile.name,
-            size: videoFile.size,
-            type: videoFile.type
-          });
-          try {
-            // Calculate module number correctly
-            // For existing modules being updated, use their position in the array
-            // For new modules added during edit, they should be at the end
+          if (videoFile) {
             let moduleNumber = i + 1;
-            
-            // If editing an existing course, we need to check if this is a new module or existing one
-            // New modules added during edit will be at the end of the array
-            // Existing modules keep their original module numbers
             if (editingCourse && editingCourse.modules) {
-              // Check if this module exists in the original course by comparing m_id
               const existingModule = editingCourse.modules.find(m => m.m_id === module.m_id);
               if (existingModule) {
-                // This is an existing module - find its original position in the database
                 const originalIndex = editingCourse.modules.findIndex(m => m.m_id === module.m_id);
                 moduleNumber = originalIndex + 1;
-                console.log(`📤 Module "${module.name}" (m_id: ${module.m_id}) is existing module, using original module number: ${moduleNumber}`);
               } else {
-                // This is a new module - calculate position after all existing modules
-                // Count how many new modules come before this one
                 const newModulesBeforeThis = updatedModules.slice(0, i).filter(m => 
                   !editingCourse.modules.some(existing => existing.m_id === m.m_id)
                 ).length;
                 moduleNumber = editingCourse.modules.length + newModulesBeforeThis + 1;
-                console.log(`📤 Module "${module.name}" (m_id: ${module.m_id}) is new module, using module number: ${moduleNumber} (existing: ${editingCourse.modules.length}, new before this: ${newModulesBeforeThis})`);
               }
             }
             
-            const formDataToSend = new FormData();
-            formDataToSend.append("video", videoFile);
-
-            const uploadUrl = `${API_ENDPOINTS.VIDEOS.UPLOAD}/${encodeURIComponent(courseName)}/${moduleNumber}`;
-            console.log('📤 Upload URL:', uploadUrl);
-            console.log('📤 Course name:', courseName);
-            console.log('📤 Module number:', moduleNumber);
-
-            const uploadResponse = await fetch(uploadUrl, {
-              method: 'POST',
-              body: formDataToSend,
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
+            videosToUpload.push({
+              index: i,
+              module: module,
+              videoFile: videoFile,
+              moduleNumber: moduleNumber
             });
-
-            console.log('📤 Upload response status:', uploadResponse.status);
-            console.log('📤 Upload response headers:', Object.fromEntries(uploadResponse.headers.entries()));
-
-            if (!uploadResponse.ok) {
-              let errorData;
-              try {
-                errorData = await uploadResponse.json();
-              } catch (e) {
-                errorData = { error: `HTTP ${uploadResponse.status}: ${uploadResponse.statusText}` };
-              }
-              console.error('❌ Upload failed:', errorData);
-              throw new Error(errorData.error || `Failed to upload video for module ${module.name}: ${uploadResponse.statusText}`);
-            }
-
-            const uploadResult = await uploadResponse.json();
-            console.log('✅ Upload result:', uploadResult);
-            
-            // Validate upload result
-            if (!uploadResult.video?.url && !uploadResult.videoUrl) {
-              console.error('❌ Upload result missing video URL:', uploadResult);
-              throw new Error('Upload succeeded but no video URL returned');
-            }
-            
-            const videoUrl = uploadResult.video?.url || uploadResult.videoUrl;
-            console.log('✅ Video URL:', videoUrl);
-            
-            // Update module with video URL (using same structure as admincourses)
-            updatedModules[i] = {
-              ...module,
-              video: {
-                url: videoUrl,
-                name: module.video?.name || videoFile.name,
-                size: module.video?.size || `${(videoFile.size / 1024 / 1024).toFixed(2)} MB`,
-                type: module.video?.type || videoFile.type,
-                s3Key: uploadResult.video?.s3Key,
-                uploadedAt: uploadResult.video?.uploadedAt || new Date().toISOString(),
-                pendingUpload: false
-              }
-            };
-            
-            videosUploaded++;
-            console.log(`✅ Video uploaded successfully for module ${i + 1}: ${module.name}`);
-          } catch (err) {
-            console.error('❌ Video upload failed:', err);
-            throw new Error(`Failed to upload video for module "${module.name}": ${err.message}`);
-          }
-        }
-      }
-      
-      if (videosUploaded > 0) {
-        console.log(`✅ Successfully uploaded ${videosUploaded} video(s) to S3`);
-      }
-
-      // Step 2: Also check if currentModule has a video that needs uploading
-      // This handles the case where a module was added but video upload failed or was deferred
-      if (currentModule.video?.file && !currentModule.video?.url) {
-        console.log('📤 Uploading video for current module before adding...');
-        // Calculate module number: existing modules count + 1
-        let moduleNumber = updatedModules.length + 1;
-        
-        // If editing an existing course, account for existing modules
-        if (editingCourse && editingCourse.modules) {
-          moduleNumber = Math.max(editingCourse.modules.length, updatedModules.length) + 1;
-          console.log('📤 Editing existing course - calculating module number for current module:', moduleNumber);
-        }
-        
-        const formDataToSend = new FormData();
-        formDataToSend.append("video", currentModule.video.file);
-
-        const courseName = courseTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-        const uploadUrl = `${API_ENDPOINTS.VIDEOS.UPLOAD}/${encodeURIComponent(courseName)}/${moduleNumber}`;
-        console.log('📤 Upload URL for current module:', uploadUrl);
-        console.log('📤 Course name (sanitized):', courseName);
-        
-        const uploadResponse = await fetch(uploadUrl, {
-          method: 'POST',
-          body: formDataToSend,
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (!uploadResponse.ok) {
-          let errorData;
-          try {
-            errorData = await uploadResponse.json();
-          } catch (e) {
-            errorData = { error: `HTTP ${uploadResponse.status}` };
-          }
-          throw new Error(errorData.error || 'Failed to upload video for current module');
-        }
-
-        const uploadResult = await uploadResponse.json();
-        console.log('✅ Current module upload result:', uploadResult);
-        
-        // Validate upload result
-        if (!uploadResult.video?.url && !uploadResult.videoUrl) {
-          console.error('❌ Upload result missing video URL:', uploadResult);
-          throw new Error('Upload succeeded but no video URL returned');
-        }
-        
-        const videoUrl = uploadResult.video?.url || uploadResult.videoUrl;
-        console.log('✅ Video URL:', videoUrl);
-        
-        currentModule.video.url = videoUrl;
-        currentModule.video.s3Key = uploadResult.video?.s3Key;
-        currentModule.video.uploadedAt = uploadResult.video?.uploadedAt || new Date().toISOString();
-        currentModule.video.pendingUpload = false;
-      }
-
-      // Step 3: Upload course background image if needed
-      let finalBackgroundImageUrl = formData.backgroundImageUrl;
-      
-      // If there's a new image file but no URL, upload it
-      if (formData.backgroundImage && !formData.backgroundImageUrl) {
-        try {
-          console.log('📤 Uploading course background image...');
-          const courseName = courseTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-          const formDataToSend = new FormData();
-          formDataToSend.append("image", formData.backgroundImage);
-
-          const uploadUrl = `${API_ENDPOINTS.UPLOAD.QUIZ_IMAGE.replace('/upload-quiz-image', '/upload-course-image')}/${encodeURIComponent(courseName)}`;
-          const uploadResponse = await fetch(uploadUrl, {
-            method: 'POST',
-            body: formDataToSend,
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-
-          if (uploadResponse.ok) {
-            const uploadResult = await uploadResponse.json();
-            finalBackgroundImageUrl = uploadResult.image?.url;
-            console.log('✅ Course background image uploaded:', finalBackgroundImageUrl);
+            console.log(`📤 Added module "${module.name}" to upload queue (moduleNumber: ${moduleNumber})`);
           } else {
-            console.warn('⚠️ Failed to upload course background image');
+            console.warn(`⚠️ Module "${module.name}" needs upload but videoFile is invalid`);
           }
-        } catch (err) {
-          console.error('❌ Error uploading course background image:', err);
-          // Don't fail the entire save if image upload fails
         }
       }
+      
+      console.log(`📤 Total videos to upload: ${videosToUpload.length}`);
+      
+      // Step 2: Save course IMMEDIATELY (don't wait for videos), then upload videos in background
+      // Mark modules with pending uploads so we can update them later
+      videosToUpload.forEach(({ index }) => {
+        updatedModules[index] = {
+          ...updatedModules[index],
+          video: {
+            ...updatedModules[index].video,
+            pendingUpload: true
+          }
+        };
+      });
+      
+      console.log('📤 Step 2: Saving course immediately (videos will upload in background and update course)...');
 
-      // Step 4: Prepare course data with all video URLs
+      // Step 4: Use existing background image URL (upload in background after course save)
+      let finalBackgroundImageUrl = formData.backgroundImageUrl;
+      const backgroundImageToUpload = formData.backgroundImage && !formData.backgroundImageUrl 
+        ? formData.backgroundImage 
+        : null;
+
+      // Step 4: Prepare course data (videos will be added after upload completes)
       const courseData = {
         title: formData.title,
         description: formData.description || '',
@@ -1560,6 +1317,13 @@ const CreateCommonCourses = () => {
       console.log(`📤 ${isEditing ? 'Updating' : 'Creating'} course via ${method} ${endpoint}`);
       console.log(`📤 Editing course ID: ${editingCourse?._id}`);
       console.log(`📤 Full endpoint URL: ${endpoint}`);
+      console.log(`📤 API Base URL: ${API_ENDPOINTS.COURSES.GET_COURSES}`);
+      console.log(`📤 Token present: ${!!token}`);
+      
+      // Validate endpoint URL
+      if (!endpoint || endpoint.includes('undefined')) {
+        throw new Error('Invalid API endpoint. Please check your API configuration.');
+      }
 
       console.log(`📤 Sending ${method} request to: ${endpoint}`);
       console.log(`📤 Request body preview:`, {
@@ -1568,96 +1332,241 @@ const CreateCommonCourses = () => {
         modulesWithVideo: courseData.modules.filter(m => m.lessonDetails?.videoUrl).length
       });
 
-      const response = await fetch(endpoint, {
-        method: method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        },
-        body: JSON.stringify(courseData)
-      });
+      let response;
+      try {
+        response = await fetch(endpoint, {
+          method: method,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { 'Authorization': `Bearer ${token}` })
+          },
+          body: JSON.stringify(courseData)
+        });
+      } catch (networkError) {
+        console.error('❌ Network error:', networkError);
+        throw new Error(`Network error: Unable to connect to server. Please check your internet connection and try again. ${networkError.message}`);
+      }
+
+      console.log(`📥 Response status: ${response.status}`);
+      console.log(`📥 Response ok: ${response.ok}`);
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to ${isEditing ? 'update' : 'create'} course`);
+        let errorData;
+        try {
+          errorData = await response.json();
+          console.error('❌ API Error Response:', errorData);
+        } catch (e) {
+          // If response is not JSON, get text
+          const errorText = await response.text();
+          console.error('❌ API Error (non-JSON):', errorText);
+          errorData = { error: `HTTP ${response.status}: ${response.statusText}`, details: errorText };
+        }
+        throw new Error(errorData.error || errorData.message || `Failed to ${isEditing ? 'update' : 'create'} course. Status: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log(`✅ Course ${isEditing ? 'updated' : 'created'}:`, result);
-      
-      // Verify video URLs were saved
-      if (result.course?.modules) {
-        const savedVideoUrls = result.course.modules.map(m => ({
-          m_id: m.m_id,
-          name: m.name,
-          hasVideoUrl: !!m.lessonDetails?.videoUrl,
-          videoUrl: m.lessonDetails?.videoUrl
-        }));
-        console.log('📹 Video URLs saved in database:', savedVideoUrls);
-        
-        // Check if any expected video URLs are missing
-        const expectedVideoUrls = courseData.modules
-          .filter(m => m.lessonDetails?.videoUrl)
-          .map(m => ({ m_id: m.m_id, videoUrl: m.lessonDetails.videoUrl }));
-        const missingUrls = expectedVideoUrls.filter(expected => 
-          !savedVideoUrls.find(saved => saved.m_id === expected.m_id && saved.videoUrl === expected.videoUrl)
-        );
-        if (missingUrls.length > 0) {
-          console.error('❌ Some video URLs were not saved:', missingUrls);
-          setError(`Warning: Some video URLs may not have been saved. Please check the course.`);
-        }
-      }
-      
-      // If there are videos or quizzes, save them separately
       const courseId = isEditing ? editingCourse._id : (result.course?._id || result._id);
-      if (updatedModules.some(m => m.video || (m.quiz && (m.quiz.firstAttemptQuestions?.length > 0 || m.quiz.retakeQuestions?.length > 0)))) {
-        
-        // Save quizzes for each module
-        for (const module of updatedModules) {
-          if (module.quiz && (module.quiz.firstAttemptQuestions?.length > 0 || module.quiz.retakeQuestions?.length > 0)) {
-            const quizResponse = await fetch(`${API_ENDPOINTS.COURSES.GET_COURSES.replace('/getcourse', '/create-quiz')}`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(token && { 'Authorization': `Bearer ${token}` })
-              },
-              body: JSON.stringify({
-                courseId: courseId,
-                mo_id: module.m_id,
-                firstAttemptQuestions: module.quiz.firstAttemptQuestions || [],
-                retakeQuestions: module.quiz.retakeQuestions || [],
-                passingScore: module.quiz.passingScore || 70
-              })
-            });
-            
-            if (!quizResponse.ok) {
-              console.error('Failed to save quiz for module:', module.m_id);
-            }
-          }
-        }
-      }
-
-      // Set editingCourse after creation for future edits
-      if (!isEditing && result.course) {
-        console.log('📝 Setting editingCourse after course creation');
-        setEditingCourse(result.course);
-      }
-
-      // Show success message with video upload info
+      
+      console.log(`✅ Course ${isEditing ? 'updated' : 'created'} instantly! Course ID: ${courseId}`);
+      
+      // Show success message immediately
       let successMessage = isEditing ? "Course updated successfully!" : "Course created successfully!";
-      if (videosUploaded > 0) {
-        successMessage += ` ${videosUploaded} video(s) uploaded to S3 and saved to database.`;
+      if (videosToUpload.length > 0) {
+        successMessage += ` Uploading ${videosToUpload.length} video(s) in background...`;
       }
+      
+      // Clear loading state immediately
+      setIsLoading(false);
       
       alert(successMessage + " 🎉");
       setSuccess(successMessage);
       
+      // Close modal and refresh immediately
       setTimeout(() => {
         closeModal();
         fetchCourses();
-      }, 1500);
+      }, 500);
+      
+      // Step 5: Upload videos in background (parallel) and update course
+      if (videosToUpload.length > 0) {
+        console.log(`📤 Step 5: Starting background upload of ${videosToUpload.length} video(s) in parallel...`);
+        
+        const uploadPromises = videosToUpload.map(({ index, module, videoFile, moduleNumber }) => {
+          return (async () => {
+            try {
+              const formDataToSend = new FormData();
+              formDataToSend.append("video", videoFile);
+              const uploadUrl = `${API_ENDPOINTS.VIDEOS.UPLOAD}/${encodeURIComponent(courseName)}/${moduleNumber}`;
+              
+              console.log(`📤 [Background] Uploading video for module "${module.name}" (m_id: ${module.m_id})`);
+              
+              const uploadResponse = await fetch(uploadUrl, {
+                method: 'POST',
+                body: formDataToSend,
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+
+              if (!uploadResponse.ok) {
+                const errorData = await uploadResponse.json().catch(() => ({ 
+                  error: `HTTP ${uploadResponse.status}` 
+                }));
+                throw new Error(errorData.error || `Failed to upload video`);
+              }
+
+              const uploadResult = await uploadResponse.json();
+              const videoUrl = uploadResult.video?.url || uploadResult.videoUrl;
+              
+              if (!videoUrl) {
+                throw new Error('Upload succeeded but no video URL returned');
+              }
+              
+              console.log(`✅ [Background] Video uploaded for module "${module.name}": ${videoUrl}`);
+              
+              return {
+                index,
+                module: {
+                  ...module,
+                  m_id: module.m_id
+                },
+                videoUrl,
+                moduleNumber
+              };
+            } catch (err) {
+              console.error(`❌ [Background] Video upload failed for module "${module.name}":`, err);
+              return {
+                index,
+                module: {
+                  ...module,
+                  m_id: module.m_id
+                },
+                error: err.message
+              };
+            }
+          })();
+        });
+        
+        // Upload all videos in parallel
+        Promise.all(uploadPromises).then(uploadResults => {
+          const successfulUploads = uploadResults.filter(r => r.videoUrl);
+          const failedUploads = uploadResults.filter(r => r.error);
+          
+          console.log(`✅ [Background] ${successfulUploads.length} video(s) uploaded to S3`);
+          if (failedUploads.length > 0) {
+            console.warn(`⚠️ [Background] ${failedUploads.length} video upload(s) failed`);
+          }
+          
+          // Update course with video URLs
+          if (successfulUploads.length > 0) {
+            // Get current course
+            fetch(`${API_ENDPOINTS.COURSES.GET_COURSES.replace('/getcourse', '')}/${courseId}`)
+              .then(res => res.json())
+              .then(courseData => {
+                const course = Array.isArray(courseData) ? courseData[0] : courseData;
+                
+                if (course && course.modules) {
+                  // Create video URL map by m_id
+                  const videoUrlMap = {};
+                  successfulUploads.forEach(upload => {
+                    if (upload.module?.m_id && upload.videoUrl) {
+                      videoUrlMap[upload.module.m_id] = upload.videoUrl;
+                    }
+                  });
+                  
+                  // Update modules with video URLs
+                  const updatedModules = course.modules.map((m) => {
+                    const videoUrl = videoUrlMap[m.m_id];
+                    if (videoUrl) {
+                      return {
+                        ...m,
+                        lessonDetails: {
+                          ...(m.lessonDetails || {}),
+                          videoUrl: videoUrl,
+                          title: m.lessonDetails?.title || m.name,
+                          content: m.lessonDetails?.content || [],
+                          duration: m.lessonDetails?.duration || `${m.duration || 0}min`,
+                          notes: m.lessonDetails?.notes || m.notes || ''
+                        }
+                      };
+                    }
+                    return m;
+                  });
+                  
+                  // Update course with video URLs
+                  fetch(`${API_ENDPOINTS.COURSES.GET_COURSES.replace('/getcourse', '/update')}/${courseId}`, {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                      title: course.title,
+                      description: course.description || '',
+                      backgroundImageUrl: course.backgroundImageUrl,
+                      retakeQuizCooldownHours: course.retakeQuizCooldownHours || 24,
+                      preTest: course.preTest || { enabled: false, passingScore: 0, questions: [] },
+                      modules: updatedModules
+                    })
+                  }).then(() => {
+                    console.log(`✅ [Background] Course updated with ${successfulUploads.length} video URL(s) in database`);
+                    fetchCourses(); // Refresh course list
+                  }).catch(err => {
+                    console.error('❌ [Background] Failed to update course with video URLs:', err);
+                  });
+                }
+              })
+              .catch(err => {
+                console.error('❌ [Background] Failed to fetch course for update:', err);
+              });
+          }
+        }).catch(err => {
+          console.error('❌ [Background] Promise.all failed:', err);
+        });
+      }
+      
+      // Save quizzes in background (non-blocking)
+      if (updatedModules.some(m => m.quiz && (m.quiz.firstAttemptQuestions?.length > 0 || m.quiz.retakeQuestions?.length > 0))) {
+        // Save quizzes asynchronously
+        setTimeout(() => {
+          for (const module of updatedModules) {
+            if (module.quiz && (module.quiz.firstAttemptQuestions?.length > 0 || module.quiz.retakeQuestions?.length > 0)) {
+              fetch(`${API_ENDPOINTS.COURSES.GET_COURSES.replace('/getcourse', '/create-quiz')}`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                  courseId: courseId,
+                  mo_id: module.m_id,
+                  firstAttemptQuestions: module.quiz.firstAttemptQuestions || [],
+                  retakeQuestions: module.quiz.retakeQuestions || [],
+                  passingScore: module.quiz.passingScore || 70
+                })
+              }).catch(err => {
+                console.error('Failed to save quiz for module:', module.m_id, err);
+              });
+            }
+          }
+        }, 100);
+      }
+
+      // Set editingCourse after creation for future edits
+      if (!isEditing && result.course) {
+        setEditingCourse(result.course);
+      }
     } catch (err) {
-      setError(err.message || "Failed to create course");
+      console.error('❌ Error saving course:', err);
+      console.error('❌ Error details:', {
+        message: err.message,
+        stack: err.stack,
+        name: err.name
+      });
+      
+      const errorMessage = err.message || "Failed to create course";
+      setError(errorMessage);
+      
+      // Also show alert for better visibility in production
+      alert(`❌ Error: ${errorMessage}\n\nPlease check the browser console for more details.`);
     } finally {
       setIsLoading(false);
     }
@@ -2739,14 +2648,16 @@ const CreateCommonCourses = () => {
                           const hasFirstAttempt = firstAttemptQuestions.length > 0;
                           const hasRetake = retakeQuestions.length > 0;
                           
-                          console.log('🔍 Checking existing questions visibility:', {
-                            hasFirstAttempt,
-                            hasRetake,
-                            firstAttemptCount: firstAttemptQuestions.length,
-                            retakeCount: retakeQuestions.length,
-                            quiz: quiz,
-                            currentModuleQuiz: currentModule.quiz
-                          });
+                          // Removed console.log to prevent infinite render loop
+                          // Only log in development mode if needed for debugging
+                          // if (process.env.NODE_ENV === 'development') {
+                          //   console.log('🔍 Checking existing questions visibility:', {
+                          //     hasFirstAttempt,
+                          //     hasRetake,
+                          //     firstAttemptCount: firstAttemptQuestions.length,
+                          //     retakeCount: retakeQuestions.length
+                          //   });
+                          // }
                           
                           return hasFirstAttempt || hasRetake;
                         })() && (
