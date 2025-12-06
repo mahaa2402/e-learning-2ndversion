@@ -1396,9 +1396,11 @@ const CreateCommonCourses = () => {
             try {
               const formDataToSend = new FormData();
               formDataToSend.append("video", videoFile);
-              const uploadUrl = `${API_ENDPOINTS.VIDEOS.UPLOAD}/${encodeURIComponent(courseName)}/${moduleNumber}`;
+              // Include courseId in URL query parameter for reliable course lookup
+              const uploadUrl = `${API_ENDPOINTS.VIDEOS.UPLOAD}/${encodeURIComponent(courseName)}/${moduleNumber}?courseId=${courseId}`;
               
               console.log(`📤 [Background] Uploading video for module "${module.name}" (m_id: ${module.m_id})`);
+              console.log(`📤 [Background] Course ID: ${courseId}`);
               
               const uploadResponse = await fetch(uploadUrl, {
                 method: 'POST',

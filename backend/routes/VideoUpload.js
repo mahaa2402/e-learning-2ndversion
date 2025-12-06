@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require("uuid");
 const path = require("path");
 const fs = require("fs");
 const Course = require("../models/Course"); // make sure this path is correct
+const Common_Course = require("../models/common_courses"); // Import Common_Course model
 
 const router = express.Router();
 
@@ -36,10 +37,31 @@ const upload = multer({
 });
 
 // AWS S3 Config
-const s3 = new AWS.S3({
+const s3Config = {
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   region: process.env.AWS_REGION,
+};
+
+// Add endpoint override if needed (for some regions or custom endpoints)
+if (process.env.AWS_ENDPOINT) {
+  s3Config.endpoint = process.env.AWS_ENDPOINT;
+  s3Config.s3ForcePathStyle = true; // Required for some S3-compatible services
+  console.log('📤 Using custom AWS endpoint:', process.env.AWS_ENDPOINT);
+}
+
+// Enable signature version 4 for better compatibility
+s3Config.signatureVersion = 'v4';
+
+const s3 = new AWS.S3(s3Config);
+
+// Log AWS configuration (without sensitive data)
+console.log('✅ AWS S3 Configuration:', {
+  region: s3Config.region,
+  bucket: process.env.AWS_BUCKET_NAME,
+  endpoint: s3Config.endpoint || 'default',
+  hasAccessKey: !!s3Config.accessKeyId,
+  hasSecretKey: !!s3Config.secretAccessKey
 });
 
 // Error handler for multer errors (file size limit removed)
@@ -189,6 +211,85 @@ router.post(
 
       console.log(`✅ Video uploaded successfully to S3: ${key}`);
 
+      // Automatically update course in database with video URL
+      try {
+        let course = null;
+        
+        // Try to find course by courseId from query parameter first (most reliable)
+        if (req.query.courseId) {
+          const mongoose = require('mongoose');
+          if (mongoose.Types.ObjectId.isValid(req.query.courseId)) {
+            course = await Common_Course.findById(req.query.courseId);
+            console.log(`📤 Found course by ID: ${req.query.courseId}`);
+          }
+        }
+        
+        // If not found by ID, try to find by title
+        if (!course) {
+          // Try exact title match first
+          course = await Common_Course.findOne({ title: decodedCourseName });
+          
+          // If not found, try case-insensitive match
+          if (!course) {
+            course = await Common_Course.findOne({ 
+              title: { $regex: new RegExp(`^${decodedCourseName.replace(/[^a-zA-Z0-9]/g, '.*')}$`, 'i') }
+            });
+          }
+          
+          // If still not found, try sanitized name
+          if (!course) {
+            const sanitizedTitle = decodedCourseName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+            course = await Common_Course.findOne({ 
+              title: { $regex: new RegExp(sanitizedTitle, 'i') }
+            });
+          }
+        }
+        
+        if (course) {
+          // Find the module by module number (modules array index + 1)
+          const moduleIndex = moduleNum - 1;
+          if (course.modules && course.modules[moduleIndex]) {
+            const module = course.modules[moduleIndex];
+            
+            // Update module's lessonDetails with video URL
+            if (!module.lessonDetails) {
+              module.lessonDetails = {
+                title: module.name,
+                videoUrl: uploadResult.Location,
+                content: [],
+                duration: duration || `${module.duration || 0}min`,
+                notes: module.notes || ''
+              };
+            } else {
+              module.lessonDetails.videoUrl = uploadResult.Location;
+              if (duration) {
+                module.lessonDetails.duration = duration;
+              }
+            }
+            
+            // Mark module as modified
+            course.markModified('modules');
+            await course.save();
+            
+            console.log(`✅ Course "${course.title}" (ID: ${course._id}) updated with video URL for module ${moduleNum} (m_id: ${module.m_id})`);
+            console.log(`✅ Video URL saved to database: ${uploadResult.Location}`);
+          } else {
+            console.warn(`⚠️ Module ${moduleNum} (index ${moduleIndex}) not found in course "${course.title}". Course has ${course.modules?.length || 0} modules.`);
+          }
+        } else {
+          console.warn(`⚠️ Could not find course to update. Searched for: "${decodedCourseName}". Video uploaded to S3: ${uploadResult.Location}`);
+          console.warn(`⚠️ Video URL will need to be manually added to the course.`);
+        }
+      } catch (dbError) {
+        console.error('❌ Error updating course in database:', dbError);
+        console.error('❌ DB Error details:', {
+          message: dbError.message,
+          stack: dbError.stack
+        });
+        // Don't fail the upload if DB update fails - video is already in S3
+        console.warn('⚠️ Video uploaded to S3 but failed to update course in database. Video URL:', uploadResult.Location);
+      }
+
       const response = {
         success: true,
         message: `Video uploaded for ${decodedCourseName} Module ${moduleNum}`,
@@ -238,6 +339,15 @@ router.post(
       } else if (error.code === 'NoSuchBucket') {
         errorMessage = `The S3 bucket "${process.env.AWS_BUCKET_NAME}" does not exist. Please check your bucket name.`;
         errorCode = 'BUCKET_NOT_FOUND';
+      } else if (error.code === 'UnknownEndpoint' || error.code === 'NetworkingError' || error.code === 'ENOTFOUND') {
+        errorMessage = `Cannot connect to AWS S3. Please check your network connection and AWS region configuration. Region: ${process.env.AWS_REGION}, Bucket: ${process.env.AWS_BUCKET_NAME}. Error: ${error.message}`;
+        errorCode = 'S3_CONNECTION_ERROR';
+        console.error('❌ AWS S3 Connection Error Details:', {
+          region: process.env.AWS_REGION,
+          bucket: process.env.AWS_BUCKET_NAME,
+          endpoint: error.hostname,
+          originalError: error.originalError?.message
+        });
       }
       
       res.status(500).json({ 
