@@ -1395,117 +1395,89 @@ const CreateCommonCourses = () => {
         const uploadWithRetry = async (videoFile, uploadUrl, moduleName, maxRetries = 5) => {
           for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-              console.log(`📤 [Background] Upload attempt ${attempt}/${maxRetries} for module "${moduleName}"`);
-              console.log(`📤 [Background] File size: ${(videoFile.size / 1024 / 1024).toFixed(2)} MB`);
-              console.log(`📤 [Background] Upload URL: ${uploadUrl}`);
-              
+              console.log(`📤 Attempt ${attempt}/${maxRetries} for "${moduleName}"`);
+              console.log(`📤 File size: ${(videoFile.size / 1024 / 1024).toFixed(2)} MB`);
+        
               return new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
                 const formData = new FormData();
                 formData.append("video", videoFile);
-                
-                // Set timeout (15 minutes for large files in production)
-                xhr.timeout = 900000; // 15 minutes
-                
+        
+                xhr.timeout = 900000; // 15 mins
+        
                 xhr.upload.onprogress = (e) => {
                   if (e.lengthComputable) {
                     const percentComplete = (e.loaded / e.total) * 100;
                     if (percentComplete % 25 === 0 || percentComplete === 100) {
-                      console.log(`📤 [Background] Upload progress for "${moduleName}": ${percentComplete.toFixed(1)}%`);
+                      console.log(`📤 Upload Progress "${moduleName}": ${percentComplete.toFixed(1)}%`);
                     }
                   }
                 };
-                
+        
                 xhr.onload = () => {
                   if (xhr.status >= 200 && xhr.status < 300) {
                     try {
-                      const uploadResult = JSON.parse(xhr.responseText);
-                      const videoUrl = uploadResult.video?.url || uploadResult.videoUrl;
-                      
-                      if (!videoUrl) {
-                        reject(new Error('Upload succeeded but no video URL returned'));
-                        return;
-                      }
-                      
-                      console.log(`✅ [Background] Video uploaded successfully for module "${moduleName}": ${videoUrl}`);
+                      const res = JSON.parse(xhr.responseText);
+                      const videoUrl = res.video?.url || res.videoUrl;
+                      if (!videoUrl) return reject(new Error("Server returned no video URL"));
+                      console.log(`✅ Upload success for ${moduleName}: ${videoUrl}`);
                       resolve(videoUrl);
-                    } catch (parseError) {
-                      console.error(`❌ [Background] Failed to parse upload response:`, parseError);
-                      reject(new Error('Invalid response from server'));
+                    } catch (err) {
+                      console.error("❌ JSON parse error", err);
+                      reject(new Error("Invalid upload response"));
                     }
                   } else {
-                    let errorMessage = `HTTP ${xhr.status}: ${xhr.statusText}`;
-                    try {
-                      const errorData = JSON.parse(xhr.responseText);
-                      errorMessage = errorData.error || errorData.details || errorMessage;
-                    } catch (e) {
-                      // Response is not JSON, use status text
-                    }
-                    reject(new Error(errorMessage));
+                    reject(new Error(`Upload failed: HTTP ${xhr.status}`));
                   }
                 };
-                
-                xhr.onerror = (e) => {
-                  console.error(`❌ [Background] XHR error event:`, e);
-                  reject(new Error(`Network error: Connection failed or reset. Please check your network connection and try again.`));
-                };
-                
-                xhr.ontimeout = () => {
-                  reject(new Error(`Upload timeout: File too large or connection too slow`));
-                };
-                
-                xhr.onabort = () => {
-                  reject(new Error(`Upload aborted`));
-                };
-                
-                // Use relative URL in production to go through proxy (avoids ERR_CONNECTION_RESET)
+        
+                xhr.onerror = () => reject(new Error("Network error / Connection reset"));
+                xhr.ontimeout = () => reject(new Error("Upload timeout"));
+                xhr.onabort = () => reject(new Error("Upload aborted"));
+        
+                // --- FIXED: CORRECT relative URL logic ---
                 let finalUploadUrl = uploadUrl;
-                const isProduction = window.location.hostname !== 'localhost' && 
-                                     window.location.hostname !== '127.0.0.1';
-                
+        
+                const isProduction = window.location.hostname !== "localhost" &&
+                                     window.location.hostname !== "127.0.0.1";
+        
                 if (isProduction) {
                   try {
                     const urlObj = new URL(uploadUrl);
-                    // If URL contains port 5000 or direct IP, use relative path instead
-                    if (urlObj.port === '5000' || urlObj.hostname === window.location.hostname) {
+        
+                    // Convert absolute → relative path
+                    if (urlObj.port === "5000") {
                       finalUploadUrl = urlObj.pathname + urlObj.search;
-                      console.log(`📤 [Background] Production mode: Using relative URL: ${finalUploadUrl}`);
+                      console.log(`📤 Using PRODUCTION relative URL: ${finalUploadUrl}`);
                     }
+        
                   } catch (e) {
-                    // If uploadUrl is already relative, use it as-is
-                    if (uploadUrl.startsWith('/')) {
+                    if (uploadUrl.startsWith("/")) {
                       finalUploadUrl = uploadUrl;
-                      console.log(`📤 [Background] Production mode: Using relative URL: ${finalUploadUrl}`);
-                    } else {
-                      console.warn('⚠️ [Background] Could not parse upload URL, using original');
                     }
                   }
                 }
-                
-                console.log(`📤 [Background] Final upload URL: ${finalUploadUrl}`);
-                xhr.open('POST', finalUploadUrl);
-                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-                // Don't set Content-Type header - let browser set it with boundary for multipart/form-data
+        
+                console.log("📤 Final Upload URL:", finalUploadUrl);
+        
+                xhr.open("POST", finalUploadUrl);
+                xhr.setRequestHeader("Authorization", `Bearer ${token}`);
                 xhr.send(formData);
               });
-              
+        
             } catch (err) {
-              console.error(`❌ [Background] Upload failed for module "${moduleName}" (attempt ${attempt}/${maxRetries}):`, err.message);
-              
-              // If this was the last attempt, throw the error
-              if (attempt === maxRetries) {
-                throw err;
-              }
-              
-              // Wait before retrying (exponential backoff with jitter)
-              const baseDelay = 1000 * Math.pow(2, attempt - 1);
-              const jitter = Math.random() * 1000; // Random 0-1s jitter
-              const delay = Math.min(baseDelay + jitter, 30000); // Max 30 seconds
-              console.log(`⏳ [Background] Retrying upload for "${moduleName}" in ${(delay/1000).toFixed(1)}s...`);
-              await new Promise(resolve => setTimeout(resolve, delay));
+              console.error(`❌ Attempt ${attempt} failed:`, err.message);
+        
+              if (attempt === maxRetries) throw err;
+        
+              // Exponential backoff
+              const delay = Math.min(1000 * 2 ** (attempt - 1) + Math.random() * 1000, 30000);
+              console.log(`⏳ Retrying in ${(delay / 1000).toFixed(1)}s...`);
+              await new Promise((r) => setTimeout(r, delay));
             }
           }
         };
+        
         
         const uploadPromises = videosToUpload.map(({ index, module, videoFile, moduleNumber }) => {
           return (async () => {
