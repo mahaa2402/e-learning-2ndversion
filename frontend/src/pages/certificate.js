@@ -274,39 +274,57 @@ const CertificatePage = () => {
     // Fetch PDF template with error handling and fallback
     let existingPdfBytes;
     let fetchError = null;
+    let templateLoaded = false;
     
     // Try public folder first
     try {
+      console.log('📄 Attempting to load PDF template from public folder:', templateToUse);
       const response = await fetch(templateToUse);
       
       if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unable to read error response');
+        console.error('❌ Public folder fetch failed:', response.status, response.statusText);
+        console.error('❌ Response body (first 200 chars):', errorText.substring(0, 200));
         throw new Error(`Failed to fetch PDF template: ${response.status} ${response.statusText}`);
       }
       
       // Check if response is actually a PDF
       const contentType = response.headers.get('content-type');
+      console.log('📄 Response content-type:', contentType);
+      
       if (contentType && !contentType.includes('application/pdf')) {
         console.warn('⚠️ Response is not a PDF, content-type:', contentType);
         // Still try to load it, might work if server doesn't set content-type correctly
       }
       
       existingPdfBytes = await response.arrayBuffer();
+      console.log('📄 Fetched bytes length:', existingPdfBytes.byteLength);
       
       // Validate that it's actually a PDF by checking the header
       const uint8Array = new Uint8Array(existingPdfBytes);
       const pdfHeader = String.fromCharCode(...uint8Array.slice(0, 4));
+      const firstBytes = Array.from(uint8Array.slice(0, 20)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+      
+      console.log('📄 First 4 bytes (header):', pdfHeader);
+      console.log('📄 First 20 bytes (hex):', firstBytes);
+      
       if (pdfHeader !== '%PDF') {
-        throw new Error('Fetched file is not a valid PDF. Got header: ' + pdfHeader);
+        // Try to see what we actually got
+        const textPreview = String.fromCharCode(...uint8Array.slice(0, 100));
+        console.error('❌ Not a valid PDF header. First 100 chars:', textPreview);
+        throw new Error(`Fetched file is not a valid PDF. Got header: "${pdfHeader}" (expected "%PDF"). File might be HTML or missing.`);
       }
       
       console.log('✅ PDF template loaded successfully from public folder, size:', existingPdfBytes.byteLength, 'bytes');
+      templateLoaded = true;
     } catch (publicError) {
-      console.warn('⚠️ Failed to load PDF from public folder, trying asset import:', publicError.message);
+      console.warn('⚠️ Failed to load PDF from public folder:', publicError.message);
       fetchError = publicError;
       
       // Fallback to asset import if available
       if (templateAsset) {
         try {
+          console.log('📄 Attempting to load PDF template from assets:', templateAsset);
           const assetResponse = await fetch(templateAsset);
           if (!assetResponse.ok) {
             throw new Error(`Failed to fetch PDF template from assets: ${assetResponse.status}`);
@@ -321,6 +339,7 @@ const CertificatePage = () => {
           }
           
           console.log('✅ PDF template loaded successfully from assets, size:', existingPdfBytes.byteLength, 'bytes');
+          templateLoaded = true;
           fetchError = null; // Clear error since fallback worked
         } catch (assetError) {
           console.error('❌ Error fetching PDF template from assets:', assetError);
@@ -328,21 +347,43 @@ const CertificatePage = () => {
         }
       }
       
-      // If both failed, throw error
-      if (fetchError) {
+      // If both failed, we'll create PDF from scratch after loading attempt
+      if (!templateLoaded) {
+        console.error('❌ Both template sources failed. Will create PDF from scratch...');
         console.error('❌ Template URL (public):', templateToUse);
         console.error('❌ Template Asset:', templateAsset);
-        throw new Error(`Failed to load PDF template: ${fetchError.message}. Please ensure the template files are available in the public folder or assets.`);
+        console.error('❌ Public error:', fetchError?.message);
+        // Set existingPdfBytes to null to signal we need to create from scratch
+        existingPdfBytes = null;
       }
     }
     
     let pdfDoc;
+    let isNewPdf = false;
+    
     try {
-      pdfDoc = await PDFDocument.load(existingPdfBytes);
+      if (!existingPdfBytes) {
+        // Create a new PDF from scratch as fallback
+        console.log('📄 Creating new PDF from scratch (templates not available)');
+        pdfDoc = await PDFDocument.create();
+        const page = pdfDoc.addPage([612, 792]); // US Letter size
+        isNewPdf = true;
+        console.log('✅ Created new PDF document from scratch');
+      } else {
+        // Load from bytes
+        pdfDoc = await PDFDocument.load(existingPdfBytes);
+        console.log('✅ PDF document loaded from template bytes');
+      }
     } catch (loadError) {
       console.error('❌ Error loading PDF document:', loadError);
-      console.error('❌ PDF bytes length:', existingPdfBytes.byteLength);
-      throw new Error(`Failed to parse PDF template: ${loadError.message}. The template file may be corrupted.`);
+      console.error('❌ PDF bytes length:', existingPdfBytes?.byteLength || 'N/A');
+      
+      // Last resort: create from scratch
+      console.log('📄 Creating PDF from scratch as last resort...');
+      pdfDoc = await PDFDocument.create();
+      pdfDoc.addPage([612, 792]);
+      isNewPdf = true;
+      console.log('✅ Created new PDF document as fallback');
     }
 
     // Embed standard font
