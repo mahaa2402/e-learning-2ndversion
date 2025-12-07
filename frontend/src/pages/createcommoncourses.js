@@ -1391,38 +1391,133 @@ const CreateCommonCourses = () => {
       if (videosToUpload.length > 0) {
         console.log(`📤 Step 5: Starting background upload of ${videosToUpload.length} video(s) in parallel...`);
         
+        // Upload function using XMLHttpRequest (more reliable for large files than fetch)
+        const uploadWithRetry = async (videoFile, uploadUrl, moduleName, maxRetries = 5) => {
+          for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+              console.log(`📤 [Background] Upload attempt ${attempt}/${maxRetries} for module "${moduleName}"`);
+              console.log(`📤 [Background] File size: ${(videoFile.size / 1024 / 1024).toFixed(2)} MB`);
+              console.log(`📤 [Background] Upload URL: ${uploadUrl}`);
+              
+              return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                const formData = new FormData();
+                formData.append("video", videoFile);
+                
+                // Set timeout (15 minutes for large files in production)
+                xhr.timeout = 900000; // 15 minutes
+                
+                xhr.upload.onprogress = (e) => {
+                  if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    if (percentComplete % 25 === 0 || percentComplete === 100) {
+                      console.log(`📤 [Background] Upload progress for "${moduleName}": ${percentComplete.toFixed(1)}%`);
+                    }
+                  }
+                };
+                
+                xhr.onload = () => {
+                  if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                      const uploadResult = JSON.parse(xhr.responseText);
+                      const videoUrl = uploadResult.video?.url || uploadResult.videoUrl;
+                      
+                      if (!videoUrl) {
+                        reject(new Error('Upload succeeded but no video URL returned'));
+                        return;
+                      }
+                      
+                      console.log(`✅ [Background] Video uploaded successfully for module "${moduleName}": ${videoUrl}`);
+                      resolve(videoUrl);
+                    } catch (parseError) {
+                      console.error(`❌ [Background] Failed to parse upload response:`, parseError);
+                      reject(new Error('Invalid response from server'));
+                    }
+                  } else {
+                    let errorMessage = `HTTP ${xhr.status}: ${xhr.statusText}`;
+                    try {
+                      const errorData = JSON.parse(xhr.responseText);
+                      errorMessage = errorData.error || errorData.details || errorMessage;
+                    } catch (e) {
+                      // Response is not JSON, use status text
+                    }
+                    reject(new Error(errorMessage));
+                  }
+                };
+                
+                xhr.onerror = (e) => {
+                  console.error(`❌ [Background] XHR error event:`, e);
+                  reject(new Error(`Network error: Connection failed or reset. Please check your network connection and try again.`));
+                };
+                
+                xhr.ontimeout = () => {
+                  reject(new Error(`Upload timeout: File too large or connection too slow`));
+                };
+                
+                xhr.onabort = () => {
+                  reject(new Error(`Upload aborted`));
+                };
+                
+                // Use relative URL in production to go through proxy (avoids ERR_CONNECTION_RESET)
+                let finalUploadUrl = uploadUrl;
+                const isProduction = window.location.hostname !== 'localhost' && 
+                                     window.location.hostname !== '127.0.0.1';
+                
+                if (isProduction) {
+                  try {
+                    const urlObj = new URL(uploadUrl);
+                    // If URL contains port 5000 or direct IP, use relative path instead
+                    if (urlObj.port === '5000' || urlObj.hostname === window.location.hostname) {
+                      finalUploadUrl = urlObj.pathname + urlObj.search;
+                      console.log(`📤 [Background] Production mode: Using relative URL: ${finalUploadUrl}`);
+                    }
+                  } catch (e) {
+                    // If uploadUrl is already relative, use it as-is
+                    if (uploadUrl.startsWith('/')) {
+                      finalUploadUrl = uploadUrl;
+                      console.log(`📤 [Background] Production mode: Using relative URL: ${finalUploadUrl}`);
+                    } else {
+                      console.warn('⚠️ [Background] Could not parse upload URL, using original');
+                    }
+                  }
+                }
+                
+                console.log(`📤 [Background] Final upload URL: ${finalUploadUrl}`);
+                xhr.open('POST', finalUploadUrl);
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                // Don't set Content-Type header - let browser set it with boundary for multipart/form-data
+                xhr.send(formData);
+              });
+              
+            } catch (err) {
+              console.error(`❌ [Background] Upload failed for module "${moduleName}" (attempt ${attempt}/${maxRetries}):`, err.message);
+              
+              // If this was the last attempt, throw the error
+              if (attempt === maxRetries) {
+                throw err;
+              }
+              
+              // Wait before retrying (exponential backoff with jitter)
+              const baseDelay = 1000 * Math.pow(2, attempt - 1);
+              const jitter = Math.random() * 1000; // Random 0-1s jitter
+              const delay = Math.min(baseDelay + jitter, 30000); // Max 30 seconds
+              console.log(`⏳ [Background] Retrying upload for "${moduleName}" in ${(delay/1000).toFixed(1)}s...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
+          }
+        };
+        
         const uploadPromises = videosToUpload.map(({ index, module, videoFile, moduleNumber }) => {
           return (async () => {
             try {
-              const formDataToSend = new FormData();
-              formDataToSend.append("video", videoFile);
               // Include courseId in URL query parameter for reliable course lookup
               const uploadUrl = `${API_ENDPOINTS.VIDEOS.UPLOAD}/${encodeURIComponent(courseName)}/${moduleNumber}?courseId=${courseId}`;
               
-              console.log(`📤 [Background] Uploading video for module "${module.name}" (m_id: ${module.m_id})`);
+              console.log(`📤 [Background] Starting upload for module "${module.name}" (m_id: ${module.m_id})`);
               console.log(`📤 [Background] Course ID: ${courseId}`);
+              console.log(`📤 [Background] File size: ${(videoFile.size / 1024 / 1024).toFixed(2)} MB`);
               
-              const uploadResponse = await fetch(uploadUrl, {
-                method: 'POST',
-                body: formDataToSend,
-                headers: { 'Authorization': `Bearer ${token}` }
-              });
-
-              if (!uploadResponse.ok) {
-                const errorData = await uploadResponse.json().catch(() => ({ 
-                  error: `HTTP ${uploadResponse.status}` 
-                }));
-                throw new Error(errorData.error || `Failed to upload video`);
-              }
-
-              const uploadResult = await uploadResponse.json();
-              const videoUrl = uploadResult.video?.url || uploadResult.videoUrl;
-              
-              if (!videoUrl) {
-                throw new Error('Upload succeeded but no video URL returned');
-              }
-              
-              console.log(`✅ [Background] Video uploaded for module "${module.name}": ${videoUrl}`);
+              const videoUrl = await uploadWithRetry(videoFile, uploadUrl, module.name, 3);
               
               return {
                 index,
@@ -1434,14 +1529,14 @@ const CreateCommonCourses = () => {
                 moduleNumber
               };
             } catch (err) {
-              console.error(`❌ [Background] Video upload failed for module "${module.name}":`, err);
+              console.error(`❌ [Background] Video upload failed for module "${module.name}" after retries:`, err);
               return {
                 index,
                 module: {
                   ...module,
                   m_id: module.m_id
                 },
-                error: err.message
+                error: err.message || 'Upload failed after retries'
               };
             }
           })();
@@ -1454,11 +1549,18 @@ const CreateCommonCourses = () => {
           
           console.log(`✅ [Background] ${successfulUploads.length} video(s) uploaded to S3`);
           if (failedUploads.length > 0) {
-            console.warn(`⚠️ [Background] ${failedUploads.length} video upload(s) failed`);
+            console.warn(`⚠️ [Background] ${failedUploads.length} video upload(s) failed:`, failedUploads.map(f => ({
+              module: f.module?.name,
+              error: f.error
+            })));
+            
+            // Show user-friendly error message
+            setError(`Warning: ${failedUploads.length} video upload(s) failed due to network issues. The course was saved, but videos will need to be re-uploaded. Error: ${failedUploads[0]?.error || 'Connection reset'}`);
           }
           
-          // Update course with video URLs
+          // Update course with video URLs (only if we have successful uploads)
           if (successfulUploads.length > 0) {
+            console.log(`📤 [Background] Updating course with ${successfulUploads.length} video URL(s)...`);
             // Get current course
             fetch(`${API_ENDPOINTS.COURSES.GET_COURSES.replace('/getcourse', '')}/${courseId}`)
               .then(res => res.json())

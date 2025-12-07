@@ -5,7 +5,9 @@ const API_CONFIG = {
     API_PREFIX: '/api'
   },
   production: {
-    BASE_URL: process.env.REACT_APP_API_URL || 'http://localhost:5000', // Local backend
+    // In production, use relative URL to go through proxy (nginx/apache)
+    // This avoids direct port 5000 connections that get reset
+    BASE_URL: process.env.REACT_APP_API_URL || '', // Empty string = relative URL
     API_PREFIX: '/api'
   }
 };
