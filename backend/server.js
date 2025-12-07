@@ -46,6 +46,12 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Increase server timeout for large file uploads (30 minutes)
+app.timeout = 1800000; // 30 minutes
+if (app.setTimeout) {
+  app.setTimeout(1800000);
+}
+
 // Debug middleware - MUST be after body parsing but before routes
 app.use((req, res, next) => {
   // Log ALL requests, especially PUT requests

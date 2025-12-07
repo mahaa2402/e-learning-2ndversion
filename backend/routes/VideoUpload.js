@@ -84,6 +84,10 @@ router.post(
   upload.single("video"),
   handleMulterError,
   async (req, res) => {
+    // Set timeout for this route (30 minutes for large files)
+    req.setTimeout(1800000); // 30 minutes
+    res.setTimeout(1800000); // 30 minutes
+    
     try {
       console.log('📥 Video upload request received');
       console.log('📥 Params:', req.params);
