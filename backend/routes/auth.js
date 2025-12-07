@@ -287,7 +287,7 @@ router.get('/validate-dashboard-link', async (req, res) => {
       
       if (host) {
         // ALWAYS remove port 5000 (backend port) - frontend never uses this
-        if (host.includes(':5000')) {
+      if (host.includes(':5000')) {
           host = host.replace(':5000', '');
           console.log(`🔧 Removed port 5000, new host: ${host}`);
         }
@@ -299,9 +299,9 @@ router.get('/validate-dashboard-link', async (req, res) => {
         } else if (host.includes(':3000')) {
           // Keep port 3000 if present (development)
           frontendBase = `${protocol}://${host}`;
-        } else {
+      } else {
           // For production, use the host without any port (defaults to port 80/443)
-          frontendBase = `${protocol}://${host}`;
+        frontendBase = `${protocol}://${host}`;
         }
         
         console.log(`🔧 Constructed frontend base from request: ${frontendBase}`);

@@ -1435,30 +1435,37 @@ const CreateCommonCourses = () => {
                 xhr.ontimeout = () => reject(new Error("Upload timeout"));
                 xhr.onabort = () => reject(new Error("Upload aborted"));
         
-                // --- FIXED: CORRECT relative URL logic ---
+                // --- FIXED: ALWAYS convert to relative URL if contains :5000 (fixes ERR_CONNECTION_RESET) ---
                 let finalUploadUrl = uploadUrl;
-        
                 const isProduction = window.location.hostname !== "localhost" &&
                                      window.location.hostname !== "127.0.0.1";
         
-                if (isProduction) {
+                // Force relative URL in production OR if URL contains :5000
+                if (isProduction || uploadUrl.includes(':5000')) {
                   try {
-                    const urlObj = new URL(uploadUrl);
-        
-                    // Convert absolute → relative path
-                    if (urlObj.port === "5000") {
-                      finalUploadUrl = urlObj.pathname + urlObj.search;
-                      console.log(`📤 Using PRODUCTION relative URL: ${finalUploadUrl}`);
-                    }
-        
-                  } catch (e) {
+                    // If it's already a relative URL, use it
                     if (uploadUrl.startsWith("/")) {
                       finalUploadUrl = uploadUrl;
+                      console.log(`📤 [Background] Already relative URL: ${finalUploadUrl}`);
+                    } else {
+                      // Parse absolute URL and extract path
+                      const urlObj = new URL(uploadUrl);
+                      finalUploadUrl = urlObj.pathname + urlObj.search;
+                      console.log(`📤 [Background] Converted to relative URL: ${finalUploadUrl} (from: ${uploadUrl})`);
+                    }
+                  } catch (e) {
+                    // If URL parsing fails, try to extract path manually
+                    const pathMatch = uploadUrl.match(/\/api\/.*/);
+                    if (pathMatch) {
+                      finalUploadUrl = pathMatch[0];
+                      console.log(`📤 [Background] Extracted relative path: ${finalUploadUrl}`);
+                    } else {
+                      console.warn('⚠️ [Background] Could not convert URL, using original:', uploadUrl);
                     }
                   }
                 }
         
-                console.log("📤 Final Upload URL:", finalUploadUrl);
+                console.log("📤 [Background] Final Upload URL:", finalUploadUrl);
         
                 xhr.open("POST", finalUploadUrl);
                 xhr.setRequestHeader("Authorization", `Bearer ${token}`);

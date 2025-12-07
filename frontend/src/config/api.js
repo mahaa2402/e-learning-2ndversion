@@ -18,7 +18,12 @@ const isDevelopment = process.env.NODE_ENV === 'development' ||
                      window.location.hostname === 'localhost' ||
                      window.location.hostname === '127.0.0.1';
 
-const config = isDevelopment ? API_CONFIG.development : API_CONFIG.production;
+// In production, ALWAYS use relative URLs to go through proxy
+// This prevents ERR_CONNECTION_RESET from direct port 5000 connections
+const config = isDevelopment ? API_CONFIG.development : {
+  BASE_URL: '', // Force relative URL in production (ignores REACT_APP_API_URL)
+  API_PREFIX: '/api'
+};
 
 // Debug logging
 console.log('🔧 API Configuration:', {
