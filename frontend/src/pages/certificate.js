@@ -1,11 +1,18 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import pretestTemplate from '../assets/Pre assesment.pdf';
-import preTrainingTemplate from '../assets/VISTA_Pre_Training_Certificate_Final 3.pdf';
-import postTrainingTemplate from '../assets/VISTA_Post_Training_Certificate_Final 2.pdf';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './certificate.css';
 import { API_ENDPOINTS } from '../config/api';
+
+// Import PDF templates from assets (fallback)
+import preTrainingTemplateAsset from '../assets/VISTA_Pre_Training_Certificate_Final 3.pdf';
+import postTrainingTemplateAsset from '../assets/VISTA_Post_Training_Certificate_Final 2.pdf';
+import pretestTemplateAsset from '../assets/Pre assesment.pdf';
+
+// Use public folder paths for PDF templates (more reliable in production)
+const pretestTemplate = '/Pre_assessment.pdf';
+const preTrainingTemplate = '/VISTA_Pre_Training_Certificate_Final_3.pdf';
+const postTrainingTemplate = '/VISTA_Post_Training_Certificate_Final_2.pdf';
 
 const CertificatePage = () => {
   const navigate = useNavigate();
@@ -253,15 +260,90 @@ const CertificatePage = () => {
     const certType = isPreTest ? 'pre' : 'pro';
     
     // Select the correct template based on certificate type
+    // Try public folder first, then fallback to asset imports
     let templateToUse;
+    let templateAsset;
     if (certType === 'pre') {
       templateToUse = preTrainingTemplate;
+      templateAsset = preTrainingTemplateAsset;
     } else {
       templateToUse = postTrainingTemplate;
+      templateAsset = postTrainingTemplateAsset;
     }
     
-    const existingPdfBytes = await fetch(templateToUse).then(r => r.arrayBuffer());
-    const pdfDoc = await PDFDocument.load(existingPdfBytes);
+    // Fetch PDF template with error handling and fallback
+    let existingPdfBytes;
+    let fetchError = null;
+    
+    // Try public folder first
+    try {
+      const response = await fetch(templateToUse);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch PDF template: ${response.status} ${response.statusText}`);
+      }
+      
+      // Check if response is actually a PDF
+      const contentType = response.headers.get('content-type');
+      if (contentType && !contentType.includes('application/pdf')) {
+        console.warn('⚠️ Response is not a PDF, content-type:', contentType);
+        // Still try to load it, might work if server doesn't set content-type correctly
+      }
+      
+      existingPdfBytes = await response.arrayBuffer();
+      
+      // Validate that it's actually a PDF by checking the header
+      const uint8Array = new Uint8Array(existingPdfBytes);
+      const pdfHeader = String.fromCharCode(...uint8Array.slice(0, 4));
+      if (pdfHeader !== '%PDF') {
+        throw new Error('Fetched file is not a valid PDF. Got header: ' + pdfHeader);
+      }
+      
+      console.log('✅ PDF template loaded successfully from public folder, size:', existingPdfBytes.byteLength, 'bytes');
+    } catch (publicError) {
+      console.warn('⚠️ Failed to load PDF from public folder, trying asset import:', publicError.message);
+      fetchError = publicError;
+      
+      // Fallback to asset import if available
+      if (templateAsset) {
+        try {
+          const assetResponse = await fetch(templateAsset);
+          if (!assetResponse.ok) {
+            throw new Error(`Failed to fetch PDF template from assets: ${assetResponse.status}`);
+          }
+          existingPdfBytes = await assetResponse.arrayBuffer();
+          
+          // Validate PDF header
+          const uint8Array = new Uint8Array(existingPdfBytes);
+          const pdfHeader = String.fromCharCode(...uint8Array.slice(0, 4));
+          if (pdfHeader !== '%PDF') {
+            throw new Error('Asset file is not a valid PDF. Got header: ' + pdfHeader);
+          }
+          
+          console.log('✅ PDF template loaded successfully from assets, size:', existingPdfBytes.byteLength, 'bytes');
+          fetchError = null; // Clear error since fallback worked
+        } catch (assetError) {
+          console.error('❌ Error fetching PDF template from assets:', assetError);
+          fetchError = assetError;
+        }
+      }
+      
+      // If both failed, throw error
+      if (fetchError) {
+        console.error('❌ Template URL (public):', templateToUse);
+        console.error('❌ Template Asset:', templateAsset);
+        throw new Error(`Failed to load PDF template: ${fetchError.message}. Please ensure the template files are available in the public folder or assets.`);
+      }
+    }
+    
+    let pdfDoc;
+    try {
+      pdfDoc = await PDFDocument.load(existingPdfBytes);
+    } catch (loadError) {
+      console.error('❌ Error loading PDF document:', loadError);
+      console.error('❌ PDF bytes length:', existingPdfBytes.byteLength);
+      throw new Error(`Failed to parse PDF template: ${loadError.message}. The template file may be corrupted.`);
+    }
 
     // Embed standard font
     const helveticaFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
