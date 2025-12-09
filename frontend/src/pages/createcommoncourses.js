@@ -1158,22 +1158,60 @@ const CreateCommonCourses = () => {
       
       for (let i = 0; i < updatedModules.length; i++) {
         const module = updatedModules[i];
-        const hasVideoFile = module.video?.file instanceof File || (module.video instanceof File);
-        const needsUpload = (hasVideoFile && !module.video?.url) || module.video?.pendingUpload;
         
+        // Enhanced video detection - check multiple possible structures
+        const hasVideoFile = 
+          (module.video?.file instanceof File) || 
+          (module.video instanceof File) ||
+          (module.video?.file && typeof module.video.file === 'object' && module.video.file.constructor === File);
+        
+        const hasVideoUrl = !!module.video?.url;
+        const hasPendingUpload = !!module.video?.pendingUpload;
+        const needsUpload = (hasVideoFile && !hasVideoUrl) || hasPendingUpload;
+        
+        // Detailed logging for debugging
         console.log(`🔍 Module ${i + 1} "${module.name}":`, {
           hasVideoFile,
-          hasUrl: !!module.video?.url,
-          pendingUpload: module.video?.pendingUpload,
-          needsUpload
+          hasUrl: hasVideoUrl,
+          pendingUpload: hasPendingUpload,
+          needsUpload,
+          videoStructure: module.video ? {
+            hasFile: !!module.video.file,
+            fileType: module.video.file?.constructor?.name,
+            isFileInstance: module.video.file instanceof File,
+            hasUrl: !!module.video.url,
+            hasPendingUpload: !!module.video.pendingUpload,
+            videoKeys: Object.keys(module.video || {})
+          } : 'no video object'
         });
         
         if (needsUpload) {
-          const videoFile = module.video?.file instanceof File 
-            ? module.video.file 
-            : (module.video instanceof File ? module.video : null);
+          // Try multiple ways to get the File object
+          let videoFile = null;
+          
+          if (module.video?.file instanceof File) {
+            videoFile = module.video.file;
+            console.log(`✅ Found video file via module.video.file`);
+          } else if (module.video instanceof File) {
+            videoFile = module.video;
+            console.log(`✅ Found video file via module.video (direct File)`);
+          } else if (module.video?.file && typeof module.video.file === 'object') {
+            // Try to reconstruct File object if it was serialized
+            console.warn(`⚠️ Video file exists but may not be a File instance. Type: ${module.video.file.constructor?.name}`);
+            // If it has the properties of a File, try to use it
+            if (module.video.file.name && module.video.file.size) {
+              videoFile = module.video.file;
+              console.log(`✅ Using video file object (has name and size)`);
+            }
+          }
           
           if (videoFile) {
+            console.log(`📤 Video file details:`, {
+              name: videoFile.name,
+              size: videoFile.size,
+              type: videoFile.type,
+              isFile: videoFile instanceof File
+            });
             let moduleNumber = i + 1;
             if (editingCourse && editingCourse.modules) {
               const existingModule = editingCourse.modules.find(m => m.m_id === module.m_id);
@@ -1203,27 +1241,173 @@ const CreateCommonCourses = () => {
       
       console.log(`📤 Total videos to upload: ${videosToUpload.length}`);
       
-      // Step 2: Save course IMMEDIATELY (don't wait for videos), then upload videos in background
-      // Mark modules with pending uploads so we can update them later
-      videosToUpload.forEach(({ index }) => {
-        updatedModules[index] = {
-          ...updatedModules[index],
-          video: {
-            ...updatedModules[index].video,
-            pendingUpload: true
+      // Step 2: Upload ALL videos FIRST (blocking) before saving course
+      // This ensures video URLs are available when saving to database
+      if (videosToUpload.length > 0) {
+        console.log('📤 Step 2: Uploading videos FIRST (blocking) before saving course...');
+        
+        // Upload function using XMLHttpRequest (more reliable for large files than fetch)
+        const uploadWithRetry = async (videoFile, uploadUrl, moduleName, maxRetries = 5) => {
+          for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+              console.log(`📤 Attempt ${attempt}/${maxRetries} for "${moduleName}"`);
+              console.log(`📤 File size: ${(videoFile.size / 1024 / 1024).toFixed(2)} MB`);
+        
+              return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                const formData = new FormData();
+                formData.append("video", videoFile);
+        
+                xhr.timeout = 900000; // 15 mins
+        
+                xhr.upload.onprogress = (e) => {
+                  if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    if (percentComplete % 25 === 0 || percentComplete === 100) {
+                      console.log(`📤 Upload Progress "${moduleName}": ${percentComplete.toFixed(1)}%`);
+                    }
+                  }
+                };
+        
+                xhr.onload = () => {
+                  if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                      const res = JSON.parse(xhr.responseText);
+                      const videoUrl = res.video?.url || res.videoUrl;
+                      if (!videoUrl) return reject(new Error("Server returned no video URL"));
+                      console.log(`✅ Upload success for ${moduleName}: ${videoUrl}`);
+                      resolve(videoUrl);
+                    } catch (err) {
+                      console.error("❌ JSON parse error", err);
+                      reject(new Error("Invalid upload response"));
+                    }
+                  } else {
+                    reject(new Error(`Upload failed: HTTP ${xhr.status}`));
+                  }
+                };
+        
+                xhr.onerror = () => reject(new Error("Network error / Connection reset"));
+                xhr.ontimeout = () => reject(new Error("Upload timeout"));
+                xhr.onabort = () => reject(new Error("Upload aborted"));
+        
+                // Convert to relative URL if needed (for production)
+                let finalUploadUrl = uploadUrl;
+                const isProduction = window.location.hostname !== "localhost" &&
+                                     window.location.hostname !== "127.0.0.1";
+        
+                if (isProduction || uploadUrl.includes(':5000')) {
+                  try {
+                    if (uploadUrl.startsWith("/")) {
+                      finalUploadUrl = uploadUrl;
+                      console.log(`📤 Already relative URL: ${finalUploadUrl}`);
+                    } else {
+                      const urlObj = new URL(uploadUrl);
+                      finalUploadUrl = urlObj.pathname + urlObj.search;
+                      console.log(`📤 Converted to relative URL: ${finalUploadUrl} (from: ${uploadUrl})`);
+                    }
+                  } catch (e) {
+                    const pathMatch = uploadUrl.match(/\/api\/.*/);
+                    if (pathMatch) {
+                      finalUploadUrl = pathMatch[0];
+                      console.log(`📤 Extracted relative path: ${finalUploadUrl}`);
+                    } else {
+                      console.warn('⚠️ Could not convert URL, using original:', uploadUrl);
+                    }
+                  }
+                }
+        
+                console.log("📤 Final Upload URL:", finalUploadUrl);
+        
+                xhr.open("POST", finalUploadUrl);
+                xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+                xhr.send(formData);
+              });
+        
+            } catch (err) {
+              console.error(`❌ Attempt ${attempt} failed:`, err.message);
+        
+              if (attempt === maxRetries) throw err;
+        
+              // Exponential backoff with jitter
+              const delay = Math.min(1000 * 2 ** (attempt - 1) + Math.random() * 1000, 30000);
+              console.log(`⏳ Retrying in ${(delay / 1000).toFixed(1)}s...`);
+              await new Promise((r) => setTimeout(r, delay));
+            }
           }
         };
-      });
+        
+        // Upload all videos in parallel
+        const uploadPromises = videosToUpload.map(({ index, module, videoFile, moduleNumber }) => {
+          return (async () => {
+            try {
+              // For new courses, don't include courseId (will be set after course creation)
+              // For editing, include courseId if available
+              const courseIdParam = editingCourse?._id ? `?courseId=${editingCourse._id}` : '';
+              const uploadUrl = `${API_ENDPOINTS.VIDEOS.UPLOAD}/${encodeURIComponent(courseName)}/${moduleNumber}${courseIdParam}`;
+              
+              console.log(`📤 Starting upload for module "${module.name}" (m_id: ${module.m_id})`);
+              console.log(`📤 Course ID: ${editingCourse?._id || 'NEW (will be set after course creation)'}`);
+              console.log(`📤 File size: ${(videoFile.size / 1024 / 1024).toFixed(2)} MB`);
+              
+              const videoUrl = await uploadWithRetry(videoFile, uploadUrl, module.name, 5);
+              
+              // Update the module with the video URL
+              updatedModules[index] = {
+                ...updatedModules[index],
+                video: {
+                  ...updatedModules[index].video,
+                  url: videoUrl,
+                  file: null // Clear file reference after successful upload
+                }
+              };
+              
+              return {
+                index,
+                module: updatedModules[index],
+                videoUrl,
+                moduleNumber
+              };
+            } catch (err) {
+              console.error(`❌ Video upload failed for module "${module.name}" after retries:`, err);
+              throw new Error(`Failed to upload video for module "${module.name}": ${err.message}`);
+            }
+          })();
+        });
+        
+        // Wait for all uploads to complete (blocking)
+        console.log('📤 Waiting for all video uploads to complete...');
+        try {
+          const uploadResults = await Promise.all(uploadPromises);
+          console.log(`✅ All ${uploadResults.length} video(s) uploaded successfully!`);
+          
+          // Update modules with video URLs
+          uploadResults.forEach(({ index, videoUrl }) => {
+            updatedModules[index] = {
+              ...updatedModules[index],
+              video: {
+                ...updatedModules[index].video,
+                url: videoUrl
+              }
+            };
+          });
+        } catch (uploadError) {
+          // If any upload fails, abort the entire save operation
+          console.error('❌ Video upload failed:', uploadError);
+          setIsLoading(false);
+          setError(`Failed to upload videos: ${uploadError.message}. Please try again.`);
+          throw uploadError; // Re-throw to prevent course save
+        }
+      }
       
-      console.log('📤 Step 2: Saving course immediately (videos will upload in background and update course)...');
+      console.log('📤 Step 3: Saving course with video URLs...');
 
-      // Step 4: Use existing background image URL (upload in background after course save)
+      // Step 4: Use existing background image URL
       let finalBackgroundImageUrl = formData.backgroundImageUrl;
       const backgroundImageToUpload = formData.backgroundImage && !formData.backgroundImageUrl 
         ? formData.backgroundImage 
         : null;
 
-      // Step 4: Prepare course data (videos will be added after upload completes)
+      // Step 4: Prepare course data (videos are already uploaded and URLs are in updatedModules)
       const courseData = {
         title: formData.title,
         description: formData.description || '',
@@ -1247,8 +1431,8 @@ const CreateCommonCourses = () => {
           
           // Always include lessonDetails if video URL exists (required for video display)
           // Check multiple sources for video URL:
-          // 1. module.video.url (from formData - most recent upload)
-          // 2. module.lessonDetails.videoUrl (from database - existing or newly added)
+          // 1. module.video.url (from updatedModules - just uploaded)
+          // 2. module.lessonDetails.videoUrl (from database - existing)
           // 3. Check if editingCourse has the video URL for this module
           let videoUrl = module.video?.url || module.lessonDetails?.videoUrl;
           
@@ -1367,244 +1551,22 @@ const CreateCommonCourses = () => {
       const result = await response.json();
       const courseId = isEditing ? editingCourse._id : (result.course?._id || result._id);
       
-      console.log(`✅ Course ${isEditing ? 'updated' : 'created'} instantly! Course ID: ${courseId}`);
+      console.log(`✅ Course ${isEditing ? 'updated' : 'created'} successfully! Course ID: ${courseId}`);
       
-      // Show success message immediately
-      let successMessage = isEditing ? "Course updated successfully!" : "Course created successfully!";
-      if (videosToUpload.length > 0) {
-        successMessage += ` Uploading ${videosToUpload.length} video(s) in background...`;
-      }
+      // Show success message
+      const successMessage = isEditing ? "Course updated successfully!" : "Course created successfully!";
       
-      // Clear loading state immediately
+      // Clear loading state
       setIsLoading(false);
       
       alert(successMessage + " 🎉");
       setSuccess(successMessage);
       
-      // Close modal and refresh immediately
+      // Close modal and refresh
       setTimeout(() => {
         closeModal();
         fetchCourses();
       }, 500);
-      
-      // Step 5: Upload videos in background (parallel) and update course
-      if (videosToUpload.length > 0) {
-        console.log(`📤 Step 5: Starting background upload of ${videosToUpload.length} video(s) in parallel...`);
-        
-        // Upload function using XMLHttpRequest (more reliable for large files than fetch)
-        const uploadWithRetry = async (videoFile, uploadUrl, moduleName, maxRetries = 5) => {
-          for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-              console.log(`📤 Attempt ${attempt}/${maxRetries} for "${moduleName}"`);
-              console.log(`📤 File size: ${(videoFile.size / 1024 / 1024).toFixed(2)} MB`);
-        
-              return new Promise((resolve, reject) => {
-                const xhr = new XMLHttpRequest();
-                const formData = new FormData();
-                formData.append("video", videoFile);
-        
-                xhr.timeout = 900000; // 15 mins
-        
-                xhr.upload.onprogress = (e) => {
-                  if (e.lengthComputable) {
-                    const percentComplete = (e.loaded / e.total) * 100;
-                    if (percentComplete % 25 === 0 || percentComplete === 100) {
-                      console.log(`📤 Upload Progress "${moduleName}": ${percentComplete.toFixed(1)}%`);
-                    }
-                  }
-                };
-        
-                xhr.onload = () => {
-                  if (xhr.status >= 200 && xhr.status < 300) {
-                    try {
-                      const res = JSON.parse(xhr.responseText);
-                      const videoUrl = res.video?.url || res.videoUrl;
-                      if (!videoUrl) return reject(new Error("Server returned no video URL"));
-                      console.log(`✅ Upload success for ${moduleName}: ${videoUrl}`);
-                      resolve(videoUrl);
-                    } catch (err) {
-                      console.error("❌ JSON parse error", err);
-                      reject(new Error("Invalid upload response"));
-                    }
-                  } else {
-                    reject(new Error(`Upload failed: HTTP ${xhr.status}`));
-                  }
-                };
-        
-                xhr.onerror = () => reject(new Error("Network error / Connection reset"));
-                xhr.ontimeout = () => reject(new Error("Upload timeout"));
-                xhr.onabort = () => reject(new Error("Upload aborted"));
-        
-                // --- FIXED: ALWAYS convert to relative URL if contains :5000 (fixes ERR_CONNECTION_RESET) ---
-                let finalUploadUrl = uploadUrl;
-                const isProduction = window.location.hostname !== "localhost" &&
-                                     window.location.hostname !== "127.0.0.1";
-        
-                // Force relative URL in production OR if URL contains :5000
-                if (isProduction || uploadUrl.includes(':5000')) {
-                  try {
-                    // If it's already a relative URL, use it
-                    if (uploadUrl.startsWith("/")) {
-                      finalUploadUrl = uploadUrl;
-                      console.log(`📤 [Background] Already relative URL: ${finalUploadUrl}`);
-                    } else {
-                      // Parse absolute URL and extract path
-                      const urlObj = new URL(uploadUrl);
-                      finalUploadUrl = urlObj.pathname + urlObj.search;
-                      console.log(`📤 [Background] Converted to relative URL: ${finalUploadUrl} (from: ${uploadUrl})`);
-                    }
-                  } catch (e) {
-                    // If URL parsing fails, try to extract path manually
-                    const pathMatch = uploadUrl.match(/\/api\/.*/);
-                    if (pathMatch) {
-                      finalUploadUrl = pathMatch[0];
-                      console.log(`📤 [Background] Extracted relative path: ${finalUploadUrl}`);
-                    } else {
-                      console.warn('⚠️ [Background] Could not convert URL, using original:', uploadUrl);
-                    }
-                  }
-                }
-        
-                console.log("📤 [Background] Final Upload URL:", finalUploadUrl);
-        
-                xhr.open("POST", finalUploadUrl);
-                xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-                xhr.send(formData);
-              });
-        
-            } catch (err) {
-              console.error(`❌ Attempt ${attempt} failed:`, err.message);
-        
-              if (attempt === maxRetries) throw err;
-        
-              // Exponential backoff
-              const delay = Math.min(1000 * 2 ** (attempt - 1) + Math.random() * 1000, 30000);
-              console.log(`⏳ Retrying in ${(delay / 1000).toFixed(1)}s...`);
-              await new Promise((r) => setTimeout(r, delay));
-            }
-          }
-        };
-        
-        
-        const uploadPromises = videosToUpload.map(({ index, module, videoFile, moduleNumber }) => {
-          return (async () => {
-            try {
-              // Include courseId in URL query parameter for reliable course lookup
-              const uploadUrl = `${API_ENDPOINTS.VIDEOS.UPLOAD}/${encodeURIComponent(courseName)}/${moduleNumber}?courseId=${courseId}`;
-              
-              console.log(`📤 [Background] Starting upload for module "${module.name}" (m_id: ${module.m_id})`);
-              console.log(`📤 [Background] Course ID: ${courseId}`);
-              console.log(`📤 [Background] File size: ${(videoFile.size / 1024 / 1024).toFixed(2)} MB`);
-              
-              const videoUrl = await uploadWithRetry(videoFile, uploadUrl, module.name, 3);
-              
-              return {
-                index,
-                module: {
-                  ...module,
-                  m_id: module.m_id
-                },
-                videoUrl,
-                moduleNumber
-              };
-            } catch (err) {
-              console.error(`❌ [Background] Video upload failed for module "${module.name}" after retries:`, err);
-              return {
-                index,
-                module: {
-                  ...module,
-                  m_id: module.m_id
-                },
-                error: err.message || 'Upload failed after retries'
-              };
-            }
-          })();
-        });
-        
-        // Upload all videos in parallel
-        Promise.all(uploadPromises).then(uploadResults => {
-          const successfulUploads = uploadResults.filter(r => r.videoUrl);
-          const failedUploads = uploadResults.filter(r => r.error);
-          
-          console.log(`✅ [Background] ${successfulUploads.length} video(s) uploaded to S3`);
-          if (failedUploads.length > 0) {
-            console.warn(`⚠️ [Background] ${failedUploads.length} video upload(s) failed:`, failedUploads.map(f => ({
-              module: f.module?.name,
-              error: f.error
-            })));
-            
-            // Show user-friendly error message
-            setError(`Warning: ${failedUploads.length} video upload(s) failed due to network issues. The course was saved, but videos will need to be re-uploaded. Error: ${failedUploads[0]?.error || 'Connection reset'}`);
-          }
-          
-          // Update course with video URLs (only if we have successful uploads)
-          if (successfulUploads.length > 0) {
-            console.log(`📤 [Background] Updating course with ${successfulUploads.length} video URL(s)...`);
-            // Get current course
-            fetch(`${API_ENDPOINTS.COURSES.GET_COURSES.replace('/getcourse', '')}/${courseId}`)
-              .then(res => res.json())
-              .then(courseData => {
-                const course = Array.isArray(courseData) ? courseData[0] : courseData;
-                
-                if (course && course.modules) {
-                  // Create video URL map by m_id
-                  const videoUrlMap = {};
-                  successfulUploads.forEach(upload => {
-                    if (upload.module?.m_id && upload.videoUrl) {
-                      videoUrlMap[upload.module.m_id] = upload.videoUrl;
-                    }
-                  });
-                  
-                  // Update modules with video URLs
-                  const updatedModules = course.modules.map((m) => {
-                    const videoUrl = videoUrlMap[m.m_id];
-                    if (videoUrl) {
-                      return {
-                        ...m,
-                        lessonDetails: {
-                          ...(m.lessonDetails || {}),
-                          videoUrl: videoUrl,
-                          title: m.lessonDetails?.title || m.name,
-                          content: m.lessonDetails?.content || [],
-                          duration: m.lessonDetails?.duration || `${m.duration || 0}min`,
-                          notes: m.lessonDetails?.notes || m.notes || ''
-                        }
-                      };
-                    }
-                    return m;
-                  });
-                  
-                  // Update course with video URLs
-                  fetch(`${API_ENDPOINTS.COURSES.GET_COURSES.replace('/getcourse', '/update')}/${courseId}`, {
-                    method: 'PUT',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                      title: course.title,
-                      description: course.description || '',
-                      backgroundImageUrl: course.backgroundImageUrl,
-                      retakeQuizCooldownHours: course.retakeQuizCooldownHours || 24,
-                      preTest: course.preTest || { enabled: false, passingScore: 0, questions: [] },
-                      modules: updatedModules
-                    })
-                  }).then(() => {
-                    console.log(`✅ [Background] Course updated with ${successfulUploads.length} video URL(s) in database`);
-                    fetchCourses(); // Refresh course list
-                  }).catch(err => {
-                    console.error('❌ [Background] Failed to update course with video URLs:', err);
-                  });
-                }
-              })
-              .catch(err => {
-                console.error('❌ [Background] Failed to fetch course for update:', err);
-              });
-          }
-        }).catch(err => {
-          console.error('❌ [Background] Promise.all failed:', err);
-        });
-      }
       
       // Save quizzes in background (non-blocking)
       if (updatedModules.some(m => m.quiz && (m.quiz.firstAttemptQuestions?.length > 0 || m.quiz.retakeQuestions?.length > 0))) {

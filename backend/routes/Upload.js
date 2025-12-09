@@ -1,5 +1,6 @@
 const express = require('express');
 const AWS = require('aws-sdk');
+// const {AWS,PutObjectCommand}= require("@aws-sdk/client-s3");
 const multer = require('multer');
 const multerS3 = require('multer-s3');
 const path = require('path');
@@ -14,6 +15,7 @@ AWS.config.update({
 });
 
 const s3 = new AWS.S3();
+//const s3 = new S3Client({ region: "eu-north-1" });
 
 const upload = multer({
   storage: multerS3({

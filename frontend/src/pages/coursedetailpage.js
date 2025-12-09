@@ -85,9 +85,10 @@ const CourseDetailPage = () => {
       return course.backgroundImageUrl;
     }
     if (course && imageMap[course.title]) {
-      return `${process.env.PUBLIC_URL}/${imageMap[course.title]}`;
+      // Use absolute path from public folder (works in both dev and production)
+      return `/${imageMap[course.title]}`;
     }
-    return `${process.env.PUBLIC_URL}/course.jpg`;
+    return `/course.jpg`;
   };
 
   // Fetch common courses for dropdown

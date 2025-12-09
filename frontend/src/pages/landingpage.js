@@ -170,9 +170,10 @@ const getCourseImage = (course) => {
     return course.backgroundImageUrl;
   }
   if (imageMap[course.title]) {
-    return `${process.env.PUBLIC_URL}/${imageMap[course.title]}`;
+    // Use absolute path from public folder (works in both dev and production)
+    return `/${imageMap[course.title]}`;
   }
-  return `${process.env.PUBLIC_URL}/course.jpg`;
+  return `/course.jpg`;
 };
 
 
@@ -511,7 +512,7 @@ const getCourseImage = (course) => {
     backgroundRepeat: 'no-repeat'
   }}
 >
-                  {console.log('Course title:', course.title, 'Image path:', imageMap[course.title] ? `${process.env.PUBLIC_URL}/${imageMap[course.title]}` : `${process.env.PUBLIC_URL}/course.jpg`)}
+                  {console.log('Course title:', course.title, 'Image path:', imageMap[course.title] ? `/${imageMap[course.title]}` : `/course.jpg`)}
 
 
                       

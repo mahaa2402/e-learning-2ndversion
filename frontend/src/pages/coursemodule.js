@@ -100,7 +100,7 @@ const VistaCourseModules = () => {
         <div 
           className="vista-hero-content"
 style={{
-  backgroundImage: `url('/uploads/course.jpg')`,
+  backgroundImage: `url('/course.jpg')`,
   backgroundSize: 'cover',
   backgroundPosition: 'center',
 }}
