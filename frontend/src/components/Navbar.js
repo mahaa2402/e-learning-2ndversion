@@ -266,6 +266,11 @@ const Navbar = ({ showSearch = true }) => {
               alt="VISTA Logo"
               onClick={() => navigate('/')}
               style={{ cursor: 'pointer' }}
+              onError={(e) => {
+                console.error('❌ Failed to load logo:', e.target.src);
+                e.target.style.display = 'none';
+              }}
+              onLoad={() => console.log('✅ Logo loaded successfully:', '/logo_new.jpg')}
             />
           </div>
         </div>

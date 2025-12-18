@@ -191,9 +191,23 @@ const EmployeeDirectory = () => {
       }
 
       // Combine both lists, prioritizing employees with certificates
-      const allEmployees = [...employeesWithCertificates, ...regularEmployees.filter(emp => 
-        !employeesWithCertificates.some(certEmp => certEmp.email === emp.email)
-      )];
+      // Include all employees from certificates (even if they don't exist in regular employees list)
+      // This allows users to see and delete orphaned employees
+      const allEmployees = [
+        ...employeesWithCertificates,
+        ...regularEmployees.filter(emp => 
+          !employeesWithCertificates.some(certEmp => certEmp.email === emp.email)
+        )
+      ];
+
+      // Log if we found orphaned employees (in certificates but not in database)
+      const orphanedCertEmployees = employeesWithCertificates.filter(certEmp => 
+        !regularEmployees.some(regEmp => regEmp.email === certEmp.email)
+      );
+      
+      if (orphanedCertEmployees.length > 0) {
+        console.log('⚠️ Found employees in certificates but not in database (can be deleted):', orphanedCertEmployees);
+      }
 
       setEmployees(allEmployees);
       console.log('📋 Final employee list:', allEmployees);
@@ -313,6 +327,18 @@ const EmployeeDirectory = () => {
       });
 
       const data = await response.json();
+      
+      // If employee not found (404), still remove from UI since they don't exist
+      if (response.status === 404) {
+        console.log('⚠️ Employee not found in database (404), removing from UI');
+        setEmployees((prev) => prev.filter((emp) => (emp._id || emp.id) !== employeeId));
+        setFormStatus({ 
+          type: 'success', 
+          message: 'Employee removed from list (was not found in database)' 
+        });
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(data.details || data.error || 'Failed to delete employee');
       }
@@ -321,7 +347,17 @@ const EmployeeDirectory = () => {
       setFormStatus({ type: 'success', message: data.message || 'Employee deleted successfully' });
     } catch (err) {
       console.error('Error deleting employee:', err);
-      alert(err.message || 'Failed to delete employee');
+      // If it's a 404 error, still remove from UI
+      if (err.message && err.message.includes('404') || err.message && err.message.includes('not found')) {
+        console.log('⚠️ Employee not found, removing from UI');
+        setEmployees((prev) => prev.filter((emp) => (emp._id || emp.id) !== employeeId));
+        setFormStatus({ 
+          type: 'success', 
+          message: 'Employee removed from list (was not found in database)' 
+        });
+      } else {
+        alert(err.message || 'Failed to delete employee');
+      }
     } finally {
       setDeletingEmployeeId(null);
     }

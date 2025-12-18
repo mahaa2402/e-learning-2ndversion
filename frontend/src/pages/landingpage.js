@@ -72,57 +72,154 @@ function LandingPage() {
     setLoading(true);
     setError(null);
 
-  fetch(API_ENDPOINTS.COURSES.GET_COURSES, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      mode: 'cors'
-    })
-      .then(response => {
-        if (!response.ok) {
-          console.error('Response not OK:', response.status, response.statusText);
-          throw new Error(`Failed to fetch courses: ${response.status} ${response.statusText}`);
-        }
-        return response.json();
+    // Get user role from localStorage
+    const userSession = localStorage.getItem('userSession');
+    let userRole = null;
+    if (userSession) {
+      try {
+        const user = JSON.parse(userSession);
+        userRole = user.role;
+      } catch (e) {
+        console.error('Error parsing user session:', e);
+      }
+    }
+
+    // If user is an employee, fetch only assigned courses
+    if (userRole === 'employee') {
+      console.log('👤 Employee detected - fetching assigned courses only');
+      
+      // First, fetch assigned courses
+      fetch(API_ENDPOINTS.ASSIGNED_COURSES.GET_ASSIGNED_COURSES, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors'
       })
-      .then(data => {
-        console.log('Fetched courses:', data);
-        
-        // Handle different response structures
-        if (data && Array.isArray(data)) {
-          setCourses(data);
-        } else if (data && data.courses && Array.isArray(data.courses)) {
-          setCourses(data.courses);
-        } else {
-          console.warn('Unexpected data structure:', data);
-          setCourses([]); // Fallback to empty array
-        }
+        .then(response => {
+          if (!response.ok) {
+            console.error('Response not OK for assigned courses:', response.status, response.statusText);
+            throw new Error(`Failed to fetch assigned courses: ${response.status} ${response.statusText}`);
+          }
+          return response.json();
+        })
+        .then(assignedData => {
+          console.log('📋 Assigned courses data:', assignedData);
+          
+          // Extract course names from assigned courses
+          const assignedCourseNames = assignedData.assignedCourses 
+            ? assignedData.assignedCourses.map(assignment => assignment.courseName)
+            : [];
+          
+          console.log('📝 Assigned course names:', assignedCourseNames);
+          
+          if (assignedCourseNames.length === 0) {
+            console.log('ℹ️ No assigned courses found for employee');
+            setCourses([]);
+            setLoading(false);
+            return;
+          }
+          
+          // Now fetch all courses and filter to only show assigned ones
+          return fetch(API_ENDPOINTS.COURSES.GET_COURSES, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            mode: 'cors'
+          })
+            .then(response => {
+              if (!response.ok) {
+                throw new Error(`Failed to fetch courses: ${response.status} ${response.statusText}`);
+              }
+              return response.json();
+            })
+            .then(allCoursesData => {
+              console.log('📚 All courses data:', allCoursesData);
+              
+              // Handle different response structures
+              let allCourses = [];
+              if (allCoursesData && Array.isArray(allCoursesData)) {
+                allCourses = allCoursesData;
+              } else if (allCoursesData && allCoursesData.courses && Array.isArray(allCoursesData.courses)) {
+                allCourses = allCoursesData.courses;
+              }
+              
+              // Filter courses to only include assigned ones
+              const filteredCourses = allCourses.filter(course => 
+                assignedCourseNames.includes(course.title)
+              );
+              
+              console.log(`✅ Filtered ${filteredCourses.length} assigned course(s) from ${allCourses.length} total course(s)`);
+              setCourses(filteredCourses);
+            });
+        })
+        .catch(error => {
+          console.error('❌ Error fetching assigned courses:', error);
+          setError(error.message || 'Failed to load assigned courses');
+          setCourses([]);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    } else {
+      // For admin or non-logged-in users, fetch all courses (original behavior)
+      console.log('👤 Admin or guest - fetching all courses');
+      
+      fetch(API_ENDPOINTS.COURSES.GET_COURSES, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors'
       })
-      .catch(error => {
-        console.error('Error fetching courses:', error);
-        
-        // If it's a network error (backend not running), show a helpful message
-        if (error.message.includes('Failed to fetch') || error.message.includes('Unexpected token')) {
-          setError('Backend server is not running. Please start the backend server to view courses.');
-          // Provide fallback courses for demo purposes
-          setCourses([
-            { title: 'ISP', description: 'Information Security Policy', modules: [] },
-            { title: 'GDPR', description: 'General Data Protection Regulation', modules: [] },
-            { title: 'POSH', description: 'Prevention of Sexual Harassment', modules: [] },
-            { title: 'Factory Act', description: 'Factory Safety Regulations', modules: [] },
-            { title: 'Welding', description: 'Welding Safety Training', modules: [] },
-            { title: 'CNC', description: 'CNC Machine Operation', modules: [] }
-          ]);
-        } else {
-          setError(error.message);
-          setCourses([]); // Ensure courses is always an array
-        }
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+        .then(response => {
+          if (!response.ok) {
+            console.error('Response not OK:', response.status, response.statusText);
+            throw new Error(`Failed to fetch courses: ${response.status} ${response.statusText}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          console.log('Fetched courses:', data);
+          
+          // Handle different response structures
+          if (data && Array.isArray(data)) {
+            setCourses(data);
+          } else if (data && data.courses && Array.isArray(data.courses)) {
+            setCourses(data.courses);
+          } else {
+            console.warn('Unexpected data structure:', data);
+            setCourses([]); // Fallback to empty array
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching courses:', error);
+          
+          // If it's a network error (backend not running), show a helpful message
+          if (error.message.includes('Failed to fetch') || error.message.includes('Unexpected token')) {
+            setError('Backend server is not running. Please start the backend server to view courses.');
+            // Provide fallback courses for demo purposes
+            setCourses([
+              { title: 'ISP', description: 'Information Security Policy', modules: [] },
+              { title: 'GDPR', description: 'General Data Protection Regulation', modules: [] },
+              { title: 'POSH', description: 'Prevention of Sexual Harassment', modules: [] },
+              { title: 'Factory Act', description: 'Factory Safety Regulations', modules: [] },
+              { title: 'Welding', description: 'Welding Safety Training', modules: [] },
+              { title: 'CNC', description: 'CNC Machine Operation', modules: [] }
+            ]);
+          } else {
+            setError(error.message);
+            setCourses([]); // Ensure courses is always an array
+          }
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
   }, [isLoggedIn]); // Add isLoggedIn as dependency
 
   useEffect(() => {
@@ -390,7 +487,18 @@ const getCourseImage = (course) => {
         <div className={`bottom-navbar ${isScrolled ? 'scrolled' : ''}`}>
           <div className="logo-section">
             <div className="logo-icon">
-              <img src="/logo_new.jpg" className={isScrolled ? 'logo-small' : ''} width="500" height="100" />
+              <img 
+                src="/logo_new.jpg" 
+                className={isScrolled ? 'logo-small' : ''} 
+                width="500" 
+                height="100" 
+                alt="VISTA Logo"
+                onError={(e) => {
+                  console.error('❌ Failed to load logo:', e.target.src);
+                  e.target.style.display = 'none';
+                }}
+                onLoad={() => console.log('✅ Logo loaded successfully:', '/logo_new.jpg')}
+              />
             </div>
             <div className="logo-text">
               

@@ -79,8 +79,11 @@ export const API_ENDPOINTS = {
     DELETE: (employeeId) => `${API_BASE_URL}/employee/employees/${employeeId}`
   },
   TASKS: {
-    GET_ASSIGNED_TASKS: `${API_BASE_URL}/assigned-tasks`
-    , VALIDATE_ASSIGNED_COURSE: `${API_BASE_URL}/assigned-course/validate`
+    GET_ASSIGNED_TASKS: `${API_BASE_URL}/assigned-tasks`,
+    VALIDATE_ASSIGNED_COURSE: `${API_BASE_URL}/assigned-course/validate`
+  },
+  ASSIGNED_COURSES: {
+    GET_ASSIGNED_COURSES: `${API_BASE_URL}/assigned-course-progress/assigned-courses`
   },
   QUIZ: {
     CHECK_AVAILABILITY: `${API_BASE_URL}/courses/check-quiz-availability`,
