@@ -1258,7 +1258,7 @@ const CreateCommonCourses = () => {
                 const formData = new FormData();
                 formData.append("video", videoFile);
         
-                xhr.timeout = 900000; // 15 mins
+                xhr.timeout = 7200000; // 2 hours (7200 seconds) - matches nginx/backend timeout
         
                 xhr.upload.onprogress = (e) => {
                   if (e.lengthComputable) {
@@ -1286,9 +1286,19 @@ const CreateCommonCourses = () => {
           }
                 };
         
-                xhr.onerror = () => reject(new Error("Network error / Connection reset"));
-                xhr.ontimeout = () => reject(new Error("Upload timeout"));
-                xhr.onabort = () => reject(new Error("Upload aborted"));
+                xhr.onerror = (e) => {
+                  console.error(`❌ XHR Error for "${moduleName}":`, e);
+                  console.error(`❌ XHR Status: ${xhr.status}, ReadyState: ${xhr.readyState}`);
+                  reject(new Error(`Network error / Connection reset (Status: ${xhr.status || 'unknown'})`));
+                };
+                xhr.ontimeout = () => {
+                  console.error(`❌ Upload timeout for "${moduleName}" after ${xhr.timeout}ms`);
+                  reject(new Error(`Upload timeout after ${(xhr.timeout / 1000 / 60).toFixed(1)} minutes`));
+                };
+                xhr.onabort = () => {
+                  console.error(`❌ Upload aborted for "${moduleName}"`);
+                  reject(new Error("Upload aborted by user or browser"));
+                };
         
                 // Convert to relative URL if needed (for production)
                 let finalUploadUrl = uploadUrl;

@@ -84,9 +84,9 @@ router.post(
   upload.single("video"),
   handleMulterError,
   async (req, res) => {
-    // Set timeout for this route (1 hour for large files - matches nginx)
-    req.setTimeout(3600000); // 1 hour
-    res.setTimeout(3600000); // 1 hour
+    // Set timeout for this route (2 hours for large files - matches nginx)
+    req.setTimeout(7200000); // 2 hours (7200 seconds)
+    res.setTimeout(7200000); // 2 hours (7200 seconds)
     
     try {
       console.log('📥 Video upload request received');
