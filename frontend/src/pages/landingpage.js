@@ -740,7 +740,7 @@ const getCourseImage = (course) => {
                   ))
                 ) : (
                   <div style={{ textAlign: 'center', padding: '20px' }}>
-                    <p>No courses available at the moment.</p>
+                    <p>No courses assigned yet.</p>
                   </div>
                 )}
               </div>
@@ -845,13 +845,7 @@ const getCourseImage = (course) => {
                       </li>
                     ))
                   ) : (
-                    <>
-                      <li><Link to="/coursedetailpage/ISP">ISP</Link></li>
-                      <li><Link to="/coursedetailpage/GDPR">GDPR</Link></li>
-                      <li><Link to="/coursedetailpage/POSH">POSH</Link></li>
-                      <li><Link to="/coursedetailpage/Factory Act">Factory Act</Link></li>
-                      <li><Link to="/coursedetailpage/Welding">Welding</Link></li>
-                      <li><Link to="/coursedetailpage/CNC">CNC</Link></li>
+                    <><p>No course assigned yet</p>
                     </>
                   )}
                 </ul>
