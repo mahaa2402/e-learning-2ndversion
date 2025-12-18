@@ -175,25 +175,112 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
     }
   }, [courseId, lessonId, dbCourse, staticCourse]);
 
-  // Fetch common courses for dropdown
+  // Fetch common courses for dropdown (filtered by user role)
   useEffect(() => {
     const fetchCommonCourses = async () => {
       try {
-        console.log('Fetching common courses from:', API_ENDPOINTS.COURSES.GET_COURSES);
-        const response = await fetch(API_ENDPOINTS.COURSES.GET_COURSES, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch courses');
+        const token = localStorage.getItem("token");
+        
+        // Get user role from localStorage
+        const userSession = localStorage.getItem('userSession');
+        let userRole = null;
+        if (userSession) {
+          try {
+            const user = JSON.parse(userSession);
+            userRole = user.role;
+          } catch (e) {
+            console.error('Error parsing user session:', e);
+          }
         }
 
-        const data = await response.json();
-        console.log('Common courses fetched:', data);
-        setCommonCourses(data);
+        // If user is an employee, fetch only assigned courses
+        if (userRole === 'employee' && token) {
+          console.log('👤 Employee detected - fetching assigned courses for LessonPage dropdown');
+          
+          try {
+            // First, fetch assigned courses
+            const assignedResponse = await fetch(API_ENDPOINTS.ASSIGNED_COURSES.GET_ASSIGNED_COURSES, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              mode: 'cors'
+            });
+
+            if (assignedResponse.ok) {
+              const assignedData = await assignedResponse.json();
+              console.log('📋 Assigned courses data for LessonPage dropdown:', assignedData);
+              
+              // Extract course names from assigned courses
+              const assignedCourseNames = assignedData.assignedCourses 
+                ? assignedData.assignedCourses.map(assignment => assignment.courseName)
+                : [];
+              
+              if (assignedCourseNames.length === 0) {
+                console.log('ℹ️ No assigned courses found for employee LessonPage dropdown');
+                setCommonCourses([]);
+                return;
+              }
+              
+              // Now fetch all courses and filter to only show assigned ones
+              const allCoursesResponse = await fetch(API_ENDPOINTS.COURSES.GET_COURSES, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                },
+                mode: 'cors'
+              });
+
+              if (allCoursesResponse.ok) {
+                const allCoursesData = await allCoursesResponse.json();
+                
+                // Handle different response structures
+                let allCourses = [];
+                if (allCoursesData && Array.isArray(allCoursesData)) {
+                  allCourses = allCoursesData;
+                } else if (allCoursesData && allCoursesData.courses && Array.isArray(allCoursesData.courses)) {
+                  allCourses = allCoursesData.courses;
+                }
+                
+                // Filter courses to only include assigned ones
+                const filteredCourses = allCourses.filter(course => 
+                  assignedCourseNames.includes(course.title)
+                );
+                
+                console.log(`✅ Filtered ${filteredCourses.length} assigned course(s) for LessonPage dropdown from ${allCourses.length} total course(s)`);
+                setCommonCourses(filteredCourses);
+              } else {
+                throw new Error('Failed to fetch all courses for filtering');
+              }
+            } else {
+              throw new Error('Failed to fetch assigned courses');
+            }
+          } catch (error) {
+            console.error('❌ Error fetching assigned courses for LessonPage dropdown:', error);
+            setCommonCourses([]);
+          }
+        } else {
+          // For admin or non-logged-in users, fetch all courses
+          console.log('👤 Admin or guest - fetching all courses for LessonPage dropdown');
+          const response = await fetch(API_ENDPOINTS.COURSES.GET_COURSES, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token && { 'Authorization': `Bearer ${token}` })
+            },
+            mode: 'cors'
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to fetch courses');
+          }
+
+          const data = await response.json();
+          console.log('Common courses fetched:', data);
+          setCommonCourses(data);
+        }
       } catch (error) {
         console.error('Error fetching common courses:', error);
         setCommonCourses([]);

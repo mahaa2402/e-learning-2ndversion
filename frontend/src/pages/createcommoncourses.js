@@ -240,20 +240,20 @@ const CreateCommonCourses = () => {
       // Store file reference - video will be uploaded when course is saved (faster UX)
       console.log('📤 Video file will be uploaded when course is saved (non-blocking)');
       console.log('📤 Video file details:', {
-        name: currentModule.video.file.name,
+            name: currentModule.video.file.name,
         size: currentModule.video.file.size,
-        type: currentModule.video.file.type,
+            type: currentModule.video.file.type,
         isFile: currentModule.video.file instanceof File
       });
-      
+
       // IMPORTANT: Store the File object directly - it will be used during save
-      videoData = {
+          videoData = {
         file: currentModule.video.file, // Keep the File object
-        name: currentModule.video.file.name,
-        size: `${(currentModule.video.file.size / 1024 / 1024).toFixed(2)} MB`,
-        type: currentModule.video.file.type,
-        pendingUpload: true
-      };
+            name: currentModule.video.file.name,
+            size: `${(currentModule.video.file.size / 1024 / 1024).toFixed(2)} MB`,
+            type: currentModule.video.file.type,
+            pendingUpload: true
+          };
     } else if (currentModule.video?.url) {
       // Video already has URL
       videoUrl = currentModule.video.url;
@@ -1207,11 +1207,11 @@ const CreateCommonCourses = () => {
           
           if (videoFile) {
             console.log(`📤 Video file details:`, {
-              name: videoFile.name,
-              size: videoFile.size,
+            name: videoFile.name,
+            size: videoFile.size,
               type: videoFile.type,
               isFile: videoFile instanceof File
-            });
+          });
             let moduleNumber = i + 1;
             if (editingCourse && editingCourse.modules) {
               const existingModule = editingCourse.modules.find(m => m.m_id === module.m_id);
@@ -1277,13 +1277,13 @@ const CreateCommonCourses = () => {
                       if (!videoUrl) return reject(new Error("Server returned no video URL"));
                       console.log(`✅ Upload success for ${moduleName}: ${videoUrl}`);
                       resolve(videoUrl);
-                    } catch (err) {
+          } catch (err) {
                       console.error("❌ JSON parse error", err);
                       reject(new Error("Invalid upload response"));
                     }
                   } else {
                     reject(new Error(`Upload failed: HTTP ${xhr.status}`));
-                  }
+          }
                 };
         
                 xhr.onerror = () => reject(new Error("Network error / Connection reset"));
@@ -1370,7 +1370,7 @@ const CreateCommonCourses = () => {
             } catch (err) {
               console.error(`❌ Video upload failed for module "${module.name}" after retries:`, err);
               throw new Error(`Failed to upload video for module "${module.name}": ${err.message}`);
-            }
+        }
           })();
         });
         
@@ -1519,13 +1519,13 @@ const CreateCommonCourses = () => {
       let response;
       try {
         response = await fetch(endpoint, {
-          method: method,
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token && { 'Authorization': `Bearer ${token}` })
-          },
-          body: JSON.stringify(courseData)
-        });
+        method: method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        body: JSON.stringify(courseData)
+      });
       } catch (networkError) {
         console.error('❌ Network error:', networkError);
         throw new Error(`Network error: Unable to connect to server. Please check your internet connection and try again. ${networkError.message}`);
@@ -1552,7 +1552,7 @@ const CreateCommonCourses = () => {
       const courseId = isEditing ? editingCourse._id : (result.course?._id || result._id);
       
       console.log(`✅ Course ${isEditing ? 'updated' : 'created'} successfully! Course ID: ${courseId}`);
-      
+        
       // Show success message
       const successMessage = isEditing ? "Course updated successfully!" : "Course created successfully!";
       
@@ -1572,24 +1572,24 @@ const CreateCommonCourses = () => {
       if (updatedModules.some(m => m.quiz && (m.quiz.firstAttemptQuestions?.length > 0 || m.quiz.retakeQuestions?.length > 0))) {
         // Save quizzes asynchronously
         setTimeout(() => {
-          for (const module of updatedModules) {
-            if (module.quiz && (module.quiz.firstAttemptQuestions?.length > 0 || module.quiz.retakeQuestions?.length > 0)) {
+        for (const module of updatedModules) {
+          if (module.quiz && (module.quiz.firstAttemptQuestions?.length > 0 || module.quiz.retakeQuestions?.length > 0)) {
               fetch(`${API_ENDPOINTS.COURSES.GET_COURSES.replace('/getcourse', '/create-quiz')}`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
                   'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                  courseId: courseId,
-                  mo_id: module.m_id,
-                  firstAttemptQuestions: module.quiz.firstAttemptQuestions || [],
-                  retakeQuestions: module.quiz.retakeQuestions || [],
-                  passingScore: module.quiz.passingScore || 70
-                })
+              },
+              body: JSON.stringify({
+                courseId: courseId,
+                mo_id: module.m_id,
+                firstAttemptQuestions: module.quiz.firstAttemptQuestions || [],
+                retakeQuestions: module.quiz.retakeQuestions || [],
+                passingScore: module.quiz.passingScore || 70
+              })
               }).catch(err => {
                 console.error('Failed to save quiz for module:', module.m_id, err);
-              });
+            });
             }
           }
         }, 100);

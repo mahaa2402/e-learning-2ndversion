@@ -190,15 +190,11 @@ const EmployeeDirectory = () => {
         console.log('👤 Regular employees:', regularEmployees);
       }
 
-      // Combine both lists, prioritizing employees with certificates
-      // Include all employees from certificates (even if they don't exist in regular employees list)
-      // This allows users to see and delete orphaned employees
-      const allEmployees = [
-        ...employeesWithCertificates,
-        ...regularEmployees.filter(emp => 
-          !employeesWithCertificates.some(certEmp => certEmp.email === emp.email)
-        )
-      ];
+      // Only include employees that actually exist in the database
+      // Filter out orphaned employees from certificates (those not in regular employees list)
+      const validEmployeesWithCertificates = employeesWithCertificates.filter(certEmp => 
+        regularEmployees.some(regEmp => regEmp.email === certEmp.email)
+      );
 
       // Log if we found orphaned employees (in certificates but not in database)
       const orphanedCertEmployees = employeesWithCertificates.filter(certEmp => 
@@ -206,11 +202,30 @@ const EmployeeDirectory = () => {
       );
       
       if (orphanedCertEmployees.length > 0) {
-        console.log('⚠️ Found employees in certificates but not in database (can be deleted):', orphanedCertEmployees);
+        console.log('⚠️ Found orphaned employees in certificates (not in database, will be excluded):', orphanedCertEmployees);
+        console.log('ℹ️ These employees have certificates but no longer exist in the employee database');
       }
 
+      // Combine lists: only show employees that exist in the database
+      // For employees with certificates, merge certificate info with regular employee data
+      const allEmployees = [
+        ...regularEmployees.map(regEmp => {
+          // Find matching certificate employee to merge certificate info
+          const certEmp = validEmployeesWithCertificates.find(c => c.email === regEmp.email);
+          if (certEmp) {
+            // Merge: use regular employee data but add certificate info
+            return {
+              ...regEmp,
+              hasCertificates: true,
+              certificateCount: certEmp.certificateCount || 1
+            };
+          }
+          return regEmp;
+        })
+      ];
+
       setEmployees(allEmployees);
-      console.log('📋 Final employee list:', allEmployees);
+      console.log('📋 Final employee list (only employees in database):', allEmployees);
     } catch (err) {
       console.error('Error fetching employees:', err);
       setError(`Failed to fetch employees: ${err.message}`);
@@ -356,7 +371,7 @@ const EmployeeDirectory = () => {
           message: 'Employee removed from list (was not found in database)' 
         });
       } else {
-        alert(err.message || 'Failed to delete employee');
+      alert(err.message || 'Failed to delete employee');
       }
     } finally {
       setDeletingEmployeeId(null);

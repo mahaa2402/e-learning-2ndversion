@@ -17,52 +17,146 @@ function LandingPage() {
   const [commonCourses, setCommonCourses] = useState([]);
   const [isScrolled, setIsScrolled] = useState(false);
 
-  // Fetch common courses for dropdown
+  // Fetch common courses for dropdown (filtered by user role)
   useEffect(() => {
     const fetchCommonCourses = async () => {
       try {
-        console.log('Fetching common courses from:', API_ENDPOINTS.COURSES.GET_COURSES);
-        const response = await fetch(API_ENDPOINTS.COURSES.GET_COURSES, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          mode: 'cors'
-        });
+        const token = localStorage.getItem("token") || localStorage.getItem("authToken");
         
-        console.log('Response status:', response.status);
-        if (response.ok) {
-          const data = await response.json();
-          setCommonCourses(data);
-          console.log('Common courses fetched successfully:', data);
+        // Get user role from localStorage
+        const userSession = localStorage.getItem('userSession');
+        let userRole = null;
+        if (userSession) {
+          try {
+            const user = JSON.parse(userSession);
+            userRole = user.role;
+            console.log('👤 User role detected:', userRole);
+          } catch (e) {
+            console.error('Error parsing user session:', e);
+          }
+        }
+
+        // If user is an employee, fetch only assigned courses
+        if (userRole === 'employee' && token) {
+          console.log('👤 Employee detected - fetching assigned courses for dropdown');
+          
+          try {
+            // First, fetch assigned courses
+            const assignedResponse = await fetch(API_ENDPOINTS.ASSIGNED_COURSES.GET_ASSIGNED_COURSES, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              mode: 'cors',
+              credentials: 'include'
+            });
+
+            if (assignedResponse.ok) {
+              const assignedData = await assignedResponse.json();
+              console.log('📋 Assigned courses data for dropdown:', assignedData);
+              
+              // Extract course names from assigned courses
+              const assignedCourseNames = assignedData.assignedCourses 
+                ? assignedData.assignedCourses.map(assignment => assignment.courseName)
+                : [];
+              
+              console.log('📝 Assigned course names for dropdown:', assignedCourseNames);
+              
+              if (assignedCourseNames.length === 0) {
+                console.log('ℹ️ No assigned courses found for employee dropdown');
+                setCommonCourses([]);
+                return;
+              }
+              
+              // Now fetch all courses and filter to only show assigned ones
+              const allCoursesResponse = await fetch(API_ENDPOINTS.COURSES.GET_COURSES, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                },
+                mode: 'cors',
+                credentials: 'include'
+              });
+
+              if (allCoursesResponse.ok) {
+                const allCoursesData = await allCoursesResponse.json();
+                
+                // Handle different response structures
+                let allCourses = [];
+                if (allCoursesData && Array.isArray(allCoursesData)) {
+                  allCourses = allCoursesData;
+                } else if (allCoursesData && allCoursesData.courses && Array.isArray(allCoursesData.courses)) {
+                  allCourses = allCoursesData.courses;
+                }
+                
+                // Filter courses to only include assigned ones (case-insensitive match)
+                const filteredCourses = allCourses.filter(course => {
+                  const courseTitle = course.title || '';
+                  const isAssigned = assignedCourseNames.some(assignedName => 
+                    assignedName.toLowerCase() === courseTitle.toLowerCase()
+                  );
+                  return isAssigned;
+                });
+                
+                console.log(`✅ Filtered ${filteredCourses.length} assigned course(s) for dropdown from ${allCourses.length} total course(s)`);
+                console.log('📋 Filtered courses:', filteredCourses.map(c => c.title));
+                setCommonCourses(filteredCourses);
+              } else {
+                console.error('❌ Failed to fetch all courses for filtering:', allCoursesResponse.status);
+                setCommonCourses([]);
+              }
+            } else {
+              console.error('❌ Failed to fetch assigned courses:', assignedResponse.status);
+              setCommonCourses([]);
+            }
+          } catch (error) {
+            console.error('❌ Error fetching assigned courses for dropdown:', error);
+            setCommonCourses([]);
+          }
         } else {
-          console.error('Failed to fetch common courses:', response.status, response.statusText);
-          // Fallback courses for demo
-          setCommonCourses([
-            { title: 'ISP', _id: '1' },
-            { title: 'GDPR', _id: '2' },
-            { title: 'POSH', _id: '3' },
-            { title: 'Factory Act', _id: '4' },
-            { title: 'Welding', _id: '5' },
-            { title: 'CNC', _id: '6' }
-          ]);
+          // For admin or non-logged-in users, fetch all courses
+          console.log('👤 Admin or guest - fetching all courses for dropdown');
+          const response = await fetch(API_ENDPOINTS.COURSES.GET_COURSES, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token && { 'Authorization': `Bearer ${token}` })
+            },
+            mode: 'cors',
+            credentials: 'include'
+          });
+          
+          console.log('Response status:', response.status);
+          if (response.ok) {
+            const data = await response.json();
+            // Handle different response structures
+            if (data && Array.isArray(data)) {
+              setCommonCourses(data);
+            } else if (data && data.courses && Array.isArray(data.courses)) {
+              setCommonCourses(data.courses);
+            } else {
+              setCommonCourses([]);
+            }
+            console.log('Common courses fetched successfully:', data);
+          } else {
+            console.error('Failed to fetch common courses:', response.status, response.statusText);
+            setCommonCourses([]);
+          }
         }
       } catch (error) {
         console.error('Error fetching common courses:', error);
-        // Fallback courses for demo
-        setCommonCourses([
-          { title: 'ISP', _id: '1' },
-          { title: 'GDPR', _id: '2' },
-          { title: 'POSH', _id: '3' },
-          { title: 'Factory Act', _id: '4' },
-          { title: 'Welding', _id: '5' },
-          { title: 'CNC', _id: '6' }
-        ]);
+        setCommonCourses([]);
       }
     };
 
-    fetchCommonCourses();
-  }, []);
+    if (isLoggedIn) {
+      fetchCommonCourses();
+    } else {
+      setCommonCourses([]);
+    }
+  }, [isLoggedIn]); // Add isLoggedIn as dependency to refetch when login status changes
 
   // Fetch courses when user is logged in
   useEffect(() => {
