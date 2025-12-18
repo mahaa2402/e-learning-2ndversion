@@ -7,8 +7,11 @@ const API_CONFIG = {
   production: {
     // In production, use relative URL to go through proxy (nginx/apache)
     // This avoids direct port 5000 connections that get reset
-    BASE_URL: process.env.REACT_APP_API_URL || '', // Empty string = relative URL
-    API_PREFIX: '/api'
+    
+  BASE_URL: 'http://16.16.205.98:5000', // Your EC2 public URL
+  API_PREFIX: '/api'
+
+
   }
 };
 
@@ -20,10 +23,7 @@ const isDevelopment = process.env.NODE_ENV === 'development' ||
 
 // In production, ALWAYS use relative URLs to go through proxy
 // This prevents ERR_CONNECTION_RESET from direct port 5000 connections
-const config = isDevelopment ? API_CONFIG.development : {
-  BASE_URL: '', // Force relative URL in production (ignores REACT_APP_API_URL)
-  API_PREFIX: '/api'
-};
+const config = isDevelopment ? API_CONFIG.development : API_CONFIG.production;
 
 // Debug logging
 console.log('🔧 API Configuration:', {
