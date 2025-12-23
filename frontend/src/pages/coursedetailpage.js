@@ -141,10 +141,10 @@ const CourseDetailPage = () => {
               
               // Now fetch all courses and filter to only show assigned ones
               const allCoursesResponse = await fetch(API_ENDPOINTS.COURSES.GET_COURSES, {
-                method: 'GET',
-                headers: {
+          method: 'GET',
+          headers: {
                   'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
+            'Content-Type': 'application/json'
                 },
                 mode: 'cors'
               });
@@ -185,25 +185,25 @@ const CourseDetailPage = () => {
             headers: {
               'Content-Type': 'application/json',
               ...(token && { 'Authorization': `Bearer ${token}` })
-            },
-            mode: 'cors'
-          });
-          
-          console.log('Response status:', response.status);
-          if (response.ok) {
-            const data = await response.json();
-            setCommonCourses(data);
-            console.log('Common courses fetched successfully:', data);
-          } else {
-            console.error('Failed to fetch common courses:', response.status, response.statusText);
-            setCommonCourses([
-              { title: 'ISP', _id: '1' },
-              { title: 'GDPR', _id: '2' },
-              { title: 'POSH', _id: '3' },
-              { title: 'Factory Act', _id: '4' },
-              { title: 'Welding', _id: '5' },
-              { title: 'CNC', _id: '6' }
-            ]);
+          },
+          mode: 'cors'
+        });
+        
+        console.log('Response status:', response.status);
+        if (response.ok) {
+          const data = await response.json();
+          setCommonCourses(data);
+          console.log('Common courses fetched successfully:', data);
+        } else {
+          console.error('Failed to fetch common courses:', response.status, response.statusText);
+          setCommonCourses([
+            { title: 'ISP', _id: '1' },
+            { title: 'GDPR', _id: '2' },
+            { title: 'POSH', _id: '3' },
+            { title: 'Factory Act', _id: '4' },
+            { title: 'Welding', _id: '5' },
+            { title: 'CNC', _id: '6' }
+          ]);
           }
         }
       } catch (error) {

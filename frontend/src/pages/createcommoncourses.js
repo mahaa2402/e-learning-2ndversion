@@ -1248,56 +1248,120 @@ const CreateCommonCourses = () => {
         
         // Upload function using XMLHttpRequest (more reliable for large files than fetch)
         const uploadWithRetry = async (videoFile, uploadUrl, moduleName, maxRetries = 5) => {
+          let lastError = null;
+          let lastProgress = 0;
+          
           for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
               console.log(`📤 Attempt ${attempt}/${maxRetries} for "${moduleName}"`);
               console.log(`📤 File size: ${(videoFile.size / 1024 / 1024).toFixed(2)} MB`);
+              if (lastProgress > 0) {
+                console.log(`📤 Resuming from previous attempt (was at ${lastProgress.toFixed(1)}%)`);
+              }
         
               return new Promise((resolve, reject) => {
+                let isAborted = false;
+                let abortReason = null;
+                let uploadStartTime = Date.now();
+                let lastProgressTime = Date.now();
+                
                 const xhr = new XMLHttpRequest();
                 const formData = new FormData();
                 formData.append("video", videoFile);
         
+                // Set timeout to 2 hours, but also monitor for connection issues
                 xhr.timeout = 7200000; // 2 hours (7200 seconds) - matches nginx/backend timeout
         
+                // Track upload progress and detect stalls
                 xhr.upload.onprogress = (e) => {
                   if (e.lengthComputable) {
                     const percentComplete = (e.loaded / e.total) * 100;
-                    if (percentComplete % 25 === 0 || percentComplete === 100) {
-                      console.log(`📤 Upload Progress "${moduleName}": ${percentComplete.toFixed(1)}%`);
+                    lastProgress = percentComplete;
+                    lastProgressTime = Date.now();
+                    
+                    // Log progress more frequently for debugging
+                    if (percentComplete % 10 === 0 || percentComplete === 100) {
+                      const elapsed = ((Date.now() - uploadStartTime) / 1000).toFixed(1);
+                      const speed = e.loaded / (Date.now() - uploadStartTime) * 1000; // bytes per second
+                      console.log(`📤 Upload Progress "${moduleName}": ${percentComplete.toFixed(1)}% (${(e.loaded / 1024 / 1024).toFixed(2)} MB / ${(e.total / 1024 / 1024).toFixed(2)} MB) - ${(speed / 1024 / 1024).toFixed(2)} MB/s - ${elapsed}s elapsed`);
                     }
+                  }
+                  
+                  // Check for stalled uploads (no progress for 2 minutes)
+                  const timeSinceLastProgress = Date.now() - lastProgressTime;
+                  if (timeSinceLastProgress > 120000 && !isAborted) {
+                    console.warn(`⚠️ Upload appears stalled for "${moduleName}" - no progress for ${(timeSinceLastProgress / 1000).toFixed(0)}s`);
+                    abortReason = `Upload stalled - no progress for ${(timeSinceLastProgress / 1000).toFixed(0)} seconds`;
+                    xhr.abort();
+                    isAborted = true;
                   }
                 };
         
                 xhr.onload = () => {
+                  if (isAborted) return;
+                  
                   if (xhr.status >= 200 && xhr.status < 300) {
                     try {
                       const res = JSON.parse(xhr.responseText);
                       const videoUrl = res.video?.url || res.videoUrl;
-                      if (!videoUrl) return reject(new Error("Server returned no video URL"));
+                      if (!videoUrl) {
+                        console.error(`❌ Server returned no video URL in response:`, res);
+                        return reject(new Error("Server returned no video URL"));
+                      }
                       console.log(`✅ Upload success for ${moduleName}: ${videoUrl}`);
                       resolve(videoUrl);
-          } catch (err) {
+                    } catch (err) {
                       console.error("❌ JSON parse error", err);
+                      console.error("❌ Response text:", xhr.responseText?.substring(0, 500));
                       reject(new Error("Invalid upload response"));
                     }
                   } else {
-                    reject(new Error(`Upload failed: HTTP ${xhr.status}`));
-          }
+                    console.error(`❌ Upload failed with HTTP ${xhr.status}`);
+                    console.error(`❌ Response:`, xhr.responseText?.substring(0, 500));
+                    reject(new Error(`Upload failed: HTTP ${xhr.status} - ${xhr.statusText || 'Unknown error'}`));
+                  }
                 };
         
                 xhr.onerror = (e) => {
+                  if (isAborted) return;
+                  
                   console.error(`❌ XHR Error for "${moduleName}":`, e);
                   console.error(`❌ XHR Status: ${xhr.status}, ReadyState: ${xhr.readyState}`);
-                  reject(new Error(`Network error / Connection reset (Status: ${xhr.status || 'unknown'})`));
+                  console.error(`❌ Network state:`, navigator.onLine ? 'online' : 'offline');
+                  
+                  const errorMsg = xhr.status === 0 
+                    ? `Network error - Connection lost or server unreachable (Check network connection)`
+                    : `Network error / Connection reset (Status: ${xhr.status || 'unknown'})`;
+                  
+                  lastError = new Error(errorMsg);
+                  reject(lastError);
                 };
+                
                 xhr.ontimeout = () => {
-                  console.error(`❌ Upload timeout for "${moduleName}" after ${xhr.timeout}ms`);
-                  reject(new Error(`Upload timeout after ${(xhr.timeout / 1000 / 60).toFixed(1)} minutes`));
+                  if (isAborted) return;
+                  
+                  console.error(`❌ Upload timeout for "${moduleName}" after ${(xhr.timeout / 1000 / 60).toFixed(1)} minutes`);
+                  console.error(`❌ Progress at timeout: ${lastProgress.toFixed(1)}%`);
+                  
+                  lastError = new Error(`Upload timeout after ${(xhr.timeout / 1000 / 60).toFixed(1)} minutes (progress: ${lastProgress.toFixed(1)}%)`);
+                  reject(lastError);
                 };
+                
                 xhr.onabort = () => {
+                  isAborted = true;
                   console.error(`❌ Upload aborted for "${moduleName}"`);
-                  reject(new Error("Upload aborted by user or browser"));
+                  console.error(`❌ Abort reason: ${abortReason || 'Unknown (may be network issue or browser timeout)'}`);
+                  console.error(`❌ Progress at abort: ${lastProgress.toFixed(1)}%`);
+                  console.error(`❌ XHR Status: ${xhr.status}, ReadyState: ${xhr.readyState}`);
+                  console.error(`❌ Network state:`, navigator.onLine ? 'online' : 'offline');
+                  
+                  // Determine if this is a network issue or user abort
+                  const errorMsg = abortReason 
+                    ? `Upload aborted: ${abortReason}`
+                    : `Upload aborted - likely network connection issue. Check your internet connection and try again.`;
+                  
+                  lastError = new Error(errorMsg);
+                  reject(lastError);
                 };
         
                 // Convert to relative URL if needed (for production)
@@ -1327,20 +1391,78 @@ const CreateCommonCourses = () => {
                 }
         
                 console.log("📤 Final Upload URL:", finalUploadUrl);
+                console.log("📤 Network status:", navigator.onLine ? 'online' : 'offline');
+                
+                // Add network online/offline listeners for better error handling
+                const handleOnline = () => {
+                  console.log('✅ Network connection restored');
+                };
+                const handleOffline = () => {
+                  console.error('❌ Network connection lost');
+                  if (!isAborted && xhr.readyState < XMLHttpRequest.DONE) {
+                    abortReason = 'Network connection lost';
+                    xhr.abort();
+                    isAborted = true;
+                  }
+                };
+                
+                window.addEventListener('online', handleOnline);
+                window.addEventListener('offline', handleOffline);
+                
+                // Clean up listeners when done
+                const cleanup = () => {
+                  window.removeEventListener('online', handleOnline);
+                  window.removeEventListener('offline', handleOffline);
+                };
+                
+                xhr.addEventListener('loadend', cleanup);
+                xhr.addEventListener('error', cleanup);
+                xhr.addEventListener('abort', cleanup);
+                xhr.addEventListener('timeout', cleanup);
         
-                xhr.open("POST", finalUploadUrl);
-                xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-                xhr.send(formData);
+                try {
+                  xhr.open("POST", finalUploadUrl);
+                  xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+                  
+                  // Add headers to help with connection stability
+                  xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+                  
+                  console.log(`📤 Starting upload request...`);
+                  uploadStartTime = Date.now();
+                  xhr.send(formData);
+                } catch (openError) {
+                  cleanup();
+                  console.error(`❌ Error opening XHR:`, openError);
+                  reject(new Error(`Failed to start upload: ${openError.message}`));
+                }
               });
         
             } catch (err) {
+              lastError = err;
               console.error(`❌ Attempt ${attempt} failed:`, err.message);
+              console.error(`❌ Error details:`, {
+                name: err.name,
+                message: err.message,
+                stack: err.stack
+              });
         
-              if (attempt === maxRetries) throw err;
+              // Don't retry if it's the last attempt
+              if (attempt === maxRetries) {
+                console.error(`❌ All ${maxRetries} attempts failed for "${moduleName}"`);
+                throw err;
+              }
         
+              // For aborted uploads, wait longer before retrying (network might need time to recover)
+              const isAbortError = err.message.includes('aborted') || err.message.includes('stalled');
+              const baseDelay = isAbortError ? 5000 : 1000; // 5 seconds for aborts, 1 second for other errors
+              
               // Exponential backoff with jitter
-              const delay = Math.min(1000 * 2 ** (attempt - 1) + Math.random() * 1000, 30000);
-              console.log(`⏳ Retrying in ${(delay / 1000).toFixed(1)}s...`);
+              const delay = Math.min(baseDelay * 2 ** (attempt - 1) + Math.random() * 1000, 60000);
+              console.log(`⏳ Retrying in ${(delay / 1000).toFixed(1)}s... (${isAbortError ? 'network issue detected' : 'retrying'})`);
+              
+              // Reset progress tracking for new attempt
+              lastProgress = 0;
+              
               await new Promise((r) => setTimeout(r, delay));
             }
           }

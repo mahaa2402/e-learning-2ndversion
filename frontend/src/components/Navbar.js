@@ -122,10 +122,10 @@ const Navbar = ({ showSearch = true }) => {
               
               // Now fetch all courses and filter to only show assigned ones
               const allCoursesResponse = await fetch(API_ENDPOINTS.COURSES.GET_COURSES, {
-                method: 'GET',
-                headers: {
+          method: 'GET',
+          headers: {
                   'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
+            'Content-Type': 'application/json'
                 },
                 mode: 'cors'
               });
@@ -168,11 +168,11 @@ const Navbar = ({ showSearch = true }) => {
               ...(token && { 'Authorization': `Bearer ${token}` })
             },
             mode: 'cors'
-          });
+        });
 
-          if (response.ok) {
-            const data = await response.json();
-            setCommonCourses(data);
+        if (response.ok) {
+          const data = await response.json();
+          setCommonCourses(data);
           } else {
             console.error('Error fetching common courses:', response.status);
             setCommonCourses([]);

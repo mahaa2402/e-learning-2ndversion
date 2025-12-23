@@ -264,22 +264,22 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
         } else {
           // For admin or non-logged-in users, fetch all courses
           console.log('👤 Admin or guest - fetching all courses for LessonPage dropdown');
-          const response = await fetch(API_ENDPOINTS.COURSES.GET_COURSES, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
+        const response = await fetch(API_ENDPOINTS.COURSES.GET_COURSES, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
               ...(token && { 'Authorization': `Bearer ${token}` })
-            },
+          },
             mode: 'cors'
-          });
+        });
 
-          if (!response.ok) {
-            throw new Error('Failed to fetch courses');
-          }
+        if (!response.ok) {
+          throw new Error('Failed to fetch courses');
+        }
 
-          const data = await response.json();
-          console.log('Common courses fetched:', data);
-          setCommonCourses(data);
+        const data = await response.json();
+        console.log('Common courses fetched:', data);
+        setCommonCourses(data);
         }
       } catch (error) {
         console.error('Error fetching common courses:', error);
