@@ -1273,6 +1273,9 @@ const CreateCommonCourses = () => {
                 xhr.timeout = 7200000; // 2 hours (7200 seconds) - matches nginx/backend timeout
         
                 // Track upload progress and detect stalls
+                let progress100Time = null;
+                let serverProcessingCheckInterval = null;
+                
                 xhr.upload.onprogress = (e) => {
                   if (e.lengthComputable) {
                     const percentComplete = (e.loaded / e.total) * 100;
@@ -1285,20 +1288,47 @@ const CreateCommonCourses = () => {
                       const speed = e.loaded / (Date.now() - uploadStartTime) * 1000; // bytes per second
                       console.log(`📤 Upload Progress "${moduleName}": ${percentComplete.toFixed(1)}% (${(e.loaded / 1024 / 1024).toFixed(2)} MB / ${(e.total / 1024 / 1024).toFixed(2)} MB) - ${(speed / 1024 / 1024).toFixed(2)} MB/s - ${elapsed}s elapsed`);
                     }
-                  }
-                  
-                  // Check for stalled uploads (no progress for 2 minutes)
-                  const timeSinceLastProgress = Date.now() - lastProgressTime;
-                  if (timeSinceLastProgress > 120000 && !isAborted) {
-                    console.warn(`⚠️ Upload appears stalled for "${moduleName}" - no progress for ${(timeSinceLastProgress / 1000).toFixed(0)}s`);
-                    abortReason = `Upload stalled - no progress for ${(timeSinceLastProgress / 1000).toFixed(0)} seconds`;
-                    xhr.abort();
-                    isAborted = true;
+                    
+                    // When upload reaches 100%, start monitoring for server processing delay
+                    if (percentComplete >= 100 && !progress100Time) {
+                      progress100Time = Date.now();
+                      console.log(`📤 File upload complete! Waiting for server to process (S3 upload, video processing, DB update)...`);
+                      
+                      // Set up a check to log server processing time
+                      serverProcessingCheckInterval = setInterval(() => {
+                        if (!isAborted && xhr.readyState !== XMLHttpRequest.DONE) {
+                          const processingTime = ((Date.now() - progress100Time) / 1000).toFixed(1);
+                          console.log(`⏳ Server still processing... (${processingTime}s elapsed since upload completed)`);
+                        } else {
+                          clearInterval(serverProcessingCheckInterval);
+                        }
+                      }, 5000); // Check every 5 seconds
+                    }
+                    
+                    // Check for stalled uploads (no progress for 2 minutes) - only check if not at 100%
+                    const timeSinceLastProgress = Date.now() - lastProgressTime;
+                    if (timeSinceLastProgress > 120000 && !isAborted && percentComplete < 100) {
+                      console.warn(`⚠️ Upload appears stalled for "${moduleName}" - no progress for ${(timeSinceLastProgress / 1000).toFixed(0)}s`);
+                      abortReason = `Upload stalled - no progress for ${(timeSinceLastProgress / 1000).toFixed(0)} seconds`;
+                      xhr.abort();
+                      isAborted = true;
+                    }
                   }
                 };
         
                 xhr.onload = () => {
+                  // Clear the server processing check interval
+                  if (serverProcessingCheckInterval) {
+                    clearInterval(serverProcessingCheckInterval);
+                    serverProcessingCheckInterval = null;
+                  }
+                  
                   if (isAborted) return;
+                  
+                  const totalTime = ((Date.now() - uploadStartTime) / 1000).toFixed(1);
+                  const serverProcessingTime = progress100Time ? ((Date.now() - progress100Time) / 1000).toFixed(1) : '0';
+                  
+                  console.log(`📥 Server response received for "${moduleName}" (Total: ${totalTime}s, Server processing: ${serverProcessingTime}s)`);
                   
                   if (xhr.status >= 200 && xhr.status < 300) {
                     try {
@@ -1413,6 +1443,10 @@ const CreateCommonCourses = () => {
                 const cleanup = () => {
                   window.removeEventListener('online', handleOnline);
                   window.removeEventListener('offline', handleOffline);
+                  if (serverProcessingCheckInterval) {
+                    clearInterval(serverProcessingCheckInterval);
+                    serverProcessingCheckInterval = null;
+                  }
                 };
                 
                 xhr.addEventListener('loadend', cleanup);
