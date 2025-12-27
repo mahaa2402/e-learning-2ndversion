@@ -4,8 +4,6 @@ const Common_Course = require('../models/common_courses');
 const {getcourse}=require('../controllers/User')
 
 const Quiz=require('../models/Quiz');
-const PreTestResult = require('../models/PreTestResult');
-const { authenticateToken } = require('../middleware/auth');
 
 // Log route registration
 console.log('✅ Course routes module loaded');
@@ -60,7 +58,7 @@ router.post('/create', async (req, res) => {
   try {
     console.log('🔍 Creating common course:', req.body);
     
-    const { title, description, modules, backgroundImageUrl, retakeQuizCooldownHours, preTest } = req.body;
+    const { title, description, modules, backgroundImageUrl, retakeQuizCooldownHours } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: 'Course title is required' });
@@ -88,13 +86,6 @@ router.post('/create', async (req, res) => {
       description: description || '',
       backgroundImageUrl: backgroundImageUrl || null,
       retakeQuizCooldownHours: retakeQuizCooldownHours || 24,
-      preTest: preTest && preTest.enabled
-        ? {
-            enabled: true,
-            passingScore: preTest.passingScore || 0,
-            questions: Array.isArray(preTest.questions) ? preTest.questions : []
-          }
-        : { enabled: false, passingScore: 0, questions: [] },
       modules: modules.map(module => {
         const moduleData = {
           m_id: module.m_id,
@@ -168,7 +159,7 @@ router.put('/update/:courseId', async (req, res, next) => {
   try {
     
     const { courseId } = req.params;
-    const { title, description, modules, backgroundImageUrl, retakeQuizCooldownHours, preTest } = req.body;
+    const { title, description, modules, backgroundImageUrl, retakeQuizCooldownHours } = req.body;
 
     // Validate courseId
     const mongoose = require('mongoose');
@@ -267,18 +258,6 @@ router.put('/update/:courseId', async (req, res, next) => {
       
       return moduleData;
     });
-
-    // Update pre-test configuration
-    if (preTest && preTest.enabled && Array.isArray(preTest.questions) && preTest.questions.length > 0) {
-      existingCourse.preTest = {
-        enabled: true,
-        passingScore: preTest.passingScore || 0,
-        questions: preTest.questions
-      };
-    } else {
-      // If disabled from UI, clear it
-      existingCourse.preTest = { enabled: false, passingScore: 0, questions: [] };
-    }
 
     const updatedCourse = await existingCourse.save();
     console.log('✅ Common course updated successfully:', updatedCourse._id);
@@ -413,45 +392,6 @@ router.get('/lesson/:courseId/:lessonId', async (req, res) => {
       error: 'Failed to fetch lesson data', 
       message: error.message 
     });
-  }
-});
-
-// POST /api/courses/pretest-submit - Submit pretest result
-router.post('/pretest-submit', authenticateToken, async (req, res) => {
-  try {
-    console.log('🔔 POST /pretest-submit called - body:', req.body);
-    const { courseId, courseName, score, total, answers, passingScore } = req.body;
-
-    if (!courseId || typeof score === 'undefined' || typeof total === 'undefined') {
-      return res.status(400).json({ error: 'Missing required fields courseId, score, total' });
-    }
-
-    const employeeEmail = req.user?.email || req.user?.userEmail || null;
-    if (!employeeEmail) {
-      console.warn('⚠️ No employee email found in token payload; using fallback header');
-    }
-
-    const percentage = total > 0 ? (score / total) * 100 : 0;
-    const passed = typeof passingScore === 'number' ? percentage >= passingScore : true;
-
-    const newPreTestResult = new PreTestResult({
-      courseId,
-      courseName,
-      employeeEmail: employeeEmail || req.body.employeeEmail || 'unknown',
-      score,
-      total,
-      percentage,
-      passed,
-      answers
-    });
-
-    const saved = await newPreTestResult.save();
-    console.log('✅ PreTestPersisted:', saved._id);
-
-    return res.status(201).json({ success: true, preTestResult: saved });
-  } catch (error) {
-    console.error('❌ Error saving PreTestResult:', error);
-    return res.status(500).json({ error: 'Failed to save pretest result', message: error.message });
   }
 });
 

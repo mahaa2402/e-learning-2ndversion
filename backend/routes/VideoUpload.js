@@ -88,8 +88,6 @@ router.post(
     req.setTimeout(7200000); // 2 hours (7200 seconds)
     res.setTimeout(7200000); // 2 hours (7200 seconds)
     
-    const uploadStartTime = Date.now();
-    
     try {
       console.log('📥 Video upload request received');
       console.log('📥 Params:', req.params);
@@ -170,229 +168,146 @@ router.post(
         AWS_REGION: process.env.AWS_REGION
       });
 
-      // Upload to S3 - use simple upload for files < 100MB, multipart for larger files
-      const s3UploadStartTime = Date.now();
-      const fileSizeMB = file.size / 1024 / 1024;
-      console.log('📤 Uploading file to S3:', file.path);
-      console.log('📤 File size:', fileSizeMB.toFixed(2), 'MB');
+      // Upload to S3
+      console.log('📤 Reading file from temp location:', file.path);
+      const fileContent = fs.readFileSync(file.path);
+      console.log('📤 File read, size:', fileContent.length, 'bytes');
+      
+      console.log('📤 Uploading to S3...');
       console.log('📤 Bucket:', process.env.AWS_BUCKET_NAME);
       console.log('📤 Key:', key);
       console.log('📤 ContentType:', file.mimetype);
       
-      let uploadResult;
-      const uploadParams = {
-        Bucket: process.env.AWS_BUCKET_NAME,
-        Key: key,
-        ContentType: file.mimetype,
-      };
+      const uploadResult = await s3
+        .upload({
+          Bucket: process.env.AWS_BUCKET_NAME,
+          Key: key,
+          Body: fileContent,
+          ContentType: file.mimetype,
+        })
+        .promise();
       
-      // Calculate timeout based on file size (minimum 2 minutes, add 1 minute per 50MB)
-      const timeoutMinutes = Math.max(2, Math.ceil(fileSizeMB / 50) + 2);
-      const timeoutMs = timeoutMinutes * 60 * 1000;
-      
-      // For files < 100MB, use simple putObject (faster, more reliable, no multipart)
-      // For larger files, use multipart upload with streaming
-      if (file.size < 100 * 1024 * 1024) {
-        // Simple upload using putObject with streaming (no memory loading)
-        console.log(`📤 Using streaming putObject upload (file < 100MB, timeout: ${timeoutMinutes}min)`);
-        
-        // Use file stream directly - no need to read entire file into memory
-        const fileStream = fs.createReadStream(file.path);
-        
-        // Use putObject with stream for simple uploads (no multipart)
-        const uploadStartTime = Date.now();
-        console.log(`📤 Starting S3 putObject streaming upload...`);
-        
-        uploadResult = await Promise.race([
-          s3.putObject({
-            Bucket: process.env.AWS_BUCKET_NAME,
-            Key: key,
-            Body: fileStream, // Stream directly - much faster
-            ContentType: file.mimetype,
-          }).promise().then(() => {
-            const uploadTime = ((Date.now() - uploadStartTime) / 1000).toFixed(2);
-            console.log(`📤 S3 putObject streaming completed in ${uploadTime}s`);
-            // putObject doesn't return Location, construct it manually
-            const region = process.env.AWS_REGION || 'us-east-1';
-            const bucket = process.env.AWS_BUCKET_NAME;
-            const location = process.env.AWS_ENDPOINT 
-              ? `${process.env.AWS_ENDPOINT}/${bucket}/${key}`
-              : `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
-            return { Location: location, Key: key };
-          }),
-          new Promise((_, reject) => 
-            setTimeout(() => {
-              const elapsed = ((Date.now() - s3UploadStartTime) / 1000).toFixed(1);
-              reject(new Error(`S3 upload timeout after ${timeoutMinutes} minutes (elapsed: ${elapsed}s)`));
-            }, timeoutMs)
-          )
-        ]);
-        
-        const elapsed = ((Date.now() - s3UploadStartTime) / 1000).toFixed(1);
-        console.log(`✅ S3 streaming upload completed in ${elapsed}s`);
-      } else {
-        // Multipart upload for large files - use streaming
-        console.log(`📤 Using multipart upload with streaming (file >= 100MB, timeout: ${timeoutMinutes}min)`);
-        const fileStream = fs.createReadStream(file.path);
-        uploadParams.Body = fileStream;
-        uploadParams.partSize = 10 * 1024 * 1024; // 10MB parts
-        uploadParams.queueSize = 4; // 4 concurrent parts
-        
-        const uploadManager = s3.upload(uploadParams);
-        
-        // Track progress
-        uploadManager.on('httpUploadProgress', (progress) => {
-          const percent = ((progress.loaded / progress.total) * 100).toFixed(1);
-          const elapsed = ((Date.now() - s3UploadStartTime) / 1000).toFixed(1);
-          const speed = progress.loaded / (Date.now() - s3UploadStartTime) * 1000;
-          console.log(`📤 S3 multipart upload: ${percent}% (${(progress.loaded / 1024 / 1024).toFixed(2)} MB / ${(progress.total / 1024 / 1024).toFixed(2)} MB) - ${(speed / 1024 / 1024).toFixed(2)} MB/s - ${elapsed}s`);
-        });
-        
-        // Add timeout to prevent hanging
-        uploadResult = await Promise.race([
-          uploadManager.promise(),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error(`S3 multipart upload timeout after ${timeoutMinutes} minutes`)), timeoutMs)
-          )
-        ]);
-      }
-      
-      const s3UploadTime = ((Date.now() - s3UploadStartTime) / 1000).toFixed(2);
-      console.log(`✅ S3 upload successful: ${uploadResult.Location} (took ${s3UploadTime}s)`);
+      console.log('✅ S3 upload successful:', uploadResult.Location);
 
-      // Extract video duration in background (non-blocking) - don't wait for it
-      // This will be updated later if needed, but won't delay the response
+            // Extract video duration (optional)
       let duration = null;
-      const tempFilePath = file.path; // Save path for background processing
-      
-      // Start duration extraction in background (fire and forget)
-      setImmediate(() => {
-        const durationStartTime = Date.now();
-        ffmpeg.ffprobe(tempFilePath, (err, metadata) => {
-          if (err) {
-            const durationTime = ((Date.now() - durationStartTime) / 1000).toFixed(2);
-            console.warn(`⚠️ Could not extract duration (took ${durationTime}s):`, err.message);
-            return;
-          }
-          
-          const extractedDuration = metadata.format.duration
-            ? `${Math.floor(metadata.format.duration / 60)}:${Math.floor(
-                metadata.format.duration % 60
-              )
-                .toString()
-                .padStart(2, "0")}`
-            : null;
-          
-          const durationTime = ((Date.now() - durationStartTime) / 1000).toFixed(2);
-          console.log(`✅ Duration extracted in background: ${extractedDuration} (took ${durationTime}s)`);
-          
-          // Optionally update course in DB with duration later (if courseId provided)
-          if (extractedDuration && req.query.courseId) {
-            // This could be done asynchronously if needed
-            console.log(`ℹ️ Duration ${extractedDuration} extracted - can be updated in course later`);
-          }
+      try {
+        duration = await new Promise((resolve, reject) => {
+          ffmpeg.ffprobe(file.path, (err, metadata) => {
+            if (err) return reject(err);
+            resolve(
+              metadata.format.duration
+                ? `${Math.floor(metadata.format.duration / 60)}:${Math.floor(
+                    metadata.format.duration % 60
+                  )
+                    .toString()
+                    .padStart(2, "0")}`
+                : null
+            );
+          });
         });
-      });
+      } catch (err) {
+        console.warn("⚠️ Could not extract duration", err);
+      }
 
-      // Delete temp file asynchronously (don't block response)
-      setImmediate(() => {
-        try {
-          if (fs.existsSync(file.path)) {
-            fs.unlinkSync(file.path);
-            console.log(`✅ Temp file deleted: ${file.path}`);
-          }
-        } catch (err) {
-          console.warn(`⚠️ Could not delete temp file:`, err.message);
-        }
-      });
+      // Delete temp file
+      fs.unlinkSync(file.path);
 
       console.log(`✅ Video uploaded successfully to S3: ${key}`);
 
-      // Send response immediately after S3 upload (don't wait for DB update)
-      const totalProcessingTime = ((Date.now() - uploadStartTime) / 1000).toFixed(2);
-      
+      // Automatically update course in database with video URL
+      try {
+        let course = null;
+        
+        // Try to find course by courseId from query parameter first (most reliable)
+        if (req.query.courseId) {
+          const mongoose = require('mongoose');
+          if (mongoose.Types.ObjectId.isValid(req.query.courseId)) {
+            course = await Common_Course.findById(req.query.courseId);
+            console.log(`📤 Found course by ID: ${req.query.courseId}`);
+          }
+        }
+        
+        // If not found by ID, try to find by title
+        if (!course) {
+          // Try exact title match first
+          course = await Common_Course.findOne({ title: decodedCourseName });
+          
+          // If not found, try case-insensitive match
+          if (!course) {
+            course = await Common_Course.findOne({ 
+              title: { $regex: new RegExp(`^${decodedCourseName.replace(/[^a-zA-Z0-9]/g, '.*')}$`, 'i') }
+            });
+          }
+          
+          // If still not found, try sanitized name
+          if (!course) {
+            const sanitizedTitle = decodedCourseName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+            course = await Common_Course.findOne({ 
+              title: { $regex: new RegExp(sanitizedTitle, 'i') }
+            });
+          }
+        }
+        
+        if (course) {
+          // Find the module by module number (modules array index + 1)
+          const moduleIndex = moduleNum - 1;
+          if (course.modules && course.modules[moduleIndex]) {
+            const module = course.modules[moduleIndex];
+            
+            // Update module's lessonDetails with video URL
+            if (!module.lessonDetails) {
+              module.lessonDetails = {
+                title: module.name,
+                videoUrl: uploadResult.Location,
+                content: [],
+                duration: duration || `${module.duration || 0}min`,
+                notes: module.notes || ''
+              };
+            } else {
+              module.lessonDetails.videoUrl = uploadResult.Location;
+              if (duration) {
+                module.lessonDetails.duration = duration;
+              }
+            }
+            
+            // Mark module as modified
+            course.markModified('modules');
+            await course.save();
+            
+            console.log(`✅ Course "${course.title}" (ID: ${course._id}) updated with video URL for module ${moduleNum} (m_id: ${module.m_id})`);
+            console.log(`✅ Video URL saved to database: ${uploadResult.Location}`);
+          } else {
+            console.warn(`⚠️ Module ${moduleNum} (index ${moduleIndex}) not found in course "${course.title}". Course has ${course.modules?.length || 0} modules.`);
+          }
+        } else {
+          console.warn(`⚠️ Could not find course to update. Searched for: "${decodedCourseName}". Video uploaded to S3: ${uploadResult.Location}`);
+          console.warn(`⚠️ Video URL will need to be manually added to the course.`);
+        }
+      } catch (dbError) {
+        console.error('❌ Error updating course in database:', dbError);
+        console.error('❌ DB Error details:', {
+          message: dbError.message,
+          stack: dbError.stack
+        });
+        // Don't fail the upload if DB update fails - video is already in S3
+        console.warn('⚠️ Video uploaded to S3 but failed to update course in database. Video URL:', uploadResult.Location);
+      }
+
       const response = {
         success: true,
         message: `Video uploaded for ${decodedCourseName} Module ${moduleNum}`,
         video: {
           url: uploadResult.Location,
           title: file.originalname,
-          duration: null, // Duration will be extracted in background
+          duration,
           s3Key: key,
           uploadedAt: new Date().toISOString()
         }
       };
 
-      console.log(`✅ Sending success response immediately (S3 upload took ${s3UploadTime}s, total: ${totalProcessingTime}s)`);
+      console.log('✅ Sending success response:', JSON.stringify(response, null, 2));
       res.json(response);
-
-      // Update course in database in background (non-blocking) - only if courseId is provided
-      setImmediate(async () => {
-        const dbUpdateStartTime = Date.now();
-        try {
-          // Skip database update for new courses (courseId not provided) - course will be created later
-          if (!req.query.courseId) {
-            console.log(`ℹ️ Skipping database update - new course will be created later with video URL`);
-            return;
-          }
-          
-          let course = null;
-          
-          // Try to find course by courseId from query parameter (most reliable)
-          const mongoose = require('mongoose');
-          if (mongoose.Types.ObjectId.isValid(req.query.courseId)) {
-            const findStartTime = Date.now();
-            course = await Common_Course.findById(req.query.courseId);
-            const findTime = ((Date.now() - findStartTime) / 1000).toFixed(2);
-            console.log(`📤 Found course by ID: ${req.query.courseId} (took ${findTime}s)`);
-          }
-          
-          if (course) {
-            // Find the module by module number (modules array index + 1)
-            const moduleIndex = moduleNum - 1;
-            if (course.modules && course.modules[moduleIndex]) {
-              const module = course.modules[moduleIndex];
-              
-              // Update module's lessonDetails with video URL
-              if (!module.lessonDetails) {
-                module.lessonDetails = {
-                  title: module.name,
-                  videoUrl: uploadResult.Location,
-                  content: [],
-                  duration: `${module.duration || 0}min`, // Duration will be updated later if extracted
-                  notes: module.notes || ''
-                };
-              } else {
-                module.lessonDetails.videoUrl = uploadResult.Location;
-              }
-              
-              // Mark module as modified
-              course.markModified('modules');
-              const saveStartTime = Date.now();
-              await course.save();
-              const saveTime = ((Date.now() - saveStartTime) / 1000).toFixed(2);
-              
-              const dbUpdateTime = ((Date.now() - dbUpdateStartTime) / 1000).toFixed(2);
-              console.log(`✅ Course "${course.title}" (ID: ${course._id}) updated with video URL for module ${moduleNum} (m_id: ${module.m_id})`);
-              console.log(`✅ Database update completed in background (total: ${dbUpdateTime}s, save: ${saveTime}s)`);
-            } else {
-              console.warn(`⚠️ Module ${moduleNum} (index ${moduleIndex}) not found in course "${course.title}". Course has ${course.modules?.length || 0} modules.`);
-            }
-          } else {
-            console.warn(`⚠️ Could not find course with ID: ${req.query.courseId}. Video uploaded to S3: ${uploadResult.Location}`);
-            console.warn(`⚠️ Video URL will need to be manually added to the course.`);
-          }
-        } catch (dbError) {
-          const dbUpdateTime = ((Date.now() - dbUpdateStartTime) / 1000).toFixed(2);
-          console.error(`❌ Error updating course in database (took ${dbUpdateTime}s):`, dbError);
-          console.error('❌ DB Error details:', {
-            message: dbError.message,
-            stack: dbError.stack
-          });
-          // Don't fail the upload if DB update fails - video is already in S3
-          console.warn('⚠️ Video uploaded to S3 but failed to update course in database. Video URL:', uploadResult.Location);
-        }
-      });
 
       
     } catch (error) {
