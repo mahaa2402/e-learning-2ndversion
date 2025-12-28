@@ -38,6 +38,10 @@ yarn-error.log*
 temp-backend/
 **/temp-backend/
 
+# Backend uploads directory (local upload artifacts)
+backend/uploads/
+backend/uploads/**
+
 # Scanner work
 .scannerwork/
 

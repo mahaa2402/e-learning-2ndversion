@@ -152,12 +152,12 @@ const CreateCommonCourses = () => {
           const { presignedUrl } = await presignedResponse.json();
           
           // Upload chunk directly to S3
+          // CRITICAL: Do NOT send any headers - S3 presigned URLs are signed without headers
+          // Adding headers will cause CORS/403 errors
           const uploadResponse = await fetch(presignedUrl, {
             method: 'PUT',
-            body: chunk,
-            headers: {
-              'Content-Type': videoFile.type || 'video/mp4'
-            }
+            body: chunk
+            // NO headers - this is required for S3 multipart uploads
           });
           
           if (!uploadResponse.ok) {
