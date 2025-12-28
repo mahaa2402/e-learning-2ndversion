@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import courseData from './coursedata';
@@ -34,6 +34,8 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
   const [dbLesson, setDbLesson] = useState(null);
   const [fetchingFromDb, setFetchingFromDb] = useState(false);
   const [presignedVideoUrl, setPresignedVideoUrl] = useState(null);
+  const [videoRetryCount, setVideoRetryCount] = useState(0);
+  const [isFetchingNewUrl, setIsFetchingNewUrl] = useState(false);
 
   // ===== PRE-TEST HANDLING (moved to top-level to avoid conditional hooks) =====
   const employeeEmail = typeof window !== 'undefined' ? localStorage.getItem('employeeEmail') : null;
@@ -531,6 +533,81 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
     console.warn(`⚠️ Please upload the video for this module in the admin panel.`);
   }
 
+  // Reusable function to fetch a fresh signed URL from backend
+  const fetchFreshSignedUrl = useCallback(async (isRetry = false) => {
+    if (!lesson?.videoUrl || !dbCourse) {
+      console.warn('⚠️ Cannot fetch signed URL: missing lesson or course data');
+      return null;
+    }
+
+    try {
+      // Extract course name from course data
+      const courseName = dbCourse.title || dbCourse.name || course?.title || course?.name;
+      
+      // Find module index from lessonId
+      let moduleIndex = 0;
+      if (dbCourse.modules && Array.isArray(dbCourse.modules)) {
+        const moduleIndexFound = dbCourse.modules.findIndex(m => m.m_id === lessonId);
+        if (moduleIndexFound >= 0) {
+          moduleIndex = moduleIndexFound;
+        }
+      }
+
+      if (!courseName) {
+        console.warn('⚠️ Cannot fetch presigned URL: course name not found');
+        return null;
+      }
+
+      if (isRetry) {
+        console.log('🔄 Retrying with fresh signed URL:', { courseName, moduleIndex, lessonId, retryCount: videoRetryCount + 1 });
+      } else {
+        console.log('🔐 Fetching presigned URL for video:', { courseName, moduleIndex, lessonId });
+      }
+      
+      // Try /api/videos/get-signed-url first (if it exists), otherwise use /api/video/get
+      let videoGetUrl = `${API_BASE_URL}/videos/get-signed-url?lessonId=${encodeURIComponent(lessonId)}`;
+      let response = await fetch(videoGetUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      // If endpoint doesn't exist (404), fall back to existing endpoint
+      if (response.status === 404) {
+        console.log('📝 /api/videos/get-signed-url not found, using /api/video/get');
+        videoGetUrl = `${API_BASE_URL}/video/get?courseName=${encodeURIComponent(courseName)}&moduleIndex=${moduleIndex}`;
+        response = await fetch(videoGetUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      }
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.url) {
+          if (isRetry) {
+            console.log('✅ Fresh signed URL fetched successfully (retry attempt)');
+          } else {
+            console.log('✅ Presigned URL fetched successfully');
+          }
+          return data.url;
+        } else {
+          console.warn('⚠️ Presigned URL response missing URL');
+          return null;
+        }
+      } else {
+        console.warn('⚠️ Failed to fetch presigned URL:', response.status, response.statusText);
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Error fetching presigned URL:', error);
+      return null;
+    }
+  }, [lesson?.videoUrl, dbCourse, lessonId, course, videoRetryCount]);
+
   // Fetch presigned URL for video if it's a direct S3 URL
   useEffect(() => {
     const fetchPresignedUrl = async () => {
@@ -549,57 +626,16 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
         return;
       }
 
-      try {
-        // Extract course name from course data
-        const courseName = dbCourse.title || dbCourse.name || course?.title || course?.name;
-        
-        // Find module index from lessonId
-        let moduleIndex = 0;
-        if (dbCourse.modules && Array.isArray(dbCourse.modules)) {
-          const moduleIndexFound = dbCourse.modules.findIndex(m => m.m_id === lessonId);
-          if (moduleIndexFound >= 0) {
-            moduleIndex = moduleIndexFound;
-          }
-        }
-
-        if (!courseName) {
-          console.warn('⚠️ Cannot fetch presigned URL: course name not found');
-          setPresignedVideoUrl(lesson.videoUrl); // Fallback to direct URL
-          return;
-        }
-
-        console.log('🔐 Fetching presigned URL for video:', { courseName, moduleIndex });
-        
-        // Use /api/video/get endpoint (note: singular 'video', not 'videos')
-        const videoGetUrl = `${API_BASE_URL}/video/get?courseName=${encodeURIComponent(courseName)}&moduleIndex=${moduleIndex}`;
-        const response = await fetch(videoGetUrl, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.url) {
-            console.log('✅ Presigned URL fetched successfully');
-            setPresignedVideoUrl(data.url);
-          } else {
-            console.warn('⚠️ Presigned URL response missing URL, using direct URL');
-            setPresignedVideoUrl(lesson.videoUrl);
-          }
-        } else {
-          console.warn('⚠️ Failed to fetch presigned URL, using direct URL');
-          setPresignedVideoUrl(lesson.videoUrl);
-        }
-      } catch (error) {
-        console.error('❌ Error fetching presigned URL:', error);
+      const freshUrl = await fetchFreshSignedUrl(false);
+      if (freshUrl) {
+        setPresignedVideoUrl(freshUrl);
+      } else {
         setPresignedVideoUrl(lesson.videoUrl); // Fallback to direct URL
       }
     };
 
     fetchPresignedUrl();
-  }, [lesson?.videoUrl, dbCourse, lessonId, course]);
+  }, [lesson?.videoUrl, dbCourse, lessonId, course, fetchFreshSignedUrl]);
 
   // Reload video when presigned videoUrl changes
   useEffect(() => {
@@ -1324,16 +1360,88 @@ const renderFormattedContent = (contentArray) => {
                 controls
                 src={presignedVideoUrl || lesson.videoUrl}
                 crossOrigin="anonymous"
-                onError={(e) => {
+                onError={async (e) => {
+                  const videoElement = e.target;
+                  const error = videoElement.error;
+                  
+                  // Preserve existing error logs
                   console.error('❌ Video load error:', e);
                   console.error('❌ Video URL:', presignedVideoUrl || lesson.videoUrl);
-                  console.error('❌ Error details:', e.target.error);
+                  console.error('❌ Error details:', error);
+                  
+                  // Check error type
+                  const isMediaError = error && error.code === 4; // MEDIA_ELEMENT_ERROR
+                  const isNetworkError = error && (error.code === 2 || error.code === 3); // NETWORK_ERROR or DECODE_ERROR
+                  const is403Error = error && error.message && error.message.includes('403');
+                  
+                  // Determine if we should retry (MEDIA_ELEMENT_ERROR, 403, or network errors)
+                  const shouldRetry = (isMediaError || is403Error || isNetworkError) && 
+                                    videoRetryCount < 3 && // Max 3 retries
+                                    !isFetchingNewUrl; // Not already fetching
+                  
+                  if (shouldRetry) {
+                    console.log('🔄 Video load failed, attempting to fetch fresh signed URL...');
+                    console.log('🔄 Error code:', error?.code, 'Error message:', error?.message);
+                    
+                    setIsFetchingNewUrl(true);
+                    setVideoRetryCount(prev => prev + 1);
+                    
+                    try {
+                      const freshUrl = await fetchFreshSignedUrl(true);
+                      
+                      if (freshUrl && videoElement) {
+                        console.log('✅ Fresh signed URL received, updating video source...');
+                        console.log('✅ New URL:', freshUrl);
+                        
+                        // Update the video source
+                        videoElement.src = freshUrl;
+                        setPresignedVideoUrl(freshUrl);
+                        setIsFetchingNewUrl(false); // Reset fetching state
+                        
+                        // Reload and attempt to play
+                        videoElement.load();
+                        
+                        // Attempt to play after a short delay
+                        setTimeout(() => {
+                          if (videoElement) {
+                            videoElement.play().catch(playError => {
+                              console.warn('⚠️ Auto-play failed (user interaction may be required):', playError);
+                            });
+                          }
+                        }, 500);
+                      } else {
+                        console.error('❌ Failed to fetch fresh signed URL, cannot retry');
+                        setIsFetchingNewUrl(false);
+                      }
+                    } catch (retryError) {
+                      console.error('❌ Error during retry attempt:', retryError);
+                      setIsFetchingNewUrl(false);
+                    }
+                  } else {
+                    if (videoRetryCount >= 3) {
+                      console.error('❌ Maximum retry attempts reached. Video cannot be loaded.');
+                    } else if (isFetchingNewUrl) {
+                      console.log('⏳ Already fetching new URL, skipping retry...');
+                    } else {
+                      console.warn('⚠️ Error type does not warrant retry:', {
+                        isMediaError,
+                        is403Error,
+                        isNetworkError,
+                        errorCode: error?.code
+                      });
+                    }
+                  }
                 }}
                 onLoadStart={() => {
                   console.log('📹 Video load started:', presignedVideoUrl || lesson.videoUrl);
                 }}
                 onCanPlay={() => {
                   console.log('✅ Video can play:', presignedVideoUrl || lesson.videoUrl);
+                  // Reset retry count on successful play
+                  if (videoRetryCount > 0) {
+                    console.log('✅ Video loaded successfully after retry, resetting retry count');
+                    setVideoRetryCount(0);
+                  }
                 }}
                 ref={(video) => {
                   videoRef.current = video;
