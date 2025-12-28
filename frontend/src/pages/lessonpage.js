@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import courseData from './coursedata';
-import { API_ENDPOINTS } from '../config/api';
+import { API_ENDPOINTS, API_BASE_URL } from '../config/api';
 import './lessonpage.css';
 
 // PreTestInline removed; use dedicated pretest page + `PreTestQuiz` component.
@@ -33,6 +33,7 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
   const [dbCourse, setDbCourse] = useState(null);
   const [dbLesson, setDbLesson] = useState(null);
   const [fetchingFromDb, setFetchingFromDb] = useState(false);
+  const [presignedVideoUrl, setPresignedVideoUrl] = useState(null);
 
   // ===== PRE-TEST HANDLING (moved to top-level to avoid conditional hooks) =====
   const employeeEmail = typeof window !== 'undefined' ? localStorage.getItem('employeeEmail') : null;
@@ -481,10 +482,38 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
     lesson = dbCourse.lessons[lessonId];
   }
 
+  // For database courses, if lesson still doesn't exist, try to get it from dbCourse.modules array
+  if (dbCourse && !lesson && dbCourse.modules && Array.isArray(dbCourse.modules)) {
+    const module = dbCourse.modules.find(m => m.m_id === lessonId);
+    if (module && module.lessonDetails) {
+      console.log('📋 Creating lesson from dbCourse.modules[].lessonDetails:', lessonId);
+      lesson = {
+        title: module.lessonDetails.title || module.name || '',
+        videoUrl: module.lessonDetails.videoUrl || null,
+        content: module.lessonDetails.content || [],
+        duration: module.lessonDetails.duration || module.duration || '0min',
+        notes: module.lessonDetails.notes || ''
+      };
+    }
+  }
+
   // If lesson still doesn't have videoUrl, try to get it from dbCourse.lessons directly
   if (lesson && !lesson.videoUrl && dbCourse && dbCourse.lessons && dbCourse.lessons[lessonId]) {
     console.log('📋 Getting videoUrl from dbCourse.lessons:', dbCourse.lessons[lessonId].videoUrl);
     lesson.videoUrl = dbCourse.lessons[lessonId].videoUrl;
+  }
+
+  // If lesson still doesn't have videoUrl, try to get it from dbCourse.modules array
+  if (lesson && !lesson.videoUrl && dbCourse && dbCourse.modules && Array.isArray(dbCourse.modules)) {
+    const module = dbCourse.modules.find(m => m.m_id === lessonId);
+    if (module && module.lessonDetails && module.lessonDetails.videoUrl) {
+      console.log('📋 Getting videoUrl from dbCourse.modules[].lessonDetails:', module.lessonDetails.videoUrl);
+      lesson.videoUrl = module.lessonDetails.videoUrl;
+      // Also set title if missing
+      if (!lesson.title && module.lessonDetails.title) {
+        lesson.title = module.lessonDetails.title;
+      }
+    }
   }
 
   console.log('📹 Final lesson data:', { 
@@ -501,6 +530,84 @@ const [unlockStatus, setUnlockStatus] = useState([]); // default to empty array
     console.warn(`⚠️ Video URL missing from database for course: "${courseName}", module: "${lessonId}"`);
     console.warn(`⚠️ Please upload the video for this module in the admin panel.`);
   }
+
+  // Fetch presigned URL for video if it's a direct S3 URL
+  useEffect(() => {
+    const fetchPresignedUrl = async () => {
+      if (!lesson?.videoUrl || !dbCourse) {
+        setPresignedVideoUrl(null);
+        return;
+      }
+
+      // Check if URL is a direct S3 URL (not already presigned)
+      const isDirectS3Url = lesson.videoUrl.includes('s3.eu-north-1.amazonaws.com') && 
+                           !lesson.videoUrl.includes('X-Amz-Signature');
+      
+      if (!isDirectS3Url) {
+        // Already a presigned URL or different format, use as-is
+        setPresignedVideoUrl(lesson.videoUrl);
+        return;
+      }
+
+      try {
+        // Extract course name from course data
+        const courseName = dbCourse.title || dbCourse.name || course?.title || course?.name;
+        
+        // Find module index from lessonId
+        let moduleIndex = 0;
+        if (dbCourse.modules && Array.isArray(dbCourse.modules)) {
+          const moduleIndexFound = dbCourse.modules.findIndex(m => m.m_id === lessonId);
+          if (moduleIndexFound >= 0) {
+            moduleIndex = moduleIndexFound;
+          }
+        }
+
+        if (!courseName) {
+          console.warn('⚠️ Cannot fetch presigned URL: course name not found');
+          setPresignedVideoUrl(lesson.videoUrl); // Fallback to direct URL
+          return;
+        }
+
+        console.log('🔐 Fetching presigned URL for video:', { courseName, moduleIndex });
+        
+        // Use /api/video/get endpoint (note: singular 'video', not 'videos')
+        const videoGetUrl = `${API_BASE_URL}/video/get?courseName=${encodeURIComponent(courseName)}&moduleIndex=${moduleIndex}`;
+        const response = await fetch(videoGetUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.url) {
+            console.log('✅ Presigned URL fetched successfully');
+            setPresignedVideoUrl(data.url);
+          } else {
+            console.warn('⚠️ Presigned URL response missing URL, using direct URL');
+            setPresignedVideoUrl(lesson.videoUrl);
+          }
+        } else {
+          console.warn('⚠️ Failed to fetch presigned URL, using direct URL');
+          setPresignedVideoUrl(lesson.videoUrl);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching presigned URL:', error);
+        setPresignedVideoUrl(lesson.videoUrl); // Fallback to direct URL
+      }
+    };
+
+    fetchPresignedUrl();
+  }, [lesson?.videoUrl, dbCourse, lessonId, course]);
+
+  // Reload video when presigned videoUrl changes
+  useEffect(() => {
+    if (videoRef.current && presignedVideoUrl) {
+      console.log('🔄 Reloading video with presigned URL:', presignedVideoUrl);
+      videoRef.current.load();
+    }
+  }, [presignedVideoUrl]);
 
   // Debounce mechanism to prevent excessive API calls
   const [fetchTimeout, setFetchTimeout] = useState(null);
@@ -1209,26 +1316,45 @@ const renderFormattedContent = (contentArray) => {
         {/* Video & Notes */}
         <div className="lesson-content">
           <div className="video-container">
-            <video 
-              width="100%" 
-              height="auto" 
-              controls
-              ref={(video) => {
-                videoRef.current = video;
-                if (video && video.textTracks.length > 0) {
-                  const track = video.textTracks[0];
-                  track.mode = showCaptions ? 'showing' : 'hidden';
-                }
-              }}
-            >
-            {lesson?.videoUrl ? (
-              <source src={lesson.videoUrl} type="video/mp4" />
+            {(presignedVideoUrl || lesson?.videoUrl) ? (
+              <video 
+                key={presignedVideoUrl || lesson.videoUrl}
+                width="100%" 
+                height="auto" 
+                controls
+                src={presignedVideoUrl || lesson.videoUrl}
+                crossOrigin="anonymous"
+                onError={(e) => {
+                  console.error('❌ Video load error:', e);
+                  console.error('❌ Video URL:', presignedVideoUrl || lesson.videoUrl);
+                  console.error('❌ Error details:', e.target.error);
+                }}
+                onLoadStart={() => {
+                  console.log('📹 Video load started:', presignedVideoUrl || lesson.videoUrl);
+                }}
+                onCanPlay={() => {
+                  console.log('✅ Video can play:', presignedVideoUrl || lesson.videoUrl);
+                }}
+                ref={(video) => {
+                  videoRef.current = video;
+                  if (video && video.textTracks.length > 0) {
+                    const track = video.textTracks[0];
+                    track.mode = showCaptions ? 'showing' : 'hidden';
+                  }
+                  // Force video to load when URL changes
+                  if (video && (presignedVideoUrl || lesson.videoUrl)) {
+                    console.log('🔄 Forcing video load:', presignedVideoUrl || lesson.videoUrl);
+                    video.load();
+                  }
+                }}
+              >
+                Your browser does not support the video tag.
+              </video>
             ) : (
-              <p style={{ padding: '20px', color: 'red' }}>
+              <div style={{ padding: '20px', color: 'red', backgroundColor: '#fff', borderRadius: '8px' }}>
                 ⚠️ Video URL not found. Please check that the video was uploaded correctly.
-              </p>
+              </div>
             )}
-          </video>
           </div>
 
           {/* Notes Section - Display below video */}

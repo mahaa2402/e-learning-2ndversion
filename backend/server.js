@@ -15,6 +15,7 @@ const progressRoutes = require('./routes/progressRoutes');
 const assignedCourseProgressRoutes = require('./routes/AssignedCourseProgress');
 const certificateRoutes = require('./routes/CertificateRoutes');
 const videoUploadRoutes = require('./routes/VideoUpload');
+const videoUploadMultipartRoutes = require('./routes/VideoUploadMultipart');
 const videoFetchRoutes = require('./routes/Videofetch');
 const uploadRoutes = require('./routes/Upload');
 const { initializeEmailService } = require('./services/emailService');
@@ -43,8 +44,8 @@ app.use(cors({
 
 // Body parsing (for JSON/URL-encoded data, not file uploads)
 // File uploads are handled by multer with their own limits
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '1gb' }));
+app.use(express.urlencoded({ extended: true, limit: '1gb' }));
 
 // Increase server timeout for large file uploads (2 hours - matches nginx)
 app.timeout = 7200000; // 2 hours (7200 seconds)
@@ -136,6 +137,7 @@ app.use('/api/assigned-course-progress', assignedCourseProgressRoutes);
 app.use('/api/certificate', certificateRoutes);
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/videos', videoUploadRoutes);
+app.use('/api/videos/multipart', videoUploadMultipartRoutes);
 app.use('/api/video', videoFetchRoutes);
 app.use('/api/upload', uploadRoutes);
 

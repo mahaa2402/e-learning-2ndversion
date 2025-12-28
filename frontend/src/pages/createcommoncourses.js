@@ -73,6 +73,169 @@ const CreateCommonCourses = () => {
 
   const questionTypes = ['multiple-choice', 'true-false'];
 
+  // Helper function for multipart upload (reusable)
+  const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB per chunk
+  
+  const uploadVideoMultipart = async (videoFile, courseName, moduleNumber, moduleName = null, courseId = null) => {
+    const fileSize = videoFile.size;
+    const totalChunks = Math.ceil(fileSize / CHUNK_SIZE);
+    const displayName = moduleName || videoFile.name;
+    
+    console.log(`📤 Starting multipart upload for "${displayName}"`);
+    console.log(`📤 File size: ${(fileSize / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`📤 Total chunks: ${totalChunks}`);
+    
+    const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+    
+    // Step 1: Create multipart upload
+    const createResponse = await fetch(API_ENDPOINTS.VIDEOS.MULTIPART.CREATE, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        courseName: courseName,
+        moduleNumber: moduleNumber,
+        fileName: videoFile.name,
+        contentType: videoFile.type || 'video/mp4'
+      })
+    });
+    
+    if (!createResponse.ok) {
+      const errorData = await createResponse.json().catch(() => ({ error: 'Failed to create multipart upload' }));
+      throw new Error(errorData.error || `Failed to create multipart upload: ${createResponse.status}`);
+    }
+    
+    const { uploadId, key } = await createResponse.json();
+    console.log(`✅ Multipart upload created: ${uploadId}`);
+    
+    // Step 2: Upload all chunks
+    const parts = [];
+    let uploadedBytes = 0;
+    
+    for (let partNumber = 1; partNumber <= totalChunks; partNumber++) {
+      const start = (partNumber - 1) * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, fileSize);
+      const chunk = videoFile.slice(start, end);
+      
+      // Retry logic for each chunk
+      let chunkUploaded = false;
+      let maxChunkRetries = 3;
+      
+      for (let retry = 0; retry < maxChunkRetries && !chunkUploaded; retry++) {
+        try {
+          if (retry > 0) {
+            console.log(`🔄 Retrying chunk ${partNumber}/${totalChunks} (attempt ${retry + 1}/${maxChunkRetries})`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * retry)); // Exponential backoff
+          }
+          
+          // Get presigned URL for this part
+          const presignedResponse = await fetch(API_ENDPOINTS.VIDEOS.MULTIPART.PRESIGNED_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              uploadId: uploadId,
+              key: key,
+              partNumber: partNumber
+            })
+          });
+          
+          if (!presignedResponse.ok) {
+            const errorData = await presignedResponse.json().catch(() => ({ error: 'Failed to get presigned URL' }));
+            throw new Error(errorData.error || `Failed to get presigned URL: ${presignedResponse.status}`);
+          }
+          
+          const { presignedUrl } = await presignedResponse.json();
+          
+          // Upload chunk directly to S3
+          const uploadResponse = await fetch(presignedUrl, {
+            method: 'PUT',
+            body: chunk,
+            headers: {
+              'Content-Type': videoFile.type || 'video/mp4'
+            }
+          });
+          
+          if (!uploadResponse.ok) {
+            throw new Error(`Failed to upload chunk ${partNumber}: ${uploadResponse.status} ${uploadResponse.statusText}`);
+          }
+          
+          // Get ETag from response headers
+          const etag = uploadResponse.headers.get('ETag') || uploadResponse.headers.get('etag');
+          if (!etag) {
+            throw new Error(`No ETag received for chunk ${partNumber}`);
+          }
+          
+          parts.push({
+            PartNumber: partNumber,
+            ETag: etag.replace(/"/g, '') // Remove quotes from ETag
+          });
+          
+          uploadedBytes += (end - start);
+          const progress = (uploadedBytes / fileSize) * 100;
+          
+          console.log(`✅ Chunk ${partNumber}/${totalChunks} uploaded (${progress.toFixed(1)}%)`);
+          
+          chunkUploaded = true;
+        } catch (chunkError) {
+          console.error(`❌ Chunk ${partNumber} upload failed (attempt ${retry + 1}):`, chunkError.message);
+          
+          if (retry === maxChunkRetries - 1) {
+            // Abort multipart upload on final failure
+            try {
+              await fetch(API_ENDPOINTS.VIDEOS.MULTIPART.ABORT, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                  uploadId: uploadId,
+                  key: key
+                })
+              });
+            } catch (abortError) {
+              console.error('❌ Failed to abort multipart upload:', abortError);
+            }
+            throw new Error(`Failed to upload chunk ${partNumber} after ${maxChunkRetries} attempts: ${chunkError.message}`);
+          }
+        }
+      }
+    }
+    
+    // Step 3: Complete multipart upload
+    console.log(`📤 Completing multipart upload...`);
+    const completeResponse = await fetch(API_ENDPOINTS.VIDEOS.MULTIPART.COMPLETE, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        uploadId: uploadId,
+        key: key,
+        parts: parts,
+        courseName: courseName,
+        moduleNumber: moduleNumber,
+        courseId: courseId
+      })
+    });
+    
+    if (!completeResponse.ok) {
+      const errorData = await completeResponse.json().catch(() => ({ error: 'Failed to complete multipart upload' }));
+      throw new Error(errorData.error || `Failed to complete multipart upload: ${completeResponse.status}`);
+    }
+    
+    const { url } = await completeResponse.json();
+    console.log(`✅ Multipart upload completed: ${url}`);
+    
+    return url;
+  };
+
   // Fetch existing common courses
   const fetchCourses = async () => {
     setIsLoading(true);
@@ -494,41 +657,24 @@ const CreateCommonCourses = () => {
           };
         } else {
           const moduleNumber = index + 1;
-          const formDataToSend = new FormData();
-          formDataToSend.append("video", currentModule.video.file);
-
           const courseName = courseTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-          const uploadUrl = `${API_ENDPOINTS.VIDEOS.UPLOAD}/${encodeURIComponent(courseName)}/${moduleNumber}`;
+          const courseId = editingCourse?._id || null;
 
-          const token = localStorage.getItem('token') || localStorage.getItem('authToken');
-          const uploadResponse = await fetch(uploadUrl, {
-            method: 'POST',
-            body: formDataToSend,
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-
-          if (!uploadResponse.ok) {
-            let errorData;
-            try {
-              errorData = await uploadResponse.json();
-            } catch (e) {
-              errorData = { error: `HTTP ${uploadResponse.status}: ${uploadResponse.statusText}` };
-            }
-            throw new Error(errorData.error || `Failed to upload video: ${uploadResponse.statusText}`);
-          }
-
-          const uploadResult = await uploadResponse.json();
-          videoUrl = uploadResult.video?.url || uploadResult.videoUrl;
+          // Use multipart upload
+          videoUrl = await uploadVideoMultipart(
+            currentModule.video.file,
+            courseName,
+            moduleNumber,
+            currentModule.name,
+            courseId
+          );
           
           videoData = {
             url: videoUrl,
             name: currentModule.video.file.name,
             size: `${(currentModule.video.file.size / 1024 / 1024).toFixed(2)} MB`,
             type: currentModule.video.file.type,
-            s3Key: uploadResult.video?.s3Key,
-            uploadedAt: uploadResult.video?.uploadedAt || new Date().toISOString(),
+            uploadedAt: new Date().toISOString(),
             pendingUpload: false
           };
         }
@@ -718,51 +864,31 @@ const CreateCommonCourses = () => {
       // Backend uses: replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
       const courseName = courseTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
 
-      // Upload video to S3 using the same pattern as admincourses
-      const formDataToSend = new FormData();
-      formDataToSend.append("video", file);
-
-      const uploadUrl = `${API_ENDPOINTS.VIDEOS.UPLOAD}/${encodeURIComponent(courseName)}/${moduleNumber}`;
-      console.log('📤 Uploading video to:', uploadUrl);
+      // Upload video to S3 using multipart upload
+      console.log('📤 Uploading video using multipart upload');
       console.log('📤 Course title:', courseTitle);
       console.log('📤 Course name (sanitized):', courseName);
       console.log('📤 Module number:', moduleNumber);
       console.log('📤 File:', file.name, file.size, 'bytes');
       console.log('📤 File type:', file.type);
 
-      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'POST',
-        body: formDataToSend,
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const courseId = editingCourse?._id || null;
+      const videoUrl = await uploadVideoMultipart(
+        file,
+        courseName,
+        moduleNumber,
+        formData.modules[moduleIndex]?.name || null,
+        courseId
+      );
 
-      console.log('📤 Upload response status:', uploadResponse.status);
-      console.log('📤 Upload response headers:', Object.fromEntries(uploadResponse.headers.entries()));
-
-      if (!uploadResponse.ok) {
-        let errorData;
-        try {
-          errorData = await uploadResponse.json();
-        } catch (e) {
-          errorData = { error: `HTTP ${uploadResponse.status}: ${uploadResponse.statusText}` };
-        }
-        console.error('❌ Upload failed:', errorData);
-        throw new Error(errorData.error || `Failed to upload video: ${uploadResponse.statusText}`);
-      }
-
-      const uploadResult = await uploadResponse.json();
-      console.log('✅ Upload result:', uploadResult);
+      console.log('✅ Upload result:', { url: videoUrl });
       
       // Validate upload result
-      if (!uploadResult.video?.url && !uploadResult.videoUrl) {
-        console.error('❌ Upload result missing video URL:', uploadResult);
+      if (!videoUrl) {
+        console.error('❌ Upload result missing video URL');
         throw new Error('Upload succeeded but no video URL returned');
       }
       
-      const videoUrl = uploadResult.video?.url || uploadResult.videoUrl;
       console.log('✅ Video URL:', videoUrl);
       
       // Update module with video URL (using same structure as admincourses)
@@ -774,8 +900,8 @@ const CreateCommonCourses = () => {
           name: file.name,
           size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
           type: file.type,
-          s3Key: uploadResult.video?.s3Key,
-          uploadedAt: uploadResult.video?.uploadedAt || new Date().toISOString(),
+          s3Key: null, // s3Key not available from multipart upload response
+          uploadedAt: new Date().toISOString(),
           pendingUpload: false
         }
       };
@@ -1246,120 +1372,26 @@ const CreateCommonCourses = () => {
       if (videosToUpload.length > 0) {
         console.log('📤 Step 2: Uploading videos FIRST (blocking) before saving course...');
         
-        // Upload function using XMLHttpRequest (more reliable for large files than fetch)
-        const uploadWithRetry = async (videoFile, uploadUrl, moduleName, maxRetries = 5) => {
-          for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-              console.log(`📤 Attempt ${attempt}/${maxRetries} for "${moduleName}"`);
-              console.log(`📤 File size: ${(videoFile.size / 1024 / 1024).toFixed(2)} MB`);
         
-              return new Promise((resolve, reject) => {
-                const xhr = new XMLHttpRequest();
-                const formData = new FormData();
-                formData.append("video", videoFile);
-        
-                xhr.timeout = 7200000; // 2 hours (7200 seconds) - matches nginx/backend timeout
-        
-                xhr.upload.onprogress = (e) => {
-                  if (e.lengthComputable) {
-                    const percentComplete = (e.loaded / e.total) * 100;
-                    if (percentComplete % 25 === 0 || percentComplete === 100) {
-                      console.log(`📤 Upload Progress "${moduleName}": ${percentComplete.toFixed(1)}%`);
-                    }
-                  }
-                };
-        
-                xhr.onload = () => {
-                  if (xhr.status >= 200 && xhr.status < 300) {
-                    try {
-                      const res = JSON.parse(xhr.responseText);
-                      const videoUrl = res.video?.url || res.videoUrl;
-                      if (!videoUrl) return reject(new Error("Server returned no video URL"));
-                      console.log(`✅ Upload success for ${moduleName}: ${videoUrl}`);
-                      resolve(videoUrl);
-          } catch (err) {
-                      console.error("❌ JSON parse error", err);
-                      reject(new Error("Invalid upload response"));
-                    }
-                  } else {
-                    reject(new Error(`Upload failed: HTTP ${xhr.status}`));
-          }
-                };
-        
-                xhr.onerror = (e) => {
-                  console.error(`❌ XHR Error for "${moduleName}":`, e);
-                  console.error(`❌ XHR Status: ${xhr.status}, ReadyState: ${xhr.readyState}`);
-                  reject(new Error(`Network error / Connection reset (Status: ${xhr.status || 'unknown'})`));
-                };
-                xhr.ontimeout = () => {
-                  console.error(`❌ Upload timeout for "${moduleName}" after ${xhr.timeout}ms`);
-                  reject(new Error(`Upload timeout after ${(xhr.timeout / 1000 / 60).toFixed(1)} minutes`));
-                };
-                xhr.onabort = () => {
-                  console.error(`❌ Upload aborted for "${moduleName}"`);
-                  reject(new Error("Upload aborted by user or browser"));
-                };
-        
-                // Convert to relative URL if needed (for production)
-                let finalUploadUrl = uploadUrl;
-                const isProduction = window.location.hostname !== "localhost" &&
-                                     window.location.hostname !== "127.0.0.1";
-        
-                if (isProduction || uploadUrl.includes(':5000')) {
-                  try {
-                    if (uploadUrl.startsWith("/")) {
-                      finalUploadUrl = uploadUrl;
-                      console.log(`📤 Already relative URL: ${finalUploadUrl}`);
-                    } else {
-                      const urlObj = new URL(uploadUrl);
-                      finalUploadUrl = urlObj.pathname + urlObj.search;
-                      console.log(`📤 Converted to relative URL: ${finalUploadUrl} (from: ${uploadUrl})`);
-                    }
-                  } catch (e) {
-                    const pathMatch = uploadUrl.match(/\/api\/.*/);
-                    if (pathMatch) {
-                      finalUploadUrl = pathMatch[0];
-                      console.log(`📤 Extracted relative path: ${finalUploadUrl}`);
-                    } else {
-                      console.warn('⚠️ Could not convert URL, using original:', uploadUrl);
-                    }
-                  }
-                }
-        
-                console.log("📤 Final Upload URL:", finalUploadUrl);
-        
-                xhr.open("POST", finalUploadUrl);
-                xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-                xhr.send(formData);
-              });
-        
-            } catch (err) {
-              console.error(`❌ Attempt ${attempt} failed:`, err.message);
-        
-              if (attempt === maxRetries) throw err;
-        
-              // Exponential backoff with jitter
-              const delay = Math.min(1000 * 2 ** (attempt - 1) + Math.random() * 1000, 30000);
-              console.log(`⏳ Retrying in ${(delay / 1000).toFixed(1)}s...`);
-              await new Promise((r) => setTimeout(r, delay));
-            }
-          }
-        };
-        
-        // Upload all videos in parallel
+        // Upload all videos in parallel using multipart upload
         const uploadPromises = videosToUpload.map(({ index, module, videoFile, moduleNumber }) => {
           return (async () => {
             try {
               // For new courses, don't include courseId (will be set after course creation)
               // For editing, include courseId if available
-              const courseIdParam = editingCourse?._id ? `?courseId=${editingCourse._id}` : '';
-              const uploadUrl = `${API_ENDPOINTS.VIDEOS.UPLOAD}/${encodeURIComponent(courseName)}/${moduleNumber}${courseIdParam}`;
+              const courseId = editingCourse?._id || null;
               
-              console.log(`📤 Starting upload for module "${module.name}" (m_id: ${module.m_id})`);
-              console.log(`📤 Course ID: ${editingCourse?._id || 'NEW (will be set after course creation)'}`);
+              console.log(`📤 Starting multipart upload for module "${module.name}" (m_id: ${module.m_id})`);
+              console.log(`📤 Course ID: ${courseId || 'NEW (will be set after course creation)'}`);
               console.log(`📤 File size: ${(videoFile.size / 1024 / 1024).toFixed(2)} MB`);
               
-              const videoUrl = await uploadWithRetry(videoFile, uploadUrl, module.name, 5);
+              const videoUrl = await uploadVideoMultipart(
+                videoFile,
+                courseName,
+                moduleNumber,
+                module.name,
+                courseId
+              );
               
               // Update the module with the video URL
               updatedModules[index] = {
@@ -1378,7 +1410,7 @@ const CreateCommonCourses = () => {
                 moduleNumber
               };
             } catch (err) {
-              console.error(`❌ Video upload failed for module "${module.name}" after retries:`, err);
+              console.error(`❌ Video upload failed for module "${module.name}":`, err);
               throw new Error(`Failed to upload video for module "${module.name}": ${err.message}`);
         }
           })();

@@ -7,11 +7,8 @@ const API_CONFIG = {
   production: {
     // In production, use relative URL to go through proxy (nginx/apache)
     // This avoids direct port 5000 connections that get reset
-    
-  BASE_URL: 'http://16.16.205.98:5000', // Your EC2 public URL
-  API_PREFIX: '/api'
-
-
+    BASE_URL: '', // Empty string = relative URLs (goes through nginx proxy)
+    API_PREFIX: '/api'
   }
 };
 
@@ -101,7 +98,13 @@ export const API_ENDPOINTS = {
   },
   VIDEOS: {
     UPLOAD: `${API_BASE_URL}/videos/upload-video`,
-    HEALTH: `${API_BASE_URL}/videos/health`
+    HEALTH: `${API_BASE_URL}/videos/health`,
+    MULTIPART: {
+      CREATE: `${API_BASE_URL}/videos/multipart/create`,
+      PRESIGNED_URL: `${API_BASE_URL}/videos/multipart/presigned-url`,
+      COMPLETE: `${API_BASE_URL}/videos/multipart/complete`,
+      ABORT: `${API_BASE_URL}/videos/multipart/abort`
+    }
   },
   UPLOAD: {
     QUIZ_IMAGE: `${API_BASE_URL}/upload/upload-quiz-image`,
